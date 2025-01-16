@@ -95,7 +95,7 @@ python = ["3.13", ]
 
 [tool.hatch.envs.hatch-static-analysis]
 # https://hatch.pypa.io/latest/how-to/static-analysis/behavior/
-dependencies = ["black", "flake8", "isort"]
+dependencies = ["black", "flake8", "isort", "pyupgrade"]
 
 [tool.hatch.envs.hatch-static-analysis.scripts]
 format-check = [
@@ -103,8 +103,7 @@ format-check = [
     "isort --check-only --diff {args:.}",
 ]
 format-fix = [
-    "isort {args:.}",
-    "black {args:.}",
+    "bash scripts/format.sh", # run as: hatch fmt -f
 ]
 lint-check = "flake8 --max-line-length 120 {args:.}"
 lint-fix = "lint-check"
