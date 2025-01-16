@@ -1,0 +1,116 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [
+    "hatchling>=1.18",
+    "hatch-vcs>=0.4",
+]
+
+[project]
+name = "Lancet"
+dynamic = ["version"]
+description = "OCR snipping tool for reading manga."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { file = "LICENSE" }
+keywords = ["AJATT", "OCR"]
+authors = [
+    { name = "Ajatt-Tools and contributors" },
+]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+    "PyQt6>=6.8.0",
+    "pillow>=11.1.0",
+    "pynput>=1.7.7",
+    "manga-ocr>=0.1.14",
+]
+
+[project.urls]
+Documentation = "https://github.com/Ajatt-Tools/lancet#readme"
+Issues = "https://github.com/Ajatt-Tools/lancet/issues"
+Source = "https://github.com/Ajatt-Tools/lancet"
+
+[project.scripts]
+lancet = "lancet.__main__:main"
+
+[tool.hatch.version]
+source = "vcs"
+path = "lancet/__about__.py"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "lancet/__about__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+    "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/lancet tests}"
+
+[tool.coverage.run]
+source_pkgs = ["lancet", "tests"]
+branch = true
+parallel = true
+omit = [
+    "lancet/__about__.py",
+]
+
+[tool.coverage.paths]
+lancet = ["src/lancet", "*/lancet/src/lancet"]
+tests = ["tests", "*/lancet/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "no cov",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py313']
+
+[tool.isort]
+profile = "black"
+
+[tool.hatch.envs.hatch-test]
+# https://hatch.pypa.io/latest/config/internal/testing/
+# https://hatch.pypa.io/latest/tutorials/testing/overview/
+dependencies = [
+    "mypy>=1.0.0",
+    "pytest",
+    "pytest-asyncio",
+]
+parallel = true
+randomize = true
+
+[[tool.hatch.envs.hatch-test.matrix]]
+# https://hatch.pypa.io/latest/tutorials/testing/overview/#testing-projects
+python = ["3.13", ]
+
+[tool.hatch.envs.hatch-static-analysis]
+# https://hatch.pypa.io/latest/how-to/static-analysis/behavior/
+dependencies = ["black", "flake8", "isort"]
+
+[tool.hatch.envs.hatch-static-analysis.scripts]
+format-check = [
+    "black --check --diff {args:.}",
+    "isort --check-only --diff {args:.}",
+]
+format-fix = [
+    "isort {args:.}",
+    "black {args:.}",
+]
+lint-check = "flake8 --max-line-length 120 {args:.}"
+lint-fix = "lint-check"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "session"
+filterwarnings = [
+    "ignore:There is no current event loop",
+]
