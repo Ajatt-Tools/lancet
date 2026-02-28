@@ -1,9 +1,8 @@
-"""
-Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
-License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""
-
+# Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
+# License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import pathlib
 from io import BytesIO
+from threading import Thread
 from typing import Self
 
 from PIL import Image
@@ -25,28 +24,31 @@ class MangaOCRException(Exception):
 
 
 class MangaOCRLauncher(Singleton):
+    _thread:Thread | None
+
     def __init__(
             self,
-            pretrained_model_name_or_path: str = "kha-white/manga-ocr-base",
+            pretrained_model_name_or_path: str | pathlib.Path = "tatsumoto/manga-ocr-base",
             force_cpu: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         self._pretrained_model_name_or_path = pretrained_model_name_or_path
         self._force_cpu = force_cpu
         self._class_instance = None
+        self._thread = None
 
     def init_model(self) -> Self:
-        from manga_ocr import MangaOcr
-
+        from lancet.ocr.manga_ocr import MangaOcr
         self._class_instance = MangaOcr(
-            pretrained_model_name_or_path=self._pretrained_model_name_or_path, force_cpu=self._force_cpu
+            pretrained_model_name_or_path=self._pretrained_model_name_or_path,
+            force_cpu=self._force_cpu,
         )
         return self
 
-    def run_image_ocr(self, img_or_path) -> str:
+    def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
         if self._class_instance is None:
             raise MangaOCRException("ocr model should be initialized")
-        return self._class_instance(img_or_path)  # run __call__()
+        return self._class_instance.recognize(img_or_path)
 
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image | None:
@@ -70,4 +72,4 @@ def run_ocr(pixmap: QPixmap, model: MangaOCRLauncher | None = None) -> str:
     image = pixmap_to_pillow_image(pixmap)
     if not image:
         return ""
-    return model.run_image_ocr(image).strip()
+    return model.recognize(image).strip()
