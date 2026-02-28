@@ -11,21 +11,23 @@ from PIL import Image
 from loguru import logger
 from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel, GenerationMixin
 
+from lancet.ocr.manga_ocr_base import MangaOcrBase
+
 
 class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
     pass
 
 
-class MangaOcr:
+class MangaOcr(MangaOcrBase):
     # possible options for pretrained_model_name_or_path:
     # "tatsumoto/manga-ocr-base"
     # "jzhang533/manga-ocr-base-2025"
     # "kha-white/manga-ocr-base" (not a safetensors model, not recommended)
 
     def __init__(
-            self,
-            pretrained_model_name_or_path: pathlib.Path | str = "tatsumoto/manga-ocr-base",
-            force_cpu: bool = False,
+        self,
+        pretrained_model_name_or_path: pathlib.Path | str = "tatsumoto/manga-ocr-base",
+        force_cpu: bool = False,
     ) -> None:
         logger.info(f"Loading OCR model from {pretrained_model_name_or_path}")
         self.processor = ViTImageProcessor.from_pretrained(pretrained_model_name_or_path)

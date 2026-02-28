@@ -2,53 +2,64 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import pathlib
 from io import BytesIO
-from threading import Thread
-from typing import Self
 
 from PIL import Image
-from PyQt6.QtCore import QBuffer
+from PyQt6.QtCore import QBuffer, QThreadPool, QObject
 from PyQt6.QtGui import QPixmap
+from loguru import logger
+
+from lancet.ocr.manga_ocr_base import MangaOcrBase
+from lancet.ocr.op import QThreadPoolOp, MangaOCRException
 
 
-class Singleton:
-    _instance: None | Self = None
-
-    def __new__(cls, *args, **kwargs) -> Self:
-        if not isinstance(cls._instance, cls):
-            cls._instance = object.__new__(cls, *args, **kwargs)
-        return cls._instance
-
-
-class MangaOCRException(Exception):
-    pass
-
-
-class MangaOCRLauncher(Singleton):
-    _thread:Thread | None
+class MangaOCRLauncher:
+    _class_instance: MangaOcrBase | None = None
 
     def __init__(
-            self,
-            pretrained_model_name_or_path: str | pathlib.Path = "tatsumoto/manga-ocr-base",
-            force_cpu: bool = False,
+        self,
+        parent: QObject,
+        threadpool: QThreadPool,
+        pretrained_model_name_or_path: str | pathlib.Path = "tatsumoto/manga-ocr-base",
+        force_cpu: bool = False,
     ) -> None:
         super().__init__()
+        self._parent = parent
+        self._threadpool = threadpool
         self._pretrained_model_name_or_path = pretrained_model_name_or_path
         self._force_cpu = force_cpu
         self._class_instance = None
-        self._thread = None
 
-    def init_model(self) -> Self:
-        from lancet.ocr.manga_ocr import MangaOcr
-        self._class_instance = MangaOcr(
-            pretrained_model_name_or_path=self._pretrained_model_name_or_path,
-            force_cpu=self._force_cpu,
+    def is_ready(self) -> bool:
+        return bool(self._class_instance)
+
+    def init_manga_ocr(self) -> None:
+        def op() -> MangaOcrBase:
+            from lancet.ocr.manga_ocr import MangaOcr
+
+            mocr = MangaOcr(
+                pretrained_model_name_or_path=self._pretrained_model_name_or_path,
+                force_cpu=self._force_cpu,
+            )
+            return mocr
+
+        def on_ready(model: MangaOcrBase) -> None:
+            self._class_instance = model
+
+        def on_failed(e: Exception) -> None:
+            logger.error(f"failed to initialize manga ocr: {e}")
+
+        (
+            QThreadPoolOp(parent=self._parent, op=op, threadpool=self._threadpool)
+            .success(on_ready)
+            .failure(on_failed)
+            .run_in_background()
         )
-        return self
 
-    def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
-        if self._class_instance is None:
-            raise MangaOCRException("ocr model should be initialized")
-        return self._class_instance.recognize(img_or_path)
+    @property
+    def instance(self) -> MangaOcrBase:
+        if not self._class_instance:
+            raise MangaOCRException("ocr model is not initialized")
+        return self._class_instance
 
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image | None:
@@ -63,13 +74,11 @@ def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image | None:
     return Image.open(bytes_io)
 
 
-def run_ocr(pixmap: QPixmap, model: MangaOCRLauncher | None = None) -> str:
+def run_ocr(pixmap: QPixmap, model: MangaOCRLauncher) -> str:
     """
     Convert QPixmap object to text using the OCR model
     """
-    if not model:
-        return ""
     image = pixmap_to_pillow_image(pixmap)
     if not image:
         return ""
-    return model.recognize(image).strip()
+    return model.instance.recognize(image).strip()
