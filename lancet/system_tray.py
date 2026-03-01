@@ -32,10 +32,12 @@ from lancet.preferences import PreferencesDialog, SettingsApplyResult
 
 
 def make_output_file_path() -> pathlib.Path:
+    """Generate a timestamped file path under ~/Pictures/Screenshots for saving a screenshot."""
     return pathlib.Path.home() / "Pictures" / "Screenshots" / f"{datetime.datetime.now().isoformat()}.png"
 
 
 def format_hotkey(menu_label: str, keyboard_shortcut: str) -> str:
+    """Append the keyboard shortcut in parentheses to the menu label, if one is set."""
     if keyboard_shortcut:
         return f"{menu_label} ({keyboard_shortcut})"
     return menu_label
@@ -54,6 +56,7 @@ class LancetSystemTray(QSystemTrayIcon):
     _hotkeys: LancetShortcutManager | None = None
 
     def __init__(self, app: QApplication, parent: QWidget | None = None) -> None:
+        """Set up the system tray icon, context menu, OCR model, and keyboard shortcuts."""
         super().__init__(parent)
         self._app = app
         self._scr = ZalaScreenshot(app)
@@ -102,6 +105,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._load_keyboard_shortcuts()
 
     def _load_keyboard_shortcuts(self) -> None:
+        """Stop any existing hotkey listener and start a new one from the current config."""
         self._stop_hotkeys()
 
         try:
@@ -113,6 +117,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._hotkeys.signals.shortcut_activated.connect(self.process_keyboard_shortcut)
 
     def get_keyboard_shortcuts(self) -> dict[LancetShortcutEnum, KeyboardShortcut]:
+        """Return a mapping of shortcut actions to their key combinations, excluding empty ones."""
         hotkey_dict = {
             LancetShortcutEnum.ocr_shortcut: self._cfg.ocr_shortcut,
             LancetShortcutEnum.screenshot_shortcut: self._cfg.screenshot_shortcut,
@@ -121,6 +126,7 @@ class LancetSystemTray(QSystemTrayIcon):
         return {k: v for k, v in hotkey_dict.items() if v}
 
     def process_keyboard_shortcut(self, shortcut: LancetShortcutEnum) -> None:
+        """Dispatch a keyboard shortcut event to the corresponding action."""
         match shortcut:
             case LancetShortcutEnum.ocr_shortcut:
                 self.make_ocr_screenshot()
@@ -128,43 +134,52 @@ class LancetSystemTray(QSystemTrayIcon):
                 self.make_screenshot_area()
 
     def open_preferences(self) -> None:
+        """Open the preferences dialog and reload shortcuts if settings are applied."""
         dialog = PreferencesDialog(self._cfg)
         dialog.settings_applied.connect(self._on_settings_changed)
         dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
+        """Handle the result of applying settings, reloading shortcuts on success."""
         if settings_applied.success:
             self._load_keyboard_shortcuts()
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
 
     def _stop_hotkeys(self) -> None:
+        """Stop and discard the current hotkey listener if one is active."""
         if self._hotkeys:
             self._hotkeys.stop()
             self._hotkeys = None
 
     def restart(self) -> None:
+        """Restart the application by replacing the current process with a fresh instance."""
+        # https://docs.python.org/3.14/library/os.html#os.execv
         logger.info("Restarting Lancet.")
         self._stop_hotkeys()
         self._app.quit()
         os.execv(sys.executable, [sys.executable, *sys.argv])
 
     def quit(self) -> None:
+        """Stop hotkeys and quit the application."""
         logger.info("Quit Lancet.")
         self._stop_hotkeys()
         self._app.quit()
 
     def make_screenshot_area(self) -> None:
+        """Open the full-screen selection overlay for taking an area screenshot."""
         self._sel = ZalaSelect(self._scr.capture_screen())
         self._sel.selection_finished.connect(self.process_select_result)
         self._sel.showFullScreen()
 
     def make_ocr_screenshot(self) -> None:
+        """Open the full-screen selection overlay for OCR recognition of the selected area."""
         self._sel = ZalaSelect(self._scr.capture_screen())
         self._sel.selection_finished.connect(self.process_ocr_result)
         self._sel.showFullScreen()
 
     def process_select_result(self, user_selection: UserSelectionResult) -> None:
+        """Save the user's screenshot selection to a file."""
         if not user_selection.pixmap:
             self._notify.notify("Selection aborted")
             return
@@ -176,6 +191,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"Failed to save selection to {output_path}")
 
     def process_ocr_result(self, user_selection: UserSelectionResult) -> None:
+        """Run OCR on the user's selection in a background thread and handle the result."""
         if not user_selection.pixmap:
             self._notify.notify(user_selection.error.capitalize())
             return
@@ -202,6 +218,7 @@ class LancetSystemTray(QSystemTrayIcon):
         )
 
     def copy_ocr_result(self, text: str) -> None:
+        """Send the OCR result to the configured destination (clipboard or GoldenDict)."""
         match self._cfg.copy_to:
             case OcrDestination.goldendict:
                 run_and_disown([find_executable("goldendict") or "goldendict", text])

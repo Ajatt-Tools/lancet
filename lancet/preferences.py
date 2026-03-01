@@ -27,19 +27,25 @@ from lancet.gui.ocr_model_list import ModelListEditor
 
 @dataclasses.dataclass(frozen=True)
 class SettingsApplyResult:
+    """Holds the outcome of applying settings: success flag and optional error."""
+
     success: bool = False
     error: Exception | None = None
 
 
 def ui_translate(key: str) -> str:
+    """Convert a snake_case config key to a human-readable label."""
     return key.capitalize().replace("_", " ")
 
 
 class SecondsSpinBox(QSpinBox):
+    """A spin box pre-configured for selecting a duration in seconds."""
+
     min: int = 1
     max: int = 120
 
     def __init__(self, initial_value: int, parent: QWidget | None = None) -> None:
+        """Initialize the spin box with range, suffix, and initial value."""
         super().__init__(parent)
         self.setRange(self.min, self.max)
         self.setSuffix(" seconds")
@@ -47,6 +53,8 @@ class SecondsSpinBox(QSpinBox):
 
 
 class FormWidgets:
+    """Container holding all form widgets used in the preferences dialog."""
+
     copy_to: EnumSelectCombo
     notification_duration: SecondsSpinBox
     huggingface_model: ModelListEditor
@@ -61,6 +69,7 @@ class PreferencesDialog(QDialog):
     settings_applied = pyqtSignal(SettingsApplyResult)
 
     def __init__(self, cfg: Config, parent: QWidget | None = None) -> None:
+        """Initialize the dialog, creating form widgets for each config field."""
         super().__init__(parent)
         self._cfg = cfg
 
@@ -106,12 +115,14 @@ class PreferencesDialog(QDialog):
         main_layout.addWidget(self._button_box)
 
     def _make_settings_layout(self) -> QLayout:
+        """Build a form layout with labeled rows for each settings widget."""
         layout = QFormLayout()
         for key, widget in self._widgets.__dict__.items():
             layout.addRow(ui_translate(key), widget)
         return layout
 
     def _on_button_clicked(self, button: QAbstractButton) -> None:
+        """Route button clicks to the appropriate action based on the button's role."""
         match self._button_box.buttonRole(button):
             case QDialogButtonBox.ButtonRole.ApplyRole:
                 self._apply()
@@ -121,6 +132,7 @@ class PreferencesDialog(QDialog):
                 self._restore_defaults()
 
     def _apply(self) -> None:
+        """Write current widget values back to the config and save to disk."""
         self._cfg.copy_to = self._widgets.copy_to.currentData()
         self._cfg.notification_duration_sec = self._widgets.notification_duration.value()
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
@@ -137,6 +149,7 @@ class PreferencesDialog(QDialog):
         self.accept()
 
     def _restore_defaults(self) -> None:
+        """Reset all form widgets to the default config values."""
         defaults = Config()
         self._widgets.copy_to.set_current(defaults.copy_to)
         self._widgets.notification_duration.setValue(defaults.notification_duration_sec)
@@ -148,6 +161,7 @@ class PreferencesDialog(QDialog):
 
 
 def playground() -> None:
+    """Launch the preferences dialog standalone for testing."""
     app = QApplication(sys.argv)
     cfg = Config.read_from_file()
     form = PreferencesDialog(cfg)

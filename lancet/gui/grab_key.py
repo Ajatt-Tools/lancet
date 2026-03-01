@@ -10,6 +10,7 @@ from zala.utils import qconnect
 
 
 def mod_mask_qt6() -> Qt.KeyboardModifier:
+    """Return a bitmask combining all supported keyboard modifiers."""
     return (
         Qt.KeyboardModifier.ControlModifier
         | Qt.KeyboardModifier.AltModifier
@@ -19,6 +20,7 @@ def mod_mask_qt6() -> Qt.KeyboardModifier:
 
 
 def forbidden_keys() -> Sequence[Qt.Key]:
+    """Return the keys that should not be accepted as standalone shortcut keys."""
     return (
         Qt.Key.Key_Shift,
         Qt.Key.Key_Alt,
@@ -28,17 +30,22 @@ def forbidden_keys() -> Sequence[Qt.Key]:
 
 
 def modifiers_allowed(modifiers: Qt.KeyboardModifier) -> bool:
+    """Check whether the given modifiers consist only of allowed modifier keys."""
     return modifiers & mod_mask_qt6() == modifiers  # Qt6
 
 
 def to_int(modifiers: Qt.KeyboardModifier) -> int:
+    """Convert a Qt keyboard modifier flag to its integer value."""
     return int(modifiers.value)  # Qt6
 
 
 class KeyPressDialog(QDialog):
+    """A modal dialog that captures a key combination from the user."""
+
     value_accepted = pyqtSignal(str)
 
     def __init__(self, parent: QWidget | None = None, initial_value: str = "", *args, **kwargs) -> None:
+        """Initialize the dialog with an optional initial shortcut value."""
         super().__init__(parent, *args, **kwargs)
         self._shortcut = initial_value
         self.setMinimumSize(380, 64)
@@ -47,6 +54,7 @@ class KeyPressDialog(QDialog):
 
     @staticmethod
     def _make_layout() -> QLayout:
+        """Create the dialog layout with an instruction label."""
         label = QLabel(
             "Please press the key combination you would like to assign.\n"
             "Supported modifiers: CTRL, ALT, SHIFT or META.\n"
@@ -58,17 +66,21 @@ class KeyPressDialog(QDialog):
         return layout
 
     def _accept_new_shortcut(self, value: str) -> None:
+        """Set the shortcut and close the dialog with an accepted result."""
         self.set_shortcut(value)
         self.accept()
 
     def set_shortcut(self, value: str) -> None:
+        """Update the stored shortcut and emit the value_accepted signal."""
         self._shortcut = value
         self.value_accepted.emit(value)  # type: ignore
 
     def current_shortcut(self) -> str:
+        """Return the currently assigned shortcut string."""
         return self._shortcut
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Handle key presses: ESC clears the shortcut, valid modifier+key combos are accepted."""
         # https://stackoverflow.com/questions/35033116
         # https://doc.qt.io/qt-6/qdialog.html#keyPressEvent
         key = int(event.key())
@@ -81,9 +93,12 @@ class KeyPressDialog(QDialog):
 
 
 class ShortCutGrabButton(QPushButton):
+    """A button that opens a key grab dialog when clicked and displays the assigned shortcut."""
+
     _placeholder = "[Not assigned]"
 
     def __init__(self, initial_value: str | None = None) -> None:
+        """Initialize the button with an optional shortcut and connect it to the grab dialog."""
         super().__init__(initial_value or self._placeholder)
         self._dialog = KeyPressDialog(self, initial_value or "")
         qconnect(self.clicked, self._dialog.exec)
@@ -93,13 +108,16 @@ class ShortCutGrabButton(QPushButton):
         )
 
     def set_keyboard_shortcut(self, value: str) -> None:
+        """Programmatically set the keyboard shortcut."""
         self._dialog.set_shortcut(value.strip())
 
     def current_shortcut(self) -> str:
+        """Return the currently assigned shortcut, or an empty string if none."""
         return self._dialog.current_shortcut() or ""
 
 
 def detect_keypress() -> None:
+    """Launch a test dialog for experimenting with keyboard shortcut capture."""
     app = QApplication(sys.argv)
     w = QDialog()
     w.setWindowTitle("Test")

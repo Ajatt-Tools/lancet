@@ -14,6 +14,11 @@ from lancet.ocr.op import QThreadPoolOp
 
 
 class MangaOCRLauncher:
+    """
+    Manages the lifecycle of the manga OCR model, handling background initialization and readiness checks.
+    Used to wrap the MangaOcr class since it is extremely slow to import.
+    """
+
     _class_instance: MangaOcrBase | None = None
 
     def __init__(
@@ -24,6 +29,7 @@ class MangaOCRLauncher:
         pretrained_model_name_or_path: str | pathlib.Path = "tatsumoto/manga-ocr-base",
         force_cpu: bool = False,
     ) -> None:
+        """Initialize the launcher with configuration for model loading."""
         super().__init__()
         self._parent = parent
         self._notify = notify
@@ -33,9 +39,12 @@ class MangaOCRLauncher:
         self._class_instance = None
 
     def is_ready(self) -> bool:
+        """Return whether the OCR model has been loaded and is ready to use."""
         return bool(self._class_instance)
 
     def init_manga_ocr(self) -> None:
+        """Start loading the OCR model in a background thread."""
+
         def op() -> MangaOcrBase:
             from lancet.ocr.manga_ocr import MangaOcr
 
@@ -62,12 +71,14 @@ class MangaOCRLauncher:
 
     @property
     def instance(self) -> MangaOcrBase:
+        """Return the loaded OCR model instance, raising an exception if not yet initialized."""
         if not self._class_instance:
             raise MangaOCRException("ocr model is not initialized")
         return self._class_instance
 
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image | None:
+    """Convert a Qt QPixmap to a PIL Image, returning None if the pixmap is empty."""
     buffer = QBuffer()
     buffer.open(QBuffer.OpenModeFlag.ReadWrite)
     pixmap.save(buffer, "PNG")

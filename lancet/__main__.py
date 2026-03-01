@@ -11,6 +11,7 @@ from lancet.system_tray import LancetSystemTray
 
 
 def main() -> None:
+    """Initialize and run the Lancet system tray application."""
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setWindowIcon(QIcon(str(APP_LOGO_PATH)))

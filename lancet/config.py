@@ -10,12 +10,16 @@ from lancet.ocr.manga_ocr_base import ConfigReadError
 
 
 class OcrDestination(enum.Enum):
+    """Enum for selecting where OCR results are sent."""
+
     goldendict = "goldendict"
     clipboard = "clipboard"
 
 
 @dataclasses.dataclass
 class Config:
+    """Application configuration with defaults, loaded from and saved to a JSON file."""
+
     copy_to: OcrDestination = OcrDestination.goldendict
     notification_duration_sec: int = 10
     huggingface_model_name: str = "tatsumoto/manga-ocr-base"
@@ -31,6 +35,7 @@ class Config:
 
     @classmethod
     def read_from_file(cls) -> Self:
+        """Read the config from the JSON file, returning defaults if the file does not exist."""
         try:
             with open(CFG_PATH, encoding="utf-8") as f:
                 data = json.load(f)
@@ -44,6 +49,7 @@ class Config:
             raise ConfigReadError(f"failed to parse config file: {ex}") from ex
 
     def save_to_file(self) -> None:
+        """Serialize the config to JSON and write it to the config file."""
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
         CFG_PATH.parent.mkdir(parents=True, exist_ok=True)

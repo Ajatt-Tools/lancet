@@ -16,6 +16,7 @@ HARDCODED_PATHS = (
 
 
 def find_executable_hardcoded(name: str) -> str | None:
+    """Search for an executable by name in a list of common installation directories."""
     for path_to_dir in HARDCODED_PATHS:
         if os.path.isfile(path_to_exe := os.path.join(path_to_dir, name)):
             return path_to_exe
@@ -32,6 +33,7 @@ def find_executable(name: str) -> str | None:
 
 
 def run_and_disown(args: Sequence[str]) -> None:
+    """Start a subprocess detached from the current process group so it survives application exit."""
     subprocess.Popen(
         args,
         shell=False,

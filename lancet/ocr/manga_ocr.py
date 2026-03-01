@@ -14,10 +14,17 @@ from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRFileNotFoundError, M
 
 
 class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
+    """Combined vision encoder-decoder model with generation capabilities for manga OCR."""
+
     pass
 
 
 class MangaOcr(MangaOcrBase):
+    """
+    Manga OCR implementation that uses a HuggingFace vision encoder-decoder model
+    to recognize Japanese text in manga images.
+    """
+
     # possible options for pretrained_model_name_or_path:
     # "tatsumoto/manga-ocr-base"
     # "jzhang533/manga-ocr-base-2025"
@@ -28,6 +35,7 @@ class MangaOcr(MangaOcrBase):
         pretrained_model_name_or_path: pathlib.Path | str = "tatsumoto/manga-ocr-base",
         force_cpu: bool = False,
     ) -> None:
+        """Load the OCR model, tokenizer, and processor, then verify with an example image."""
         logger.info(f"Loading OCR model from {pretrained_model_name_or_path}")
         self.processor = ViTImageProcessor.from_pretrained(pretrained_model_name_or_path)
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
@@ -49,6 +57,7 @@ class MangaOcr(MangaOcrBase):
         logger.info("OCR ready")
 
     def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
+        """Recognize Japanese text in the given image or image file path."""
         if isinstance(img_or_path, str) or isinstance(img_or_path, pathlib.Path):
             img = Image.open(img_or_path)
         elif isinstance(img_or_path, Image.Image):
@@ -65,11 +74,13 @@ class MangaOcr(MangaOcrBase):
         return x
 
     def _preprocess(self, img: Image.Image) -> torch.Tensor:
+        """Convert a PIL image to a tensor suitable for the model's input."""
         pixel_values = self.processor(img, return_tensors="pt").pixel_values
         return pixel_values.squeeze()
 
 
 def post_process(text: str) -> str:
+    """Clean up OCR output by normalizing whitespace, punctuation, and converting to full-width characters."""
     text = "".join(text.split())
     text = text.replace("...", "…")
     text = re.sub("[・.]{2,}", lambda x: (x.end() - x.start()) * ".", text)
@@ -79,6 +90,7 @@ def post_process(text: str) -> str:
 
 
 def main() -> None:
+    """Create a MangaOcr instance for testing purposes."""
     mocr = MangaOcr()
 
 

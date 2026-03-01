@@ -38,11 +38,15 @@ def to_pynput_hotkey(shortcut: str) -> str:
 
 
 class LancetShortcutEnum(enum.Enum):
+    """Enum identifying the available keyboard shortcut actions."""
+
     ocr_shortcut = enum.auto()
     screenshot_shortcut = enum.auto()
 
 
 class LancetShortcutSignals(QObject):
+    """Qt signals emitted when a global keyboard shortcut is activated."""
+
     shortcut_activated = pyqtSignal(LancetShortcutEnum)
 
 
@@ -50,7 +54,10 @@ type KeyboardShortcut = str
 
 
 class LancetShortcutManager(GlobalHotKeys):
+    """Listens for global keyboard shortcuts and emits Qt signals when they are pressed."""
+
     def __init__(self, keyboard_shortcuts: dict[LancetShortcutEnum, KeyboardShortcut], *args, **kwargs) -> None:
+        """Initialize the manager by converting shortcuts to pynput format and registering them."""
         hotkeys_dict = {
             to_pynput_hotkey(shortcut): functools.partial(self.on_shortcut_activated, action_name)
             for action_name, shortcut in keyboard_shortcuts.items()
@@ -59,4 +66,5 @@ class LancetShortcutManager(GlobalHotKeys):
         self.signals = LancetShortcutSignals()
 
     def on_shortcut_activated(self, action_name: LancetShortcutEnum) -> None:
+        """Emit the shortcut_activated signal for the given action."""
         q_emit(self.signals.shortcut_activated, action_name)
