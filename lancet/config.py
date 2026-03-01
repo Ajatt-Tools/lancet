@@ -46,5 +46,6 @@ class Config:
     def save_to_file(self) -> None:
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
+        CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CFG_PATH, "w", encoding="utf-8") as of:
             json.dump(data, of, ensure_ascii=False, indent=4)

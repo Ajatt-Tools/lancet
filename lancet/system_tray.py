@@ -19,6 +19,7 @@ from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum,
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
 from lancet.ocr.op import QThreadPoolOp
+from lancet.preferences import PreferencesDialog, SettingsApplyResult
 
 
 def make_output_file_path() -> pathlib.Path:
@@ -74,6 +75,8 @@ class LancetSystemTray(QSystemTrayIcon):
             format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
             self.make_ocr_screenshot,
         )
+        menu.addSeparator()
+        menu.addAction("Preferences…", self.open_preferences)
         menu.addAction(
             QIcon(str(EXIT_ICON_PATH)),
             "Exit",
@@ -111,6 +114,17 @@ class LancetSystemTray(QSystemTrayIcon):
                 self.make_ocr_screenshot()
             case LancetShortcutEnum.screenshot_shortcut:
                 self.make_screenshot_area()
+
+    def open_preferences(self) -> None:
+        dialog = PreferencesDialog(self._cfg)
+        dialog.settings_applied.connect(self._on_settings_changed)
+        dialog.exec()
+
+    def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
+        if settings_applied.success:
+            self.load_keyboard_shortcuts()
+        else:
+            self._notify.notify(f"failed to apply config: {settings_applied.error}")
 
     def quit(self) -> None:
         logger.info("Quit Lancet.")
