@@ -6,15 +6,16 @@ import pathlib
 import signal
 
 from PyQt6.QtCore import QThreadPool
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu
 from loguru import logger
 from zala.main_window import ZalaSelect, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 
 from lancet.consts import APP_LOGO_PATH, SCREENSHOT_ICON_PATH, EXIT_ICON_PATH, APP_NAME, OCR_ICON_PATH
-
+from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
+from lancet.ocr.op import QThreadPoolOp
 
 
 def make_output_file_path() -> pathlib.Path:
@@ -39,6 +40,7 @@ class LancetSystemTray(QSystemTrayIcon):
         # State trackers and configurations
         self.threadpool = QThreadPool.globalInstance()
         self._ocr = MangaOCRLauncher(parent=self, threadpool=self.threadpool)
+        self._notify = NotifySend(self)
         # self.loadHotkeys()
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
         # Menu
@@ -69,25 +71,37 @@ class LancetSystemTray(QSystemTrayIcon):
         self._sel.showFullScreen()
 
     def process_select_result(self, user_selection: UserSelectionResult) -> None:
-        if user_selection is None:
-            self.showMessage(APP_NAME, "Selection aborted")
+        if not user_selection.pixmap:
+            self._notify.notify("Selection aborted")
             return
         output_path = make_output_file_path()
-        if user_selection.save(str(output_path)):
-            self.showMessage(APP_NAME, f"Selection saved to {output_path}")
+        if user_selection.pixmap.save(str(output_path)):
+            self._notify.notify(f"Selection saved to {output_path}")
         else:
-            self.showMessage(APP_NAME, f"Failed to save selection to {output_path}")
+            self._notify.notify(f"Failed to save selection to {output_path}")
 
     def process_ocr_result(self, user_selection: UserSelectionResult) -> None:
         if not user_selection.pixmap:
-            self.showMessage(APP_NAME, user_selection.error.capitalize())
+            self._notify.notify(user_selection.error.capitalize())
             return
         if not self._ocr.is_ready():
-            self.showMessage(APP_NAME, f"OCR model is not ready.")
+            self._notify.notify(f"OCR model is not ready.")
             return
-        text = run_ocr(user_selection.pixmap, self._ocr)
-        if text:
-            self._app.clipboard().setText(text)
-            self.showMessage(APP_NAME, f"OCR result copied: {text}")
-        else:
-            self.showMessage(APP_NAME, "OCR returned no text")
+
+        def on_ocr_finished(text: str) -> None:
+            if text:
+                self._app.clipboard().setText(text)
+                self._notify.notify(f"OCR result copied: {text}")
+            else:
+                self._notify.notify("OCR returned no text")
+
+        def on_failed(e: Exception) -> None:
+            logger.error(f"failed to recognize image: {e}")
+            self._notify.notify(f"failed to recognize image: {e}")
+
+        (
+            QThreadPoolOp(parent=self, op=lambda: run_ocr(user_selection.pixmap, self._ocr), threadpool=self.threadpool)
+            .success(on_ocr_finished)
+            .failure(on_failed)
+            .run_in_background()
+        )
