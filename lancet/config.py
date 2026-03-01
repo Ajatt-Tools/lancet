@@ -27,6 +27,7 @@ class Config:
     )
     force_cpu: bool = False
     ocr_shortcut: str = "Alt+O"
+    screenshot_shortcut: str = ""  # unset
 
     @classmethod
     def read_from_file(cls) -> Self:
