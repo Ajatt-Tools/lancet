@@ -94,8 +94,8 @@ class LancetSystemTray(QSystemTrayIcon):
         self.load_keyboard_shortcuts()
 
     def load_keyboard_shortcuts(self) -> None:
-        if self._hotkeys:
-            self._hotkeys.stop()
+        self._stop_hotkeys()
+
         try:
             self._hotkeys = LancetShortcutManager(self.get_keyboard_shortcuts())
         except Exception as e:
@@ -130,13 +130,20 @@ class LancetSystemTray(QSystemTrayIcon):
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
 
+    def _stop_hotkeys(self) -> None:
+        if self._hotkeys:
+            self._hotkeys.stop()
+            self._hotkeys = None
+
     def restart(self) -> None:
         logger.info("Restarting Lancet.")
+        self._stop_hotkeys()
         self._app.quit()
         os.execv(sys.executable, [sys.executable, *sys.argv])
 
     def quit(self) -> None:
         logger.info("Quit Lancet.")
+        self._stop_hotkeys()
         self._app.quit()
 
     def make_screenshot_area(self) -> None:
