@@ -1,5 +1,6 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+from typing import Self
 
 from PyQt6.QtWidgets import QSystemTrayIcon
 
@@ -16,7 +17,12 @@ class NotifySend:
         self._tray = tray
         self._duration_sec = duration_sec
 
-    def notify(self, msg: str) -> None:
+    def set_duration(self, duration_sec: int) -> Self:
+        """Update the notification display duration."""
+        self._duration_sec = duration_sec
+        return self
+
+    def notify(self, msg: str) -> Self:
         """Display a desktop notification with the given message."""
         if self._notify_send:
             msg = msg.replace("<", "&lt;").replace(">", "&gt;")
@@ -24,3 +30,4 @@ class NotifySend:
             run_and_disown([self._notify_send, APP_NAME, msg, "--expire-time", f"{self._duration_sec * 1_000}"])
         else:
             self._tray.showMessage(APP_NAME, msg)
+        return self

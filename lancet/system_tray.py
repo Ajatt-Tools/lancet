@@ -66,7 +66,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self.threadpool = QThreadPool.globalInstance()
         self._cfg = Config.read_from_file()
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
-        self._history = OcrHistory(self._cfg)
+        self._history = OcrHistory(self._cfg.max_history_size)
         self._ocr = MangaOCRLauncher(
             parent=self,
             notify=self._notify,
@@ -143,9 +143,12 @@ class LancetSystemTray(QSystemTrayIcon):
         dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
-        """Handle the result of applying settings, reloading shortcuts on success."""
+        """Handle the result of applying settings, reloading all affected components on success."""
         if settings_applied.success:
             self._load_keyboard_shortcuts()
+            self._notify.set_duration(self._cfg.notification_duration_sec)
+            self._history.set_max_size(self._cfg.max_history_size)
+            self._ocr.load_new_config(self._cfg.huggingface_model_name, self._cfg.force_cpu)
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
 

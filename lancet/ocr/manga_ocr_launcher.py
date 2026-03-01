@@ -38,6 +38,16 @@ class MangaOCRLauncher:
         self._force_cpu = force_cpu
         self._class_instance = None
 
+    def load_new_config(self, model_name: str, force_cpu: bool) -> None:
+        """Update model configuration and reload the model in the background if it changed."""
+        reload_needed = model_name != self._pretrained_model_name_or_path or force_cpu != self._force_cpu
+        self._pretrained_model_name_or_path = model_name
+        self._force_cpu = force_cpu
+        if reload_needed:
+            logger.info(f"OCR config changed, reloading model: {model_name}, force_cpu={force_cpu}")
+            self._class_instance = None
+            self.init_manga_ocr()
+
     def is_ready(self) -> bool:
         """Return whether the OCR model has been loaded and is ready to use."""
         return bool(self._class_instance)

@@ -4,8 +4,8 @@
 import collections
 import json
 from collections.abc import Sequence
+from typing import Self
 
-from lancet.config import Config
 from lancet.consts import HISTORY_FILE_PATH
 
 
@@ -24,43 +24,51 @@ def _load_history() -> list[str]:
 class OcrHistory:
     """Stores and retrieves a list of previous OCR results, persisted to a JSON file."""
 
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, max_history_size: int = 10) -> None:
         """Load the history from disk, or start with an empty list if the file does not exist."""
-        self._cfg = cfg
-        self._entries: collections.deque[str] = collections.deque(_load_history(), maxlen=cfg.max_history_size)
+        self._entries: collections.deque[str] = collections.deque(_load_history(), maxlen=max_history_size)
 
-    def _save_history(self) -> None:
+    def _save_history(self) -> Self:
         """Write the current history entries to the JSON file."""
         HISTORY_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(HISTORY_FILE_PATH, "w", encoding="utf-8") as f:
             json.dump(tuple(self._entries), f, ensure_ascii=False, indent=2)
+        return self
 
-    def add_to_history(self, text: str) -> None:
+    def add_to_history(self, text: str) -> Self:
         """Add a new OCR result to the beginning of the history and save."""
-        text = text.strip()
-        if not text:
-            return
-
-        self._entries.appendleft(text)
-        self._save_history()
+        if text := text.strip():
+            self._entries.appendleft(text)
+            self._save_history()
+        return self
 
     def entries(self) -> Sequence[str]:
         """Return all history entries, newest first."""
         return self._entries
 
-    def set_entries(self, entries: list[str]) -> None:
+    def set_max_size(self, max_size: int) -> Self:
+        """Update the maximum history size, trimming old entries if needed."""
+        self._entries = collections.deque(self._entries, maxlen=max_size)
+        self._save_history()
+        return self
+
+    def set_entries(self, entries: list[str]) -> Self:
+        """Replace all history entries and save."""
         self._entries.clear()
         self._entries.extend(entries)
         self._save_history()
+        return self
 
-    def clear(self) -> None:
+    def clear(self) -> Self:
         """Remove all history entries and save."""
         self._entries.clear()
         self._save_history()
+        return self
 
-    def remove(self, indices: Sequence[int]) -> None:
+    def remove(self, indices: Sequence[int]) -> Self:
         """Remove entries at the given indices and save."""
         for idx in sorted(indices, reverse=True):
             if 0 <= idx < len(self._entries):
                 del self._entries[idx]
         self._save_history()
+        return self
