@@ -17,7 +17,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QApplication,
     QAbstractButton,
-    QLayout, QGridLayout,
+    QLayout,
+    QGridLayout,
 )
 
 from lancet.config import Config
@@ -55,6 +56,7 @@ class SecondsSpinBox(QSpinBox):
         self.setRange(self.min, self.max)
         self.setSuffix(f" {self.suffix}")
         self.setValue(initial_value)
+
 
 class HistorySizeSpinBox(SecondsSpinBox):
     min: int = 1
@@ -136,7 +138,7 @@ class PreferencesDialog(QDialog):
             | QDialogButtonBox.StandardButton.RestoreDefaults
         )
         self._button_box.clicked.connect(self._on_button_clicked)
-        columns_layout.addWidget(self._button_box, 3, 1, 1, 2) # row, col, rowspan, colspan
+        columns_layout.addWidget(self._button_box, 3, 1, 1, 2)  # row, col, rowspan, colspan
 
     def _make_settings_layout(self) -> QLayout:
         """Build a form layout with labeled rows for each settings widget."""
