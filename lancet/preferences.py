@@ -2,6 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import dataclasses
 import sys
+from types import SimpleNamespace
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -10,19 +11,22 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QSpinBox,
     QVBoxLayout,
     QWidget,
     QApplication,
     QAbstractButton,
-    QLayout,
+    QLayout, QGridLayout,
 )
 
 from lancet.config import Config
 from lancet.consts import APP_NAME, APP_LOGO_PATH
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.grab_key import ShortCutGrabButton
+from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.ocr_model_list import ModelListEditor
+from lancet.ocr_history import OcrHistory
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,16 +47,22 @@ class SecondsSpinBox(QSpinBox):
 
     min: int = 1
     max: int = 120
+    suffix: str = "seconds"
 
     def __init__(self, initial_value: int, parent: QWidget | None = None) -> None:
         """Initialize the spin box with range, suffix, and initial value."""
         super().__init__(parent)
         self.setRange(self.min, self.max)
-        self.setSuffix(" seconds")
+        self.setSuffix(f" {self.suffix}")
         self.setValue(initial_value)
 
+class HistorySizeSpinBox(SecondsSpinBox):
+    min: int = 1
+    max: int = 1_000
+    suffix: str = "items"
 
-class FormWidgets:
+
+class FormWidgets(SimpleNamespace):
     """Container holding all form widgets used in the preferences dialog."""
 
     copy_to: EnumSelectCombo
@@ -61,31 +71,40 @@ class FormWidgets:
     force_cpu: QCheckBox
     ocr_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
+    max_history_size: HistorySizeSpinBox
 
 
 class PreferencesDialog(QDialog):
-    """Preferences dialog for editing all Config fields."""
+    """Preferences dialog for editing all Config fields, with an OCR history panel on the right."""
 
     settings_applied = pyqtSignal(SettingsApplyResult)
 
-    def __init__(self, cfg: Config, parent: QWidget | None = None) -> None:
-        """Initialize the dialog, creating form widgets for each config field."""
+    def __init__(self, cfg: Config, history: OcrHistory, parent: QWidget | None = None) -> None:
+        """Initialize the dialog, creating form widgets for each config field and the history panel."""
         super().__init__(parent)
         self._cfg = cfg
+        self._history = history
+        self.history_list = OcrHistoryWidget(history.entries())
 
         self.setWindowIcon(QIcon(str(APP_LOGO_PATH)))
         self.setWindowTitle(f"{APP_NAME} Preferences")
-        self.setMinimumWidth(450)
+        self.setMinimumWidth(700)
 
-        main_layout = QVBoxLayout()
-        self.setLayout(main_layout)
+        # Two-column layout: settings on the left, history on the right
+        columns_layout = QGridLayout()
+        self.setLayout(columns_layout)
+
+        # Left column: settings
+        left_column = QVBoxLayout()
+        columns_layout.addLayout(left_column, 1, 1)
+
         self._widgets = FormWidgets()
 
         # OCR destination
-        self._widgets.copy_to = EnumSelectCombo(initial_value=self._cfg.copy_to)
+        self._widgets.copy_to = EnumSelectCombo(initial_value=cfg.copy_to)
 
         # Notification duration
-        self._widgets.notification_duration = SecondsSpinBox(initial_value=self._cfg.notification_duration_sec)
+        self._widgets.notification_duration = SecondsSpinBox(initial_value=cfg.notification_duration_sec)
 
         # Huggingface model name
         self._widgets.huggingface_model = ModelListEditor()
@@ -102,8 +121,13 @@ class PreferencesDialog(QDialog):
         # Screenshot shortcut
         self._widgets.screenshot_shortcut = ShortCutGrabButton(initial_value=cfg.screenshot_shortcut)
 
-        # Set Preferences layout
-        main_layout.addLayout(self._make_settings_layout())
+        # Max history size
+        self._widgets.max_history_size = HistorySizeSpinBox(initial_value=cfg.max_history_size)
+
+        left_column.addLayout(self._make_settings_layout())
+
+        # Right column: OCR history
+        columns_layout.addWidget(self.history_list, 1, 2)
 
         # Dialog buttons
         self._button_box = QDialogButtonBox(
@@ -112,7 +136,7 @@ class PreferencesDialog(QDialog):
             | QDialogButtonBox.StandardButton.RestoreDefaults
         )
         self._button_box.clicked.connect(self._on_button_clicked)
-        main_layout.addWidget(self._button_box)
+        columns_layout.addWidget(self._button_box, 3, 1, 1, 2) # row, col, rowspan, colspan
 
     def _make_settings_layout(self) -> QLayout:
         """Build a form layout with labeled rows for each settings widget."""
@@ -135,6 +159,7 @@ class PreferencesDialog(QDialog):
         """Write current widget values back to the config and save to disk."""
         self._cfg.copy_to = self._widgets.copy_to.currentData()
         self._cfg.notification_duration_sec = self._widgets.notification_duration.value()
+        self._cfg.max_history_size = self._widgets.max_history_size.value()
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
@@ -146,6 +171,7 @@ class PreferencesDialog(QDialog):
             self.settings_applied.emit(SettingsApplyResult(error=e))
         else:
             self.settings_applied.emit(SettingsApplyResult(success=True))
+        self._history.set_entries(self.history_list.as_list())
         self.accept()
 
     def _restore_defaults(self) -> None:
@@ -153,6 +179,7 @@ class PreferencesDialog(QDialog):
         defaults = Config()
         self._widgets.copy_to.set_current(defaults.copy_to)
         self._widgets.notification_duration.setValue(defaults.notification_duration_sec)
+        self._widgets.max_history_size.setValue(defaults.max_history_size)
         self._widgets.huggingface_model.set_current(defaults.huggingface_model_name)
         self._widgets.huggingface_model.set_items(defaults.huggingface_models)
         self._widgets.force_cpu.setChecked(defaults.force_cpu)
@@ -164,7 +191,8 @@ def playground() -> None:
     """Launch the preferences dialog standalone for testing."""
     app = QApplication(sys.argv)
     cfg = Config.read_from_file()
-    form = PreferencesDialog(cfg)
+    history = OcrHistory(cfg)
+    form = PreferencesDialog(cfg, history)
     form.show()
     sys.exit(app.exec())
 

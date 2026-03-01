@@ -32,6 +32,7 @@ class Config:
     force_cpu: bool = False
     ocr_shortcut: str = "Alt+O"
     screenshot_shortcut: str = ""  # unset
+    max_history_size: int = 100
 
     @classmethod
     def read_from_file(cls) -> Self:

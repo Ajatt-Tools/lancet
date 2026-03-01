@@ -28,6 +28,7 @@ from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum,
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
 from lancet.ocr.op import QThreadPoolOp
+from lancet.ocr_history import OcrHistory
 from lancet.preferences import PreferencesDialog, SettingsApplyResult
 
 
@@ -65,6 +66,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self.threadpool = QThreadPool.globalInstance()
         self._cfg = Config.read_from_file()
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
+        self._history = OcrHistory(self._cfg)
         self._ocr = MangaOCRLauncher(
             parent=self,
             notify=self._notify,
@@ -135,8 +137,9 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def open_preferences(self) -> None:
         """Open the preferences dialog and reload shortcuts if settings are applied."""
-        dialog = PreferencesDialog(self._cfg)
+        dialog = PreferencesDialog(self._cfg, self._history)
         dialog.settings_applied.connect(self._on_settings_changed)
+        dialog.history_list.copy_requested.connect(self.copy_ocr_result)
         dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
@@ -201,8 +204,8 @@ class LancetSystemTray(QSystemTrayIcon):
 
         def on_ocr_finished(text: str) -> None:
             if text:
+                self._history.add_to_history(text)
                 self.copy_ocr_result(text)
-                self._notify.notify(f"OCR result copied: {text}")
             else:
                 self._notify.notify("OCR returned no text")
 
@@ -224,3 +227,4 @@ class LancetSystemTray(QSystemTrayIcon):
                 run_and_disown([find_executable("goldendict") or "goldendict", text])
             case OcrDestination.clipboard:
                 self._app.clipboard().setText(text)
+        self._notify.notify(f"OCR result copied: {text}")
