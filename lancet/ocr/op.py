@@ -1,4 +1,4 @@
-import typing
+import dataclasses
 from typing import Callable, Any, Self
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
@@ -8,7 +8,8 @@ class MangaOCRException(Exception):
     pass
 
 
-class QThreadPoolResult[ResultType](typing.NamedTuple):
+@dataclasses.dataclass(frozen=True)
+class QThreadPoolResult[ResultType]:
     result: ResultType | None = None
     error: MangaOCRException | None = None
 
@@ -56,7 +57,7 @@ class QThreadPoolOp[ResultType](QObject):
         self._failure = failure
         return self
 
-    def _on_finished(self, result: QThreadPoolResult) -> None:
+    def _on_finished(self, result: QThreadPoolResult[ResultType]) -> None:
         if result.error:
             self._failure(result.error)
         else:
