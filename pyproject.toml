@@ -24,11 +24,20 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
+    "beartype>=0.22.9",
     "PyQt6>=6.8.0",
     "pillow>=11.1.0",
     "pynput>=1.8.1", # "pynput @ git+https://github.com/moses-palmer/pynput.git@fixup/listener-thread-handle",
-    "manga-ocr>=0.1.14",
-    "zala @ git+file:///home/ren/Documents/Projects/Zala"
+    "fire>=0.7.1",
+    "jaconv",
+    "loguru",
+    "numpy",
+    "Pillow>=10.0.0",
+    "torch>=1.0",
+    "transformers>=5.2.0",
+    "fugashi", # needed by bert_japanese/tokenization_bert_japanese.py
+    "unidic_lite", # needed by bert_japanese/tokenization_bert_japanese.py
+    "zala @ git+file:///home/ren/Documents/Projects/Zala",
 ]
 [tool.hatch.metadata]
 allow-direct-references = true
