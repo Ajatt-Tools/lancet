@@ -19,6 +19,7 @@ CFG_PATH = CFG_DIR_PATH / f"{APP_NAME.lower()}.json"
 
 CACHE_DIR_PATH = pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")) / APP_NAME.lower()
 HISTORY_FILE_PATH = CACHE_DIR_PATH / "ocr_history.json"
+GEOMETRY_FILE_PATH = CACHE_DIR_PATH / "geometry"
 
 IS_MAC = sys.platform.startswith("darwin")
 IS_WIN = sys.platform.startswith("win32")
