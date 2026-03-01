@@ -15,6 +15,7 @@ from zala.screenshot import ZalaScreenshot
 from lancet.config import Config, OcrDestination
 from lancet.consts import APP_LOGO_PATH, SCREENSHOT_ICON_PATH, EXIT_ICON_PATH, OCR_ICON_PATH
 from lancet.find_executable import run_and_disown, find_executable
+from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum, KeyboardShortcut
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
 from lancet.ocr.op import QThreadPoolOp
@@ -22,6 +23,12 @@ from lancet.ocr.op import QThreadPoolOp
 
 def make_output_file_path() -> pathlib.Path:
     return pathlib.Path.home() / "Pictures" / "Screenshots" / f"{datetime.datetime.now().isoformat()}.png"
+
+
+def format_hotkey(menu_label: str, keyboard_shortcut: str) -> str:
+    if keyboard_shortcut:
+        return f"{menu_label} ({keyboard_shortcut})"
+    return menu_label
 
 
 class LancetSystemTray(QSystemTrayIcon):
@@ -34,6 +41,7 @@ class LancetSystemTray(QSystemTrayIcon):
     _app: QApplication
     _sel: ZalaSelect | None = None
     _cfg: Config
+    _hotkeys: LancetShortcutManager | None = None
 
     def __init__(self, app: QApplication, parent=None) -> None:
         super().__init__(parent)
@@ -50,26 +58,65 @@ class LancetSystemTray(QSystemTrayIcon):
             force_cpu=self._cfg.force_cpu,
         )
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
-        # self.loadHotkeys()
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
         # Menu
         menu = QMenu(parent)
         self.setContextMenu(menu)
 
         # Menu Actions
-        menu.addAction(QIcon(str(SCREENSHOT_ICON_PATH)), "Make screenshot", self.make_screenshot)
-        menu.addAction(QIcon(str(OCR_ICON_PATH)), "OCR screenshot", self.make_ocr_screenshot)
-        menu.addAction(QIcon(str(EXIT_ICON_PATH)), "Exit", self.quit)
+        menu.addAction(
+            QIcon(str(SCREENSHOT_ICON_PATH)),
+            format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
+            self.make_screenshot_area,
+        )
+        menu.addAction(
+            QIcon(str(OCR_ICON_PATH)),
+            format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
+            self.make_ocr_screenshot,
+        )
+        menu.addAction(
+            QIcon(str(EXIT_ICON_PATH)),
+            "Exit",
+            self.quit,
+        )
 
         # Init model in background
         self._ocr.init_manga_ocr()
         signal.signal(signal.SIGINT, self.quit)
 
+        # Set keyboard shortcuts
+        self.load_keyboard_shortcuts()
+
+    def load_keyboard_shortcuts(self) -> None:
+        if self._hotkeys:
+            self._hotkeys.stop()
+        try:
+            self._hotkeys = LancetShortcutManager(self.get_keyboard_shortcuts())
+        except Exception as e:
+            self._notify.notify(f"failed to load keyboard shortcuts: {e}")
+        else:
+            self._hotkeys.start()
+            self._hotkeys.signals.shortcut_activated.connect(self.process_keyboard_shortcut)
+
+    def get_keyboard_shortcuts(self) -> dict[LancetShortcutEnum, KeyboardShortcut]:
+        hotkey_dict = {
+            LancetShortcutEnum.ocr_shortcut: self._cfg.ocr_shortcut,
+            LancetShortcutEnum.screenshot_shortcut: self._cfg.screenshot_shortcut,
+        }
+        return {name: value for name, value in hotkey_dict.items() if (value := value.strip())}
+
+    def process_keyboard_shortcut(self, shortcut: LancetShortcutEnum) -> None:
+        match shortcut:
+            case LancetShortcutEnum.ocr_shortcut:
+                self.make_ocr_screenshot()
+            case LancetShortcutEnum.screenshot_shortcut:
+                self.make_screenshot_area()
+
     def quit(self) -> None:
         logger.info("Quit Lancet.")
         self._app.quit()
 
-    def make_screenshot(self) -> None:
+    def make_screenshot_area(self) -> None:
         self._sel = ZalaSelect(self._scr.capture_screen())
         self._sel.selection_finished.connect(self.process_select_result)
         self._sel.showFullScreen()
