@@ -5,7 +5,6 @@ import pathlib
 import re
 
 import jaconv
-import numpy as np
 import torch
 from PIL import Image
 from loguru import logger
@@ -65,7 +64,7 @@ class MangaOcr(MangaOcrBase):
         x = post_process(x)
         return x
 
-    def _preprocess(self, img: Image.Image) -> np.ndarray:
+    def _preprocess(self, img: Image.Image) -> torch.Tensor:
         pixel_values = self.processor(img, return_tensors="pt").pixel_values
         return pixel_values.squeeze()
 
