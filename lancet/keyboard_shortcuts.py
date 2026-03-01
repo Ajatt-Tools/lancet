@@ -32,7 +32,7 @@ def to_pynput_hotkey(shortcut: str) -> str:
     Convert a human-readable shortcut string (e.g. "Alt+O")
     to pynput's format (e.g. "<alt>+o").
     """
-    parts = [part.strip().lower() for part in shortcut.split("+")]
+    parts = [part.strip().lower() for part in shortcut.strip().split("+")]
     parts = [(f"<{part}>" if part in _MODIFIERS else part) for part in parts if part]
     return "+".join(parts)
 

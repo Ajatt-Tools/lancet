@@ -92,7 +92,7 @@ class ShortCutGrabButton(QPushButton):
         )
 
     def set_keyboard_shortcut(self, value: str) -> None:
-        self._dialog.set_shortcut(value)
+        self._dialog.set_shortcut(value.strip())
 
     def current_shortcut(self) -> str:
         return self._dialog.current_shortcut() or ""

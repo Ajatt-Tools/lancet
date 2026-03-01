@@ -106,7 +106,8 @@ class LancetSystemTray(QSystemTrayIcon):
             LancetShortcutEnum.ocr_shortcut: self._cfg.ocr_shortcut,
             LancetShortcutEnum.screenshot_shortcut: self._cfg.screenshot_shortcut,
         }
-        return {name: value for name, value in hotkey_dict.items() if (value := value.strip())}
+        hotkey_dict = {k: v.strip() for k, v in hotkey_dict.items()}
+        return {k: v for k, v in hotkey_dict.items() if v}
 
     def process_keyboard_shortcut(self, shortcut: LancetShortcutEnum) -> None:
         match shortcut:
