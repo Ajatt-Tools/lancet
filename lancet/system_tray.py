@@ -2,8 +2,10 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import datetime
+import os
 import pathlib
 import signal
+import sys
 
 from PyQt6.QtCore import QThreadPool
 from PyQt6.QtGui import QIcon
@@ -77,6 +79,7 @@ class LancetSystemTray(QSystemTrayIcon):
         )
         menu.addSeparator()
         menu.addAction("Preferences…", self.open_preferences)
+        menu.addAction("Restart", self.restart)
         menu.addAction(
             QIcon(str(EXIT_ICON_PATH)),
             "Exit",
@@ -126,6 +129,11 @@ class LancetSystemTray(QSystemTrayIcon):
             self.load_keyboard_shortcuts()
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
+
+    def restart(self) -> None:
+        logger.info("Restarting Lancet.")
+        self._app.quit()
+        os.execv(sys.executable, [sys.executable, *sys.argv])
 
     def quit(self) -> None:
         logger.info("Quit Lancet.")
