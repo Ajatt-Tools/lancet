@@ -1,21 +1,23 @@
-"""
-Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
-License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""
+# Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
+# License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+
 import datetime
 import pathlib
+import signal
 
 from PyQt6.QtCore import QThreadPool
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu
-from zala.main_window import ZalaSelect
-
-from lancet.consts import APP_LOGO_PATH, SCREENSHOT_ICON_PATH, EXIT_ICON_PATH, APP_NAME
-from lancet.ocr import MangaOCRLauncher
+from loguru import logger
+from zala.main_window import ZalaSelect, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 
+from lancet.consts import APP_LOGO_PATH, SCREENSHOT_ICON_PATH, EXIT_ICON_PATH, APP_NAME, OCR_ICON_PATH
 
-def make_output_file_path():
+from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
+
+
+def make_output_file_path() -> pathlib.Path:
     return pathlib.Path.home() / "Pictures" / "Screenshots" / f"{datetime.datetime.now().isoformat()}.png"
 
 
@@ -23,20 +25,20 @@ class LancetSystemTray(QSystemTrayIcon):
     """
     System tray application containing all global actions
     """
-    ocr_model: MangaOCRLauncher | None = None
 
+    _ocr: MangaOCRLauncher
     _scr: ZalaScreenshot
     _app: QApplication
     _sel: ZalaSelect | None = None
 
-    def __init__(self, app: QApplication, parent=None):
+    def __init__(self, app: QApplication, parent=None) -> None:
         super().__init__(parent)
         self._app = app
         self._scr = ZalaScreenshot(app)
 
         # State trackers and configurations
         self.threadpool = QThreadPool.globalInstance()
-        self.ocr_model = None
+        self._ocr = MangaOCRLauncher(parent=self, threadpool=self.threadpool)
         # self.loadHotkeys()
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
         # Menu
@@ -45,14 +47,28 @@ class LancetSystemTray(QSystemTrayIcon):
 
         # Menu Actions
         menu.addAction(QIcon(str(SCREENSHOT_ICON_PATH)), "Make screenshot", self.make_screenshot)
-        menu.addAction(QIcon(str(EXIT_ICON_PATH)), "Exit", self._app.quit)
+        menu.addAction(QIcon(str(OCR_ICON_PATH)), "OCR screenshot", self.make_ocr_screenshot)
+        menu.addAction(QIcon(str(EXIT_ICON_PATH)), "Exit", self.quit)
+
+        # Init model in background
+        self._ocr.init_manga_ocr()
+        signal.signal(signal.SIGINT, self.quit)
+
+    def quit(self) -> None:
+        logger.info("Quit Lancet.")
+        self._app.quit()
 
     def make_screenshot(self) -> None:
         self._sel = ZalaSelect(self._scr.capture_screen())
-        self._sel.window_closed.connect(self.process_select_result)
+        self._sel.selection_finished.connect(self.process_select_result)
         self._sel.showFullScreen()
 
-    def process_select_result(self, user_selection: QPixmap) -> None:
+    def make_ocr_screenshot(self) -> None:
+        self._sel = ZalaSelect(self._scr.capture_screen())
+        self._sel.selection_finished.connect(self.process_ocr_result)
+        self._sel.showFullScreen()
+
+    def process_select_result(self, user_selection: UserSelectionResult) -> None:
         if user_selection is None:
             self.showMessage(APP_NAME, "Selection aborted")
             return
@@ -61,3 +77,17 @@ class LancetSystemTray(QSystemTrayIcon):
             self.showMessage(APP_NAME, f"Selection saved to {output_path}")
         else:
             self.showMessage(APP_NAME, f"Failed to save selection to {output_path}")
+
+    def process_ocr_result(self, user_selection: UserSelectionResult) -> None:
+        if not user_selection.pixmap:
+            self.showMessage(APP_NAME, user_selection.error.capitalize())
+            return
+        if not self._ocr.is_ready():
+            self.showMessage(APP_NAME, f"OCR model is not ready.")
+            return
+        text = run_ocr(user_selection.pixmap, self._ocr)
+        if text:
+            self._app.clipboard().setText(text)
+            self.showMessage(APP_NAME, f"OCR result copied: {text}")
+        else:
+            self.showMessage(APP_NAME, "OCR returned no text")
