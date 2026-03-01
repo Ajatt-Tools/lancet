@@ -19,3 +19,7 @@ class MangaOCRException(Exception):
 
 class MangaOCRFileNotFoundError(MangaOCRException, FileNotFoundError):
     pass
+
+
+class ConfigReadError(MangaOCRException, RuntimeError):
+    pass
