@@ -19,6 +19,7 @@ class NotifySend:
     def notify(self, msg: str) -> None:
         """Display a desktop notification with the given message."""
         if self._notify_send:
+            msg = msg.replace("<", "&lt;").replace(">", "&gt;")
             # --expire-time=TIME: The duration, in milliseconds.
             run_and_disown([self._notify_send, APP_NAME, msg, "--expire-time", f"{self._duration_sec * 1_000}"])
         else:
