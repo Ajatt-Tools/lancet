@@ -8,8 +8,8 @@ from PyQt6.QtCore import QBuffer, QThreadPool, QObject
 from PyQt6.QtGui import QPixmap
 from loguru import logger
 
-from lancet.ocr.manga_ocr_base import MangaOcrBase
-from lancet.ocr.op import QThreadPoolOp, MangaOCRException
+from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRException
+from lancet.ocr.op import QThreadPoolOp
 
 
 class MangaOCRLauncher:
@@ -80,5 +80,5 @@ def run_ocr(pixmap: QPixmap, model: MangaOCRLauncher) -> str:
     """
     image = pixmap_to_pillow_image(pixmap)
     if not image:
-        return ""
+        raise MangaOCRException("empty pixmap")
     return model.instance.recognize(image).strip()

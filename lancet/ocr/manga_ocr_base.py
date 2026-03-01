@@ -11,3 +11,11 @@ class MangaOcrBase(abc.ABC):
     @abc.abstractmethod
     def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
         raise NotImplementedError
+
+
+class MangaOCRException(Exception):
+    pass
+
+
+class MangaOCRFileNotFoundError(MangaOCRException, FileNotFoundError):
+    pass

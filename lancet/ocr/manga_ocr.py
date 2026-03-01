@@ -10,7 +10,7 @@ from PIL import Image
 from loguru import logger
 from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel, GenerationMixin
 
-from lancet.ocr.manga_ocr_base import MangaOcrBase
+from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRFileNotFoundError, MangaOCRException
 
 
 class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
@@ -44,7 +44,7 @@ class MangaOcr(MangaOcrBase):
 
         example_path = pathlib.Path(__file__).parent / "assets/example.jpg"
         if not example_path.is_file():
-            raise FileNotFoundError(f"Missing example image {example_path}")
+            raise MangaOCRFileNotFoundError(f"Missing example image {example_path}")
         logger.info(self.recognize(example_path))
         logger.info("OCR ready")
 
@@ -54,7 +54,7 @@ class MangaOcr(MangaOcrBase):
         elif isinstance(img_or_path, Image.Image):
             img = img_or_path
         else:
-            raise ValueError(f"img_or_path must be a path or PIL.Image, instead got: {img_or_path}")
+            raise MangaOCRException(f"img_or_path must be a path or PIL.Image, instead got: {img_or_path}")
 
         img = img.convert("L").convert("RGB")
 

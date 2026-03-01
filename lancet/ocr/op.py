@@ -3,9 +3,7 @@ from typing import Callable, Any, Self
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
 
-
-class MangaOCRException(Exception):
-    pass
+from lancet.ocr.manga_ocr_base import MangaOCRException
 
 
 @dataclasses.dataclass(frozen=True)
@@ -64,6 +62,10 @@ class QThreadPoolOp[ResultType](QObject):
             self._success(result.result)
 
     def run_in_background(self) -> None:
+        if not self._success:
+            raise MangaOCRException("success handler is not set")
+        if not self._failure:
+            raise MangaOCRException("failure handler is not set")
         worker = QThreadPoolWorker[ResultType](self._op)
         worker.signals.finished.connect(self._on_finished)
         self._threadpool.start(worker)
