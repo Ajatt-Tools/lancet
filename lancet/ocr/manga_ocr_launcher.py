@@ -8,6 +8,7 @@ from PyQt6.QtCore import QBuffer, QThreadPool, QObject
 from PyQt6.QtGui import QPixmap
 from loguru import logger
 
+from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRException
 from lancet.ocr.op import QThreadPoolOp
 
@@ -18,12 +19,14 @@ class MangaOCRLauncher:
     def __init__(
         self,
         parent: QObject,
+        notify: NotifySend,
         threadpool: QThreadPool,
         pretrained_model_name_or_path: str | pathlib.Path = "tatsumoto/manga-ocr-base",
         force_cpu: bool = False,
     ) -> None:
         super().__init__()
         self._parent = parent
+        self._notify = notify
         self._threadpool = threadpool
         self._pretrained_model_name_or_path = pretrained_model_name_or_path
         self._force_cpu = force_cpu
@@ -44,9 +47,11 @@ class MangaOCRLauncher:
 
         def on_ready(model: MangaOcrBase) -> None:
             self._class_instance = model
+            self._notify.notify(f"OCR ready")
 
         def on_failed(e: Exception) -> None:
             logger.error(f"failed to initialize manga ocr: {e}")
+            self._notify.notify(f"failed to initialize manga ocr: {e}")
 
         (
             QThreadPoolOp(parent=self._parent, op=op, threadpool=self._threadpool)

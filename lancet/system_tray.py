@@ -64,6 +64,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self._ocr = MangaOCRLauncher(
             parent=self,
+            notify=self._notify,
             threadpool=self.threadpool,
             pretrained_model_name_or_path=self._cfg.huggingface_model_name,
             force_cpu=self._cfg.force_cpu,
