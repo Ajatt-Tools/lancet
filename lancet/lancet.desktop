@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Lancet
+Comment=OCR application for reading manga in Japanese, made for AJATTers.
+GenericName=OCR
+Exec=lancet
+TryExec=lancet
+Icon={{ICON}}
+Categories=Education;Languages;KDE;Qt;
+Terminal=false
+Type=Application
+Version=1.0
