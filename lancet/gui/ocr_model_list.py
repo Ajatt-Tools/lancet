@@ -1,8 +1,8 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-from typing import Sequence
+from collections.abc import Sequence
 
-from PyQt6.QtWidgets import QGroupBox, QComboBox, QPushButton, QGridLayout, QLayout
+from PyQt6.QtWidgets import QGroupBox, QComboBox, QPushButton, QGridLayout, QLayout, QWidget
 from zala.utils import qconnect
 
 
@@ -11,7 +11,7 @@ class EditableSelector(QComboBox):
     Convenience class for making combo boxes with editable input field.
     """
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setEditable(True)
 

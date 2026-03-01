@@ -9,7 +9,7 @@ import sys
 
 from PyQt6.QtCore import QThreadPool
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu
+from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QWidget
 from loguru import logger
 from zala.main_window import ZalaSelect, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
@@ -53,7 +53,7 @@ class LancetSystemTray(QSystemTrayIcon):
     _cfg: Config
     _hotkeys: LancetShortcutManager | None = None
 
-    def __init__(self, app: QApplication, parent=None) -> None:
+    def __init__(self, app: QApplication, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._app = app
         self._scr = ZalaScreenshot(app)

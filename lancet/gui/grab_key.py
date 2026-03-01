@@ -1,6 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import sys
+from collections.abc import Sequence
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QKeyEvent, QKeySequence
@@ -8,7 +9,7 @@ from PyQt6.QtWidgets import QDialog, QWidget, QLayout, QLabel, QVBoxLayout, QPus
 from zala.utils import qconnect
 
 
-def mod_mask_qt6():
+def mod_mask_qt6() -> Qt.KeyboardModifier:
     return (
         Qt.KeyboardModifier.ControlModifier
         | Qt.KeyboardModifier.AltModifier
@@ -17,7 +18,7 @@ def mod_mask_qt6():
     )
 
 
-def forbidden_keys():
+def forbidden_keys() -> Sequence[Qt.Key]:
     return (
         Qt.Key.Key_Shift,
         Qt.Key.Key_Alt,
@@ -37,7 +38,7 @@ def to_int(modifiers: Qt.KeyboardModifier) -> int:
 class KeyPressDialog(QDialog):
     value_accepted = pyqtSignal(str)
 
-    def __init__(self, parent: QWidget = None, initial_value: str = "", *args, **kwargs) -> None:
+    def __init__(self, parent: QWidget | None = None, initial_value: str = "", *args, **kwargs) -> None:
         super().__init__(parent, *args, **kwargs)
         self._shortcut = initial_value
         self.setMinimumSize(380, 64)
@@ -82,9 +83,9 @@ class KeyPressDialog(QDialog):
 class ShortCutGrabButton(QPushButton):
     _placeholder = "[Not assigned]"
 
-    def __init__(self, initial_value: str = None) -> None:
+    def __init__(self, initial_value: str | None = None) -> None:
         super().__init__(initial_value or self._placeholder)
-        self._dialog = KeyPressDialog(self, initial_value)
+        self._dialog = KeyPressDialog(self, initial_value or "")
         qconnect(self.clicked, self._dialog.exec)
         qconnect(
             self._dialog.value_accepted,
@@ -105,7 +106,7 @@ def detect_keypress() -> None:
     w.setLayout(layout := QVBoxLayout())
     layout.addWidget(b := ShortCutGrabButton())
     w.show()
-    code = app.exec()
+    code: int = app.exec()
     print(f"{'Accepted' if w.result() else 'Rejected'}. Code: {code}, shortcut: \"{b.current_shortcut()}\"")
     sys.exit(code)
 

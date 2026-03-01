@@ -58,5 +58,5 @@ class LancetShortcutManager(GlobalHotKeys):
         super().__init__(hotkeys_dict, *args, **kwargs)
         self.signals = LancetShortcutSignals()
 
-    def on_shortcut_activated(self, action_name: LancetShortcutEnum):
+    def on_shortcut_activated(self, action_name: LancetShortcutEnum) -> None:
         q_emit(self.signals.shortcut_activated, action_name)

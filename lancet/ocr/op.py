@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Callable, Any, Self
+from typing import Any, Self
+from collections.abc import Callable
 
 from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot, QThreadPool
 
@@ -39,7 +40,7 @@ class QThreadPoolOp[ResultType](QObject):
     If op() throws an exception, it will be passed to `failure`.
     """
 
-    def __init__(self, *, parent: QObject, op: Callable[[], ResultType], threadpool: QThreadPool):
+    def __init__(self, *, parent: QObject, op: Callable[[], ResultType], threadpool: QThreadPool) -> None:
         super().__init__(parent)
         self._parent = parent
         self._op = op

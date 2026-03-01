@@ -4,7 +4,7 @@ import functools
 import os
 import shutil
 import subprocess
-from typing import Sequence
+from collections.abc import Sequence
 
 HARDCODED_PATHS = (
     "/usr/bin",

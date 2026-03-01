@@ -32,7 +32,7 @@ class Config:
     @classmethod
     def read_from_file(cls) -> Self:
         try:
-            with open(CFG_PATH, "r", encoding="utf-8") as f:
+            with open(CFG_PATH, encoding="utf-8") as f:
                 data = json.load(f)
         except FileNotFoundError:
             return cls()

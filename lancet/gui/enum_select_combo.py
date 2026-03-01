@@ -3,14 +3,14 @@
 
 import enum
 
-from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtWidgets import QComboBox, QWidget
 
 
 class EnumSelectCombo(QComboBox):
     def __init__(
         self,
         initial_value: enum.Enum,
-        parent=None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         enum_type = type(initial_value)

@@ -39,7 +39,7 @@ class SecondsSpinBox(QSpinBox):
     min: int = 1
     max: int = 120
 
-    def __init__(self, initial_value: int, parent=None):
+    def __init__(self, initial_value: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setRange(self.min, self.max)
         self.setSuffix(" seconds")
@@ -147,7 +147,7 @@ class PreferencesDialog(QDialog):
         self._widgets.screenshot_shortcut.set_keyboard_shortcut(defaults.screenshot_shortcut)
 
 
-def playground():
+def playground() -> None:
     app = QApplication(sys.argv)
     cfg = Config.read_from_file()
     form = PreferencesDialog(cfg)
