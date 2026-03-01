@@ -8,10 +8,10 @@ import signal
 import sys
 
 from PyQt6.QtCore import QThreadPool
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QWidget
 from loguru import logger
-from zala.main_window import ZalaSelect, UserSelectionResult
+from zala.main_window import ZalaSelect, UserSelectionResult, ScreenshotPreviewOpts
 from zala.screenshot import ZalaScreenshot
 
 from lancet.config import Config, OcrDestination
@@ -42,6 +42,17 @@ def format_hotkey(menu_label: str, keyboard_shortcut: str) -> str:
     if keyboard_shortcut:
         return f"{menu_label} ({keyboard_shortcut})"
     return menu_label
+
+
+def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
+    """Build screenshot overlay options from the current config."""
+    return ScreenshotPreviewOpts(
+        border_thickness=cfg.border_thickness,
+        border_color=QColor.fromString(cfg.border_color),
+        fill_color=QColor.fromString(cfg.fill_color),
+        outline_color=QColor.fromString(cfg.outline_color),
+        fill_brush_color=QColor.fromString(cfg.fill_brush_color),
+    )
 
 
 class LancetSystemTray(QSystemTrayIcon):
@@ -174,13 +185,13 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def make_screenshot_area(self) -> None:
         """Open the full-screen selection overlay for taking an area screenshot."""
-        self._sel = ZalaSelect(self._scr.capture_screen())
+        self._sel = ZalaSelect(self._scr.capture_screen(), opts=make_preview_opts(self._cfg))
         self._sel.selection_finished.connect(self.process_select_result)
         self._sel.showFullScreen()
 
     def make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for OCR recognition of the selected area."""
-        self._sel = ZalaSelect(self._scr.capture_screen())
+        self._sel = ZalaSelect(self._scr.capture_screen(), opts=make_preview_opts(self._cfg))
         self._sel.selection_finished.connect(self.process_ocr_result)
         self._sel.showFullScreen()
 

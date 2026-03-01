@@ -34,6 +34,13 @@ class Config:
     screenshot_shortcut: str = ""  # unset
     max_history_size: int = 100
 
+    # Screenshot overlay colors (stored as hex ARGB strings, e.g. "#FF0000FF")
+    border_thickness: int = 2
+    border_color: str = "#7F0000FF"
+    fill_color: str = "#3C0080FF"
+    outline_color: str = "#7FFF0000"
+    fill_brush_color: str = "#557F7F7F"
+
     @classmethod
     def read_from_file(cls) -> Self:
         """Read the config from the JSON file, returning defaults if the file does not exist."""

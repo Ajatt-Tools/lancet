@@ -23,6 +23,8 @@ from loguru import logger
 
 from lancet.config import Config
 from lancet.consts import APP_NAME, APP_LOGO_PATH, GEOMETRY_FILE_PATH
+from lancet.gui.color_picker import ColorEditPicker
+
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
@@ -59,9 +61,19 @@ class SecondsSpinBox(QSpinBox):
 
 
 class HistorySizeSpinBox(SecondsSpinBox):
+    """A spin box for selecting the maximum number of history items."""
+
     min: int = 1
     max: int = 1_000
     suffix: str = "items"
+
+
+class BorderThicknessSpinBox(SecondsSpinBox):
+    """A spin box for selecting the screenshot overlay border thickness in pixels."""
+
+    min: int = 1
+    max: int = 20
+    suffix: str = "px"
 
 
 class FormWidgets(SimpleNamespace):
@@ -74,6 +86,13 @@ class FormWidgets(SimpleNamespace):
     ocr_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
     max_history_size: HistorySizeSpinBox
+
+    # Screenshot overlay colors
+    border_thickness: BorderThicknessSpinBox
+    border_color: ColorEditPicker
+    fill_color: ColorEditPicker
+    outline_color: ColorEditPicker
+    fill_brush_color: ColorEditPicker
 
 
 class PreferencesDialog(QDialog):
@@ -125,6 +144,13 @@ class PreferencesDialog(QDialog):
 
         # Max history size
         self._widgets.max_history_size = HistorySizeSpinBox(initial_value=cfg.max_history_size)
+
+        # Screenshot overlay settings
+        self._widgets.border_thickness = BorderThicknessSpinBox(initial_value=cfg.border_thickness)
+        self._widgets.border_color = ColorEditPicker(initial_color=cfg.border_color)
+        self._widgets.fill_color = ColorEditPicker(initial_color=cfg.fill_color)
+        self._widgets.outline_color = ColorEditPicker(initial_color=cfg.outline_color)
+        self._widgets.fill_brush_color = ColorEditPicker(initial_color=cfg.fill_brush_color)
 
         left_column.addLayout(self._make_settings_layout())
 
@@ -198,6 +224,14 @@ class PreferencesDialog(QDialog):
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
         self._cfg.ocr_shortcut = self._widgets.ocr_shortcut.current_shortcut()
         self._cfg.screenshot_shortcut = self._widgets.screenshot_shortcut.current_shortcut()
+
+        # Screenshot overlay settings
+        self._cfg.border_thickness = self._widgets.border_thickness.value()
+        self._cfg.border_color = self._widgets.border_color.color_hex()
+        self._cfg.fill_color = self._widgets.fill_color.color_hex()
+        self._cfg.outline_color = self._widgets.outline_color.color_hex()
+        self._cfg.fill_brush_color = self._widgets.fill_brush_color.color_hex()
+
         try:
             self._cfg.save_to_file()
         except Exception as e:
@@ -219,12 +253,19 @@ class PreferencesDialog(QDialog):
         self._widgets.ocr_shortcut.set_keyboard_shortcut(defaults.ocr_shortcut)
         self._widgets.screenshot_shortcut.set_keyboard_shortcut(defaults.screenshot_shortcut)
 
+        # Screenshot overlay settings
+        self._widgets.border_thickness.setValue(defaults.border_thickness)
+        self._widgets.border_color.set_color(defaults.border_color)
+        self._widgets.fill_color.set_color(defaults.fill_color)
+        self._widgets.outline_color.set_color(defaults.outline_color)
+        self._widgets.fill_brush_color.set_color(defaults.fill_brush_color)
+
 
 def playground() -> None:
     """Launch the preferences dialog standalone for testing."""
     app = QApplication(sys.argv)
     cfg = Config.read_from_file()
-    history = OcrHistory(cfg)
+    history = OcrHistory(cfg.max_history_size)
     form = PreferencesDialog(cfg, history)
     form.show()
     sys.exit(app.exec())
