@@ -4,6 +4,7 @@ import dataclasses
 import sys
 
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -18,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lancet.config import Config
-from lancet.consts import APP_NAME
+from lancet.consts import APP_NAME, APP_LOGO_PATH
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_model_list import ModelListEditor
@@ -62,12 +63,13 @@ class PreferencesDialog(QDialog):
     def __init__(self, cfg: Config, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._cfg = cfg
+
+        self.setWindowIcon(QIcon(str(APP_LOGO_PATH)))
         self.setWindowTitle(f"{APP_NAME} Preferences")
         self.setMinimumWidth(450)
 
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
-
         self._widgets = FormWidgets()
 
         # OCR destination
