@@ -15,7 +15,14 @@ from zala.main_window import ZalaSelect, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 
 from lancet.config import Config, OcrDestination
-from lancet.consts import APP_LOGO_PATH, SCREENSHOT_ICON_PATH, EXIT_ICON_PATH, OCR_ICON_PATH
+from lancet.consts import (
+    APP_LOGO_PATH,
+    SCREENSHOT_ICON_PATH,
+    EXIT_ICON_PATH,
+    OCR_ICON_PATH,
+    RESTART_ICON_PATH,
+    PREFERENCES_ICON_PATH,
+)
 from lancet.find_executable import run_and_disown, find_executable
 from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum, KeyboardShortcut
 from lancet.notifications import NotifySend
@@ -54,13 +61,13 @@ class LancetSystemTray(QSystemTrayIcon):
         # State trackers and configurations
         self.threadpool = QThreadPool.globalInstance()
         self._cfg = Config.read_from_file()
+        self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self._ocr = MangaOCRLauncher(
             parent=self,
             threadpool=self.threadpool,
             pretrained_model_name_or_path=self._cfg.huggingface_model_name,
             force_cpu=self._cfg.force_cpu,
         )
-        self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
         # Menu
         menu = QMenu(parent)
@@ -78,8 +85,8 @@ class LancetSystemTray(QSystemTrayIcon):
             self.make_ocr_screenshot,
         )
         menu.addSeparator()
-        menu.addAction("Preferences…", self.open_preferences)
-        menu.addAction("Restart", self.restart)
+        menu.addAction(QIcon(str(PREFERENCES_ICON_PATH)), "Preferences…", self.open_preferences)
+        menu.addAction(QIcon(str(RESTART_ICON_PATH)), "Restart", self.restart)
         menu.addAction(
             QIcon(str(EXIT_ICON_PATH)),
             "Exit",
@@ -91,9 +98,9 @@ class LancetSystemTray(QSystemTrayIcon):
         signal.signal(signal.SIGINT, self.quit)
 
         # Set keyboard shortcuts
-        self.load_keyboard_shortcuts()
+        self._load_keyboard_shortcuts()
 
-    def load_keyboard_shortcuts(self) -> None:
+    def _load_keyboard_shortcuts(self) -> None:
         self._stop_hotkeys()
 
         try:
@@ -126,7 +133,7 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
         if settings_applied.success:
-            self.load_keyboard_shortcuts()
+            self._load_keyboard_shortcuts()
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
 
