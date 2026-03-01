@@ -37,9 +37,12 @@ class MangaOcr(MangaOcrBase):
     ) -> None:
         """Load the OCR model, tokenizer, and processor, then verify with an example image."""
         logger.info(f"Loading OCR model from {pretrained_model_name_or_path}")
-        self.processor = ViTImageProcessor.from_pretrained(pretrained_model_name_or_path)
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
-        self.model = MangaOcrModel.from_pretrained(pretrained_model_name_or_path)
+        try:
+            self.processor = ViTImageProcessor.from_pretrained(pretrained_model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
+            self.model = MangaOcrModel.from_pretrained(pretrained_model_name_or_path)
+        except OSError as e:
+            raise MangaOCRException(f"{e.__name__}: {e}") from e
 
         if not force_cpu and torch.cuda.is_available():
             logger.info("Using CUDA")

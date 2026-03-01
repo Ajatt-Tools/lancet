@@ -62,7 +62,7 @@ class ModelListEditor(QGroupBox):
         Remove all previously added items and add new items.
         """
         self.combo.clear()
-        self.add_items(list(dict.fromkeys(items)))
+        self.add_items(tuple(dict.fromkeys(items)))
 
     def add_new_preset(self) -> None:
         """Add the current text as a new item if it is not already in the list."""

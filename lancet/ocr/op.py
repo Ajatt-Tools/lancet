@@ -12,7 +12,7 @@ class QThreadPoolResult[ResultType]:
     """Holds the result or error from a background QThreadPool operation."""
 
     result: ResultType | None = None
-    error: MangaOCRException | None = None
+    error: Exception | None = None
 
 
 class QThreadPoolSignals[ResultType](QObject):
@@ -35,7 +35,7 @@ class QThreadPoolWorker[ResultType](QRunnable):
         """Execute the operation and emit the result or error through the finished signal."""
         try:
             result = self._op()
-        except MangaOCRException as e:
+        except Exception as e:
             self.signals.finished.emit(QThreadPoolResult(error=e))
         else:
             self.signals.finished.emit(QThreadPoolResult(result=result))
