@@ -1,15 +1,14 @@
-# Lancet
-
-[![Chat](https://img.shields.io/badge/chat-join-green)](https://ajatt.top/blog/join-our-community.html)
-[![Support](https://img.shields.io/badge/support-developer-orange?style=for-the-badge&logo=Patreon&logoColor=orange)](https://tatsumoto.neocities.org/blog/donating-to-tatsumoto)
-
 <p align="center">
     <img width=100px height=100px src="lancet/icons/logo.png" alt="Project logo">
 </p>
 
 <p align="center">Snipping utility for pytorch OCR models.</p>
 
-## About
+# Lancet
+
+[![PyPi](https://img.shields.io/pypi/v/ajt-lancet?style=for-the-badge)](https://pypi.org/project/ajt-lancet/)
+[![Chat](https://img.shields.io/badge/chat-join-green?style=for-the-badge&logo=Telegram&logoColor=green)](https://ajatt.top/blog/join-our-community.html)
+[![Support](https://img.shields.io/badge/support-developer-orange?style=for-the-badge&logo=Patreon&logoColor=orange)](https://ajatt.top/blog/donating-to-tatsumoto.html)
 
 Lancet is a OCR application for reading manga in Japanese.
 It uses pytorch models to recognize Japanese text on images.
