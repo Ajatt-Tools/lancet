@@ -31,6 +31,8 @@ and drag and hold the mouse cursor to start performing OCR.
 
 ### Installation
 
+Install using [pipx](https://pipx.pypa.io/stable/) from [pypi](https://pypi.org/project/ajt-lancet/).
+
 ```bash
 pipx install ajt-lancet
 ```
