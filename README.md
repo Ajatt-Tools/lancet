@@ -1,5 +1,5 @@
 <p align="center">
-    <img width=100px height=100px src="lancet/icons/logo.png" alt="Project logo">
+    <img width=200px height=200px src="lancet/icons/logo.png" alt="Project logo">
 </p>
 
 <p align="center">OCR application for reading manga in Japanese, made for AJATTers🇯🇵</p>
