@@ -42,10 +42,8 @@ class MangaOcr(MangaOcrBase):
         """Load the OCR model, tokenizer, and processor, then verify with an example image."""
         logger.info(f"Loading OCR model from {pretrained_model_name_or_path}")
         try:
-            self.processor = ViTImageProcessor.from_pretrained(pretrained_model_name_or_path)
-            self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
-            self.model = MangaOcrModel.from_pretrained(pretrained_model_name_or_path)
-        except OSError as ex:
+            self._load_model(pretrained_model_name_or_path)
+        except Exception as ex:
             raise MangaOCRException(f"{class_name(ex)}: {ex}") from ex
 
         if not force_cpu and torch.cuda.is_available():
@@ -62,6 +60,25 @@ class MangaOcr(MangaOcrBase):
             raise MangaOCRFileNotFoundError(f"Missing example image {example_path}")
         logger.info(self.recognize(example_path))
         logger.info("OCR ready")
+
+    def _load_model(self, pretrained_model_name_or_path: pathlib.Path | str) -> None:
+        try:
+            self._load_from_pretrained(pretrained_model_name_or_path, local_files_only=True)
+        except OSError as ex:
+            logger.error(f"{class_name(ex)}: {ex}")
+            logger.info(f"trying with local_files_only=False")
+            self._load_from_pretrained(pretrained_model_name_or_path, local_files_only=False)
+
+    def _load_from_pretrained(
+        self, pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
+    ) -> None:
+        # local_files_only = Whether to only look at local files (i.e., do not try to download the model).
+        # Cache location example: "~/.cache/huggingface/hub/models--tatsumoto--manga-ocr-base/snapshots/"
+        self.processor = ViTImageProcessor.from_pretrained(
+            pretrained_model_name_or_path, local_files_only=local_files_only
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, local_files_only=local_files_only)
+        self.model = MangaOcrModel.from_pretrained(pretrained_model_name_or_path, local_files_only=local_files_only)
 
     def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
         """Recognize Japanese text in the given image or image file path."""
