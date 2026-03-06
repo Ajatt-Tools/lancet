@@ -2,7 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 from collections.abc import Sequence
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
 )
 from zala.utils import qconnect
+
+USER_ROLE = Qt.ItemDataRole.UserRole
 
 
 class OcrHistoryWidget(QGroupBox):
@@ -29,7 +31,7 @@ class OcrHistoryWidget(QGroupBox):
 
         self._list = QListWidget()
         self._list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self._list.addItems(history_items)
+        self._populate_list(history_items)
         layout.addWidget(self._list)
 
         button_row = QHBoxLayout()
@@ -45,12 +47,19 @@ class OcrHistoryWidget(QGroupBox):
         qconnect(self._remove_btn.clicked, lambda: self._remove_selected())
         qconnect(self._clear_btn.clicked, lambda: self._clear_all())
 
+    def _populate_list(self, history_items: Sequence[str]) -> None:
+        self._list.clear()
+        for idx, text in enumerate(history_items):
+            self._list.addItem(text)
+            self._list.item(idx).setData(USER_ROLE, idx)
+
     def as_list(self) -> list[str]:
         return [self._list.item(i).text() for i in range(self._list.count())]
 
     def _copy_selected(self) -> None:
         """Combine selected items into one string and emit the copy_requested signal."""
         selected_items = self._list.selectedItems()
+        selected_items.sort(key=lambda item: item.data(USER_ROLE), reverse=True)
         if not selected_items:
             return
         combined = " ".join(item.text() for item in selected_items)
