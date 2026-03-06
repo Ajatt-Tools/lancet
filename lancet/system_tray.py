@@ -212,8 +212,9 @@ class LancetSystemTray(QSystemTrayIcon):
         if not user_selection.pixmap:
             self._notify.notify(user_selection.error.capitalize())
             return
-        if not self._ocr.is_ready():
-            self._notify.notify(f"OCR model is not ready.")
+
+        if not (status := self._ocr.is_ready()).is_ready:
+            self._notify.notify(f"OCR model is not ready. {status.error}.")
             return
 
         def on_ocr_finished(text: str) -> None:

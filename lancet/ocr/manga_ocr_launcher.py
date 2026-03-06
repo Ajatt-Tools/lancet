@@ -1,6 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import pathlib
+import typing
 from io import BytesIO
 
 from PIL import Image
@@ -13,6 +14,11 @@ from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRException
 from lancet.ocr.op import QThreadPoolOp
 
 
+class MangaOCRReadyResult(typing.NamedTuple):
+    is_ready: bool
+    error: Exception | None
+
+
 class MangaOCRLauncher:
     """
     Manages the lifecycle of the manga OCR model, handling background initialization and readiness checks.
@@ -20,6 +26,7 @@ class MangaOCRLauncher:
     """
 
     _class_instance: MangaOcrBase | None = None
+    _error: Exception | None = None
 
     def __init__(
         self,
@@ -37,6 +44,7 @@ class MangaOCRLauncher:
         self._pretrained_model_name_or_path = pretrained_model_name_or_path
         self._force_cpu = force_cpu
         self._class_instance = None
+        self._error = None
 
     def load_new_config(self, model_name: str, force_cpu: bool) -> None:
         """Update model configuration and reload the model in the background if it changed."""
@@ -48,9 +56,9 @@ class MangaOCRLauncher:
             self._class_instance = None
             self.init_manga_ocr()
 
-    def is_ready(self) -> bool:
+    def is_ready(self) -> MangaOCRReadyResult:
         """Return whether the OCR model has been loaded and is ready to use."""
-        return bool(self._class_instance)
+        return MangaOCRReadyResult(bool(self._class_instance), self._error)
 
     def init_manga_ocr(self) -> None:
         """Start loading the OCR model in a background thread."""
@@ -71,6 +79,7 @@ class MangaOCRLauncher:
         def on_failed(e: Exception) -> None:
             logger.error(f"failed to initialize manga ocr: {e}")
             self._notify.notify(f"failed to initialize manga ocr: {e}")
+            self._error = e
 
         (
             QThreadPoolOp(parent=self._parent, op=op, threadpool=self._threadpool)
