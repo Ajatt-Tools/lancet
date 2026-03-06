@@ -75,10 +75,17 @@ class MangaOcr(MangaOcrBase):
         # local_files_only = Whether to only look at local files (i.e., do not try to download the model).
         # Cache location example: "~/.cache/huggingface/hub/models--tatsumoto--manga-ocr-base/snapshots/"
         self.processor = ViTImageProcessor.from_pretrained(
-            pretrained_model_name_or_path, local_files_only=local_files_only
+            pretrained_model_name_or_path,
+            local_files_only=local_files_only,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, local_files_only=local_files_only)
-        self.model = MangaOcrModel.from_pretrained(pretrained_model_name_or_path, local_files_only=local_files_only)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path,
+            local_files_only=local_files_only,
+        )
+        self.model = MangaOcrModel.from_pretrained(
+            pretrained_model_name_or_path,
+            local_files_only=local_files_only,
+        )
 
     def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
         """Recognize Japanese text in the given image or image file path."""
