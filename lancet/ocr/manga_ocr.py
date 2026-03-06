@@ -19,6 +19,10 @@ class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
     pass
 
 
+def class_name(obj: object) -> str:
+    return obj.__class__.__name__
+
+
 class MangaOcr(MangaOcrBase):
     """
     Manga OCR implementation that uses a HuggingFace vision encoder-decoder model
@@ -41,8 +45,8 @@ class MangaOcr(MangaOcrBase):
             self.processor = ViTImageProcessor.from_pretrained(pretrained_model_name_or_path)
             self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
             self.model = MangaOcrModel.from_pretrained(pretrained_model_name_or_path)
-        except OSError as e:
-            raise MangaOCRException(f"{e.__name__}: {e}") from e
+        except OSError as ex:
+            raise MangaOCRException(f"{class_name(ex)}: {ex}") from ex
 
         if not force_cpu and torch.cuda.is_available():
             logger.info("Using CUDA")
