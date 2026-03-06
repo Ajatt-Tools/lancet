@@ -18,6 +18,13 @@ class MangaOCRReadyResult(typing.NamedTuple):
     is_ready: bool
     error: Exception | None
 
+    def what(self) -> str:
+        if self.is_ready:
+            return "OCR is ready."
+        if self.error:
+            return f"OCR model is not ready. {self.error}."
+        return "OCR model is not ready."
+
 
 class MangaOCRLauncher:
     """
