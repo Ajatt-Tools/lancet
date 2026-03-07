@@ -159,6 +159,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._load_keyboard_shortcuts()
             self._notify.set_duration(self._cfg.notification_duration_sec)
             self._history.set_max_size(self._cfg.max_history_size)
+            self._history.set_entries(settings_applied.ocr_history)
             self._ocr.load_new_config(self._cfg.huggingface_model_name, self._cfg.force_cpu)
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")

@@ -38,6 +38,7 @@ class SettingsApplyResult:
 
     success: bool = False
     error: Exception | None = None
+    ocr_history: list[str] = dataclasses.field(default_factory=list)
 
 
 def ui_translate(key: str) -> str:
@@ -237,8 +238,7 @@ class PreferencesDialog(QDialog):
         except Exception as e:
             self.settings_applied.emit(SettingsApplyResult(error=e))
         else:
-            self.settings_applied.emit(SettingsApplyResult(success=True))
-        self._history.set_entries(self.history_list.as_list())
+            self.settings_applied.emit(SettingsApplyResult(success=True, ocr_history=self.history_list.as_list()))
         self.accept()
 
     def _restore_defaults(self) -> None:
