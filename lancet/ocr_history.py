@@ -48,7 +48,7 @@ class OcrHistory:
 
     def set_max_size(self, max_size: int) -> Self:
         """Update the maximum history size, trimming old entries if needed."""
-        self._entries = collections.deque(self._entries, maxlen=max_size)
+        self._entries = collections.deque(self._entries, maxlen=max(1, max_size))
         self._save_history()
         return self
 
