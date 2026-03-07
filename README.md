@@ -15,7 +15,7 @@ It uses PyTorch models to recognize Japanese text in images.
 Lancet works best with [Goldendict-ng](https://xiaoyifang.github.io/goldendict-ng/)
 or [Rikaitan](https://rikaitan.ajatt.top/).
 
-https://user-images.githubusercontent.com/69171671/177458117-ba858b79-0b2e-4605-9985-5801d9685bd6.mp4
+https://github.com/user-attachments/assets/8859adac-1bd8-435a-9c81-945f875dc205
 
 ## User Guide
 
