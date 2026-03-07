@@ -81,3 +81,13 @@ Try these libre code editors with [python](https://wiki.archlinux.org/title/Pyth
 
 - [pycharm-community-edition](https://archlinux.org/packages/?name=pycharm-community-edition)
 - [vscodium](https://aur.archlinux.org/packages/vscodium)
+
+## Autostart
+
+Add the `lancet` command to autostart to start Lancet when you log in.
+
+Here's an example for [i3wm](https://i3wm.org/):
+
+```
+exec --no-startup-id lancet
+```
