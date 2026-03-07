@@ -29,7 +29,7 @@ Launch `Lancet` and wait for the OCR model to load.
 Show the snipping window using shortcut `Alt+O` ("O" for OCR)
 and drag and hold the mouse cursor to start performing OCR.
 
-### Installation
+## Installation
 
 Install using [pipx](https://pipx.pypa.io/stable/) from [pypi](https://pypi.org/project/ajt-lancet/).
 
@@ -48,6 +48,22 @@ They will be downloaded and saved to `~/.cache/huggingface`.
 
 - Hard drive: 8GiB (`pytorch` and its dependencies)
 - RAM: at least 2 GB (recommended)
+
+### Upgrading
+
+Running [pipx upgrade](https://pipx.pypa.io/stable/docs/#pipx-upgrade)
+upgrades lancet to the latest version.
+
+```
+pipx upgrade ajt-lancet
+```
+
+Running [pipx upgrade-all](https://pipx.pypa.io/stable/docs/#pipx-upgrade-al)
+upgrades all packages installed with `pipx`.
+
+```
+pipx upgrade-all
+```
 
 ### Development Setup
 
