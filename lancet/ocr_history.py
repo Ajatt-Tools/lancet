@@ -9,7 +9,7 @@ from typing import Self
 from lancet.consts import HISTORY_FILE_PATH
 
 
-def _load_history() -> list[str]:
+def _load_history() -> Sequence[str]:
     """Read the history entries from the JSON file."""
     try:
         with open(HISTORY_FILE_PATH, encoding="utf-8") as f:
@@ -52,7 +52,7 @@ class OcrHistory:
         self._save_history()
         return self
 
-    def set_entries(self, entries: list[str]) -> Self:
+    def set_entries(self, entries: Sequence[str]) -> Self:
         """Replace all history entries and save."""
         self._entries.clear()
         self._entries.extend(entries)
