@@ -6,7 +6,7 @@ requires = [
 ]
 
 [project]
-name = "lancet"
+name = "ajt-lancet"
 dynamic = ["version"]
 description = "OCR snipping tool for reading manga."
 readme = "README.md"
