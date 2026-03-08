@@ -30,7 +30,7 @@ from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
 from lancet.ocr.op import QThreadPoolOp
 from lancet.ocr_history import OcrHistory
-from lancet.preferences import PreferencesDialog, SettingsApplyResult
+from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 
 
 def make_output_file_path() -> pathlib.Path:
