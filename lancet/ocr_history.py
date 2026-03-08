@@ -2,6 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import collections
+import itertools
 import json
 from collections.abc import Sequence
 from typing import Self
@@ -52,10 +53,10 @@ class OcrHistory:
         self._save_history()
         return self
 
-    def set_entries(self, entries: Sequence[str]) -> Self:
+    def set_entries(self, entries: Sequence[str], max_size: int = 0) -> Self:
         """Replace all history entries and save."""
-        self._entries.clear()
-        self._entries.extend(entries)
+        max_size = max(1, max_size or self._entries.maxlen)
+        self._entries = collections.deque(itertools.islice(entries, max_size), maxlen=max_size)
         self._save_history()
         return self
 
