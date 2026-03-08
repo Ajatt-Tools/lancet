@@ -64,6 +64,9 @@ extra-dependencies = [
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/lancet tests}"
 
+[tool.hatch.build.targets.wheel]
+packages = ["lancet"]
+
 [tool.coverage.run]
 source_pkgs = ["lancet", "tests"]
 branch = true
