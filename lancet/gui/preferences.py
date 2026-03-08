@@ -98,6 +98,7 @@ class FormWidgets(SimpleNamespace):
 
 class PreferencesDialog(SaveAndRestoreGeomDialog):
     """Preferences dialog for editing all Config fields, with an OCR history panel on the right."""
+
     _geom_file: pathlib.Path = GEOMETRY_FILE_PATH.with_suffix(".preferences")
     settings_applied = pyqtSignal(SettingsApplyResult)
 
