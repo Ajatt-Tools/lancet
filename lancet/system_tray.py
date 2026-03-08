@@ -24,6 +24,7 @@ from lancet.consts import (
     PREFERENCES_ICON_PATH,
 )
 from lancet.find_executable import run_and_disown, find_executable
+from lancet.gui.about_dialog import AboutDialog
 from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum, KeyboardShortcut
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
@@ -104,6 +105,7 @@ class LancetSystemTray(QSystemTrayIcon):
         menu.addSeparator()
         menu.addAction(QIcon(str(PREFERENCES_ICON_PATH)), "Preferences…", self.open_preferences)
         menu.addAction(QIcon(str(RESTART_ICON_PATH)), "Restart", self.restart)
+        menu.addAction(QIcon(str(APP_LOGO_PATH)), "About…", self.open_about)
         menu.addAction(
             QIcon(str(EXIT_ICON_PATH)),
             "Exit",
@@ -145,6 +147,11 @@ class LancetSystemTray(QSystemTrayIcon):
                 self.make_ocr_screenshot()
             case LancetShortcutEnum.screenshot_shortcut:
                 self.make_screenshot_area()
+
+    def open_about(self) -> None:
+        """Open the About dialog."""
+        dialog = AboutDialog()
+        dialog.exec()
 
     def open_preferences(self) -> None:
         """Open the preferences dialog and reload shortcuts if settings are applied."""

@@ -23,3 +23,6 @@ GEOMETRY_FILE_PATH = CACHE_DIR_PATH / "geometry"
 
 IS_MAC = sys.platform.startswith("darwin")
 IS_WIN = sys.platform.startswith("win32")
+
+GITHUB_URL = "https://github.com/Ajatt-Tools/lancet"
+CHAT_URL = "https://ajatt.top/blog/join-our-community.html"
