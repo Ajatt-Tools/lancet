@@ -1,6 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import dataclasses
+import pathlib
 import sys
 from types import SimpleNamespace
 
@@ -8,7 +9,6 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QDialog,
     QDialogButtonBox,
     QFormLayout,
     QSpinBox,
@@ -19,13 +19,13 @@ from PyQt6.QtWidgets import (
     QLayout,
     QGridLayout,
 )
-from loguru import logger
 
 from lancet.config import Config
 from lancet.consts import APP_NAME, APP_LOGO_PATH, GEOMETRY_FILE_PATH
 from lancet.gui.color_picker import ColorEditPicker
 
 from lancet.gui.enum_select_combo import EnumSelectCombo
+from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.ocr_model_list import ModelListEditor
@@ -96,9 +96,9 @@ class FormWidgets(SimpleNamespace):
     fill_brush_color: ColorEditPicker
 
 
-class PreferencesDialog(QDialog):
+class PreferencesDialog(SaveAndRestoreGeomDialog):
     """Preferences dialog for editing all Config fields, with an OCR history panel on the right."""
-
+    _geom_file: pathlib.Path = GEOMETRY_FILE_PATH.with_suffix(".preferences")
     settings_applied = pyqtSignal(SettingsApplyResult)
 
     def __init__(self, cfg: Config, history: OcrHistory, parent: QWidget | None = None) -> None:
@@ -167,43 +167,12 @@ class PreferencesDialog(QDialog):
         self._button_box.clicked.connect(self._on_button_clicked)
         columns_layout.addWidget(self._button_box, 3, 1, 1, 2)  # row, col, rowspan, colspan
 
-        # Restore geometry
-        self._restore_geometry()
-
     def _make_settings_layout(self) -> QLayout:
         """Build a form layout with labeled rows for each settings widget."""
         layout = QFormLayout()
         for key, widget in self._widgets.__dict__.items():
             layout.addRow(ui_translate(key), widget)
         return layout
-
-    def _save_geometry(self) -> None:
-        """Save the dialog's position and size to QSettings."""
-        try:
-            GEOMETRY_FILE_PATH.parent.mkdir(exist_ok=True, parents=True)
-            GEOMETRY_FILE_PATH.write_bytes(self.saveGeometry())
-        except OSError as e:
-            logger.error(f"can't save geometry: {e}")
-
-    def _restore_geometry(self) -> None:
-        """Restore the dialog's position and size from QSettings."""
-        try:
-            geometry = GEOMETRY_FILE_PATH.read_bytes()
-        except OSError:
-            return
-        else:
-            if geometry:
-                self.restoreGeometry(geometry)
-
-    def reject(self) -> None:
-        """Save geometry and reject the dialog."""
-        self._save_geometry()
-        return super().reject()
-
-    def accept(self) -> None:
-        """Save geometry and accept the dialog."""
-        self._save_geometry()
-        return super().accept()
 
     def _on_button_clicked(self, button: QAbstractButton) -> None:
         """Route button clicks to the appropriate action based on the button's role."""

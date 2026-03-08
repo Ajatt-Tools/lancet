@@ -1,5 +1,6 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import pathlib
 import sys
 
 from PyQt6.QtCore import Qt
@@ -15,7 +16,8 @@ from PyQt6.QtWidgets import (
 )
 from zala.utils import qconnect
 
-from lancet.consts import APP_LOGO_PATH, APP_NAME, GITHUB_URL, CHAT_URL
+from lancet.consts import APP_LOGO_PATH, APP_NAME, GITHUB_URL, CHAT_URL, GEOMETRY_FILE_PATH
+from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 
 
 def _linked(url: str, label: str) -> str:
@@ -74,9 +76,10 @@ If you have any questions, {_linked(CHAT_URL, 'join our community')}.
 """
 
 
-class AboutDialog(QDialog):
+class AboutDialog(SaveAndRestoreGeomDialog):
     """Dialog that shows information about the Lancet application."""
 
+    _geom_file: pathlib.Path = GEOMETRY_FILE_PATH.with_suffix(".about")
     _content_margins = (24, 16, 24, 16)
     _spacing: int = 8
 
