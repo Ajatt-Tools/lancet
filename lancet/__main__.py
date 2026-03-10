@@ -4,6 +4,7 @@ import pathlib
 import shutil
 import socket
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 from PyQt6.QtGui import QIcon
@@ -46,7 +47,7 @@ def drop_launch_shortcut() -> None:
 
 
 @contextmanager
-def singleton_instance(cfg: Config) -> socket.socket:
+def singleton_instance(cfg: Config) -> Iterator[socket.socket]:
     """
     Context manager that ensures only one instance of the application is running.
     Uses socket binding to a specific port to ensure singleton behavior.
