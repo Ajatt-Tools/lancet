@@ -22,6 +22,7 @@ from lancet.consts import (
     OCR_ICON_PATH,
     RESTART_ICON_PATH,
     PREFERENCES_ICON_PATH,
+    APP_NAME,
 )
 from lancet.find_executable import run_and_disown, find_executable
 from lancet.gui.about_dialog import AboutDialog
@@ -33,9 +34,14 @@ from lancet.ocr_history import OcrHistory
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 
 
+def filename_compatible_datetime() -> str:
+    """Generate a timestamped file name compatible with the current system."""
+    return datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+
 def make_output_file_path() -> pathlib.Path:
     """Generate a timestamped file path under ~/Pictures/Screenshots for saving a screenshot."""
-    return pathlib.Path.home() / "Pictures" / "Screenshots" / f"{datetime.datetime.now().isoformat()}.png"
+    return pathlib.Path.home() / "Pictures" / "Screenshots" / f"{APP_NAME}_{filename_compatible_datetime()}.png"
 
 
 def format_hotkey(menu_label: str, keyboard_shortcut: str) -> str:
