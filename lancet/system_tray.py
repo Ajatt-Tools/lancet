@@ -74,7 +74,7 @@ class LancetSystemTray(QSystemTrayIcon):
     _cfg: Config
     _hotkeys: LancetShortcutManager | None = None
 
-    def __init__(self, app: QApplication, parent: QWidget | None = None) -> None:
+    def __init__(self, app: QApplication, cfg: Config, parent: QWidget | None = None) -> None:
         """Set up the system tray icon, context menu, OCR model, and keyboard shortcuts."""
         super().__init__(parent)
         self._app = app
@@ -82,7 +82,7 @@ class LancetSystemTray(QSystemTrayIcon):
 
         # State trackers and configurations
         self.threadpool = QThreadPool.globalInstance()
-        self._cfg = Config.read_from_file()
+        self._cfg = cfg
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self._history = OcrHistory(self._cfg.max_history_size)
         self._ocr = MangaOCRLauncher(

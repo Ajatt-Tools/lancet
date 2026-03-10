@@ -41,6 +41,8 @@ class Config:
     outline_color: str = "#7FFF0000"
     fill_brush_color: str = "#557F7F7F"
 
+    bind_port: int = 13129
+
     @classmethod
     def read_from_file(cls) -> Self:
         """Read the config from the JSON file, returning defaults if the file does not exist."""
@@ -55,6 +57,10 @@ class Config:
             return cls(**data)
         except TypeError as ex:
             raise ConfigReadError(f"failed to parse config file: {ex}") from ex
+
+    @staticmethod
+    def file_exists() -> bool:
+        return CFG_PATH.is_file()
 
     def save_to_file(self) -> None:
         """Serialize the config to JSON and write it to the config file."""

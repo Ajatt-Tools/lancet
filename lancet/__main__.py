@@ -10,6 +10,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 from loguru import logger
 
+from lancet.config import Config
 from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN
 from lancet.exceptions import PortAlreadyInUseError
 from lancet.system_tray import LancetSystemTray
@@ -42,12 +43,12 @@ def drop_launch_shortcut() -> None:
 
 
 @contextmanager
-def singleton_instance():
+def singleton_instance(cfg: Config):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         # Bind to a specific port (choose an unused one)
         try:
-            sock.bind(("127.0.0.1", 9999))
+            sock.bind(("127.0.0.1", cfg.bind_port))
         except OSError as ex:
             raise PortAlreadyInUseError("Another instance of this program is already running") from ex
         yield sock
@@ -56,7 +57,7 @@ def singleton_instance():
         sock.close()
 
 
-def run_program() -> None:
+def run_program(cfg: Config) -> None:
     """Initialize and run the Lancet system tray application."""
 
     drop_launch_shortcut()
@@ -65,7 +66,7 @@ def run_program() -> None:
     app.setWindowIcon(QIcon(str(APP_LOGO_PATH)))
     app.setQuitOnLastWindowClosed(False)
 
-    widget = LancetSystemTray(app)
+    widget = LancetSystemTray(app, cfg)
     widget.show()
 
     sys.exit(app.exec())
@@ -73,9 +74,13 @@ def run_program() -> None:
 
 def main() -> None:
     """Initialize and run the Lancet system tray application."""
+    cfg = Config.read_from_file()
+    if not cfg.file_exists():
+        cfg.save_to_file()
+
     try:
-        with singleton_instance():
-            run_program()
+        with singleton_instance(cfg):
+            run_program(cfg)
     except PortAlreadyInUseError as ex:
         logger.warning(str(ex))
 
