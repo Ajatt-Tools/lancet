@@ -6,6 +6,8 @@ import pathlib
 
 from PIL import Image
 
+from lancet.exceptions import LancetException
+
 
 class MangaOcrBase(abc.ABC):
     """Abstract base class defining the interface for manga OCR implementations."""
@@ -16,7 +18,7 @@ class MangaOcrBase(abc.ABC):
         raise NotImplementedError
 
 
-class MangaOCRException(Exception):
+class MangaOCRException(LancetException):
     """Base exception for all manga OCR related errors."""
 
     pass
@@ -24,11 +26,5 @@ class MangaOCRException(Exception):
 
 class MangaOCRFileNotFoundError(MangaOCRException, FileNotFoundError):
     """Raised when a required file (e.g. example image) is not found."""
-
-    pass
-
-
-class ConfigReadError(MangaOCRException, RuntimeError):
-    """Raised when the configuration file cannot be read or parsed."""
 
     pass

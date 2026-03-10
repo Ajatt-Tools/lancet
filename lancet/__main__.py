@@ -2,12 +2,16 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import pathlib
 import shutil
+import socket
 import sys
+from contextlib import contextmanager
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
+from loguru import logger
 
 from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN
+from lancet.exceptions import PortAlreadyInUseError
 from lancet.system_tray import LancetSystemTray
 
 
@@ -37,8 +41,24 @@ def drop_launch_shortcut() -> None:
             pass
 
 
-def main() -> None:
+@contextmanager
+def singleton_instance():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        # Bind to a specific port (choose an unused one)
+        try:
+            sock.bind(("127.0.0.1", 9999))
+        except OSError as ex:
+            raise PortAlreadyInUseError("Another instance of this program is already running") from ex
+        yield sock
+    finally:
+        # Code to release resource, e.g.:
+        sock.close()
+
+
+def run_program() -> None:
     """Initialize and run the Lancet system tray application."""
+
     drop_launch_shortcut()
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
@@ -46,10 +66,18 @@ def main() -> None:
     app.setQuitOnLastWindowClosed(False)
 
     widget = LancetSystemTray(app)
-
     widget.show()
-    # widget.loadModel()
+
     sys.exit(app.exec())
+
+
+def main() -> None:
+    """Initialize and run the Lancet system tray application."""
+    try:
+        with singleton_instance():
+            run_program()
+    except PortAlreadyInUseError as ex:
+        logger.warning(str(ex))
 
 
 if __name__ == "__main__":

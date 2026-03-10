@@ -6,7 +6,7 @@ import json
 from typing import Self
 
 from lancet.consts import CFG_PATH
-from lancet.ocr.manga_ocr_base import ConfigReadError
+from lancet.exceptions import ConfigReadError
 
 
 class OcrDestination(enum.Enum):
