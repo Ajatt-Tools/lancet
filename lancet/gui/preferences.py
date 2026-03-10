@@ -28,7 +28,7 @@ from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.ocr_model_list import ModelListEditor
-from lancet.gui.utils import ui_translate, SecondsSpinBox, HistorySizeSpinBox, BorderThicknessSpinBox
+from lancet.gui.utils import ui_translate, SecondsSpinBox, HistorySizeSpinBox, BorderThicknessSpinBox, BindPortSpinBox
 from lancet.ocr_history import OcrHistory
 
 
@@ -111,6 +111,9 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         # Max history size
         self._widgets.max_history_size = HistorySizeSpinBox(initial_value=cfg.max_history_size)
 
+        # Bind port
+        self._widgets.bind_port = BindPortSpinBox(initial_value=cfg.bind_port)
+
         # Screenshot overlay settings
         self._widgets.border_thickness = BorderThicknessSpinBox(initial_value=cfg.border_thickness)
         self._widgets.border_color = ColorEditPicker(initial_color=cfg.border_color)
@@ -154,6 +157,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._cfg.copy_to = self._widgets.copy_to.currentData()
         self._cfg.notification_duration_sec = self._widgets.notification_duration.value()
         self._cfg.max_history_size = self._widgets.max_history_size.value()
+        self._cfg.bind_port = self._widgets.bind_port.value()
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
@@ -181,6 +185,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._widgets.copy_to.set_current(defaults.copy_to)
         self._widgets.notification_duration.setValue(defaults.notification_duration_sec)
         self._widgets.max_history_size.setValue(defaults.max_history_size)
+        self._widgets.bind_port.setValue(defaults.bind_port)
         self._widgets.huggingface_model.set_current(defaults.huggingface_model_name)
         self._widgets.huggingface_model.set_items(defaults.huggingface_models)
         self._widgets.force_cpu.setChecked(defaults.force_cpu)

@@ -20,7 +20,8 @@ class SecondsSpinBox(QSpinBox):
         """Initialize the spin box with range, suffix, and initial value."""
         super().__init__(parent)
         self.setRange(self.min, self.max)
-        self.setSuffix(f" {self.suffix}")
+        if self.suffix:
+            self.setSuffix(f" {self.suffix}")
         self.setValue(initial_value)
 
 
@@ -38,3 +39,11 @@ class BorderThicknessSpinBox(SecondsSpinBox):
     min: int = 1
     max: int = 20
     suffix: str = "px"
+
+
+class BindPortSpinBox(SecondsSpinBox):
+    """A spin box for selecting the screenshot overlay border thickness in pixels."""
+
+    min: int = 1025
+    max: int = 32767
+    suffix: str = ""
