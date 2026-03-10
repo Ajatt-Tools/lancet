@@ -6,13 +6,16 @@ import os
 import pathlib
 import signal
 import sys
+from typing import Callable
 
 from PyQt6.QtCore import QThreadPool
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QWidget
 from loguru import logger
+from zala.exceptions import ZalaException
 from zala.main_window import ZalaSelect, UserSelectionResult, ScreenshotPreviewOpts
 from zala.screenshot import ZalaScreenshot
+from zala.take_region import ZalaTakeScreenRegion
 
 from lancet.config import Config, OcrDestination
 from lancet.consts import (
@@ -69,22 +72,21 @@ class LancetSystemTray(QSystemTrayIcon):
     """
 
     _ocr: MangaOCRLauncher
-    _scr: ZalaScreenshot
     _app: QApplication
-    _sel: ZalaSelect | None = None
+    _take: ZalaTakeScreenRegion
     _cfg: Config
     _hotkeys: LancetShortcutManager | None = None
 
     def __init__(self, app: QApplication, cfg: Config, parent: QWidget | None = None) -> None:
         """Set up the system tray icon, context menu, OCR model, and keyboard shortcuts."""
         super().__init__(parent)
-        self._app = app
-        self._scr = ZalaScreenshot(app)
 
-        # State trackers and configurations
+        # Setup members
+        self._app = app
         self.threadpool = QThreadPool.globalInstance()
         self._cfg = cfg
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
+        self._take = ZalaTakeScreenRegion(scr=ZalaScreenshot(app))
         self._history = OcrHistory(self._cfg.max_history_size)
         self._ocr = MangaOCRLauncher(
             parent=self,
@@ -94,6 +96,7 @@ class LancetSystemTray(QSystemTrayIcon):
             force_cpu=self._cfg.force_cpu,
         )
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
+
         # Menu
         menu = QMenu(parent)
         self.setContextMenu(menu)
@@ -199,15 +202,19 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def make_screenshot_area(self) -> None:
         """Open the full-screen selection overlay for taking an area screenshot."""
-        self._sel = ZalaSelect(self._scr.capture_screen(), opts=make_preview_opts(self._cfg))
-        self._sel.selection_finished.connect(self.process_select_result)
-        self._sel.showFullScreen()
+        try:
+            self._take.select_area(on_finish=self.process_select_result, opts=make_preview_opts(self._cfg))
+        except ZalaException as ex:
+            logger.error(str(ex))
+            self._notify.notify(str(ex))
 
     def make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for OCR recognition of the selected area."""
-        self._sel = ZalaSelect(self._scr.capture_screen(), opts=make_preview_opts(self._cfg))
-        self._sel.selection_finished.connect(self.process_ocr_result)
-        self._sel.showFullScreen()
+        try:
+            self._take.select_area(on_finish=self.process_ocr_result, opts=make_preview_opts(self._cfg))
+        except ZalaException as ex:
+            logger.error(str(ex))
+            self._notify.notify(str(ex))
 
     def process_select_result(self, user_selection: UserSelectionResult) -> None:
         """Save the user's screenshot selection to a file."""
