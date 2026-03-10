@@ -9,6 +9,7 @@ from PyQt6.QtCore import QBuffer, QThreadPool, QObject
 from PyQt6.QtGui import QPixmap
 from loguru import logger
 
+from lancet.exceptions import PixmapConversionError
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRException
 from lancet.ocr.op import QThreadPoolOp
@@ -102,16 +103,25 @@ class MangaOCRLauncher:
             raise MangaOCRException("ocr model is not initialized")
         return self._class_instance
 
+    def run_ocr(self, image: Image.Image) -> str:
+        """
+        Convert PIL Image object to text using the OCR model
+        """
+        return self.instance.recognize(image).strip()
+
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image | None:
-    """Convert a Qt QPixmap to a PIL Image, returning None if the pixmap is empty."""
+    """Convert a Qt QPixmap to a PIL Image. Raise if the pixmap is empty."""
+    if pixmap.isNull():
+        raise PixmapConversionError("pixmap is null")
+
     buffer = QBuffer()
     buffer.open(QBuffer.OpenModeFlag.ReadWrite)
     pixmap.save(buffer, "PNG")
     bytes_io = BytesIO(buffer.data())
 
     if bytes_io.getbuffer().nbytes == 0:
-        return None
+        raise PixmapConversionError("empty pixmap")
 
     return Image.open(bytes_io)
 
@@ -120,7 +130,5 @@ def run_ocr(pixmap: QPixmap, model: MangaOCRLauncher) -> str:
     """
     Convert QPixmap object to text using the OCR model
     """
-    image = pixmap_to_pillow_image(pixmap)
-    if not image:
-        raise MangaOCRException("empty pixmap")
-    return model.instance.recognize(image).strip()
+
+    return model.instance.recognize(pixmap_to_pillow_image(pixmap)).strip()

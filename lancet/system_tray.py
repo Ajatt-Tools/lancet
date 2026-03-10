@@ -24,11 +24,12 @@ from lancet.consts import (
     PREFERENCES_ICON_PATH,
     APP_NAME,
 )
+from lancet.exceptions import PixmapConversionError
 from lancet.find_executable import run_and_disown, find_executable
 from lancet.gui.about_dialog import AboutDialog
 from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum, KeyboardShortcut
 from lancet.notifications import NotifySend
-from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, run_ocr
+from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, pixmap_to_pillow_image
 from lancet.ocr.op import QThreadPoolOp
 from lancet.ocr_history import OcrHistory
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
@@ -230,6 +231,12 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(status.what())
             return
 
+        try:
+            image = pixmap_to_pillow_image(user_selection.pixmap)
+        except PixmapConversionError as ex:
+            self._notify.notify(str(ex))
+            return
+
         def on_ocr_finished(text: str) -> None:
             if text:
                 self._history.add_to_history(text)
@@ -242,7 +249,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"failed to recognize image: {e}")
 
         (
-            QThreadPoolOp(parent=self, op=lambda: run_ocr(user_selection.pixmap, self._ocr), threadpool=self.threadpool)
+            QThreadPoolOp(parent=self, op=lambda: self._ocr.run_ocr(image), threadpool=self.threadpool)
             .success(on_ocr_finished)
             .failure(on_failed)
             .run_in_background()

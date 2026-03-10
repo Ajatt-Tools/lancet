@@ -14,3 +14,7 @@ class ConfigReadError(LancetException, RuntimeError):
 
 class PortAlreadyInUseError(LancetException, OSError):
     pass
+
+
+class PixmapConversionError(LancetException, ValueError):
+    pass
