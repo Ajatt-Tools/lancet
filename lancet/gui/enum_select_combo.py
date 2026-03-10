@@ -5,6 +5,8 @@ import enum
 
 from PyQt6.QtWidgets import QComboBox, QWidget
 
+from lancet.gui.utils import ui_translate
+
 
 class EnumSelectCombo(QComboBox):
     """A combo box that populates itself from an enum type and allows selecting an enum value."""
@@ -18,7 +20,7 @@ class EnumSelectCombo(QComboBox):
         super().__init__(parent)
         enum_type = type(initial_value)
         for item in enum_type:
-            self.addItem(item.name, item)
+            self.addItem(ui_translate(item.name), item)
         self.set_current(initial_value)
 
     def set_current(self, value: enum.Enum) -> None:

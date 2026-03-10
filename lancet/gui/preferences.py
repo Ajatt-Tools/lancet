@@ -11,7 +11,6 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialogButtonBox,
     QFormLayout,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
     QApplication,
@@ -29,6 +28,7 @@ from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.ocr_model_list import ModelListEditor
+from lancet.gui.utils import ui_translate, SecondsSpinBox, HistorySizeSpinBox, BorderThicknessSpinBox
 from lancet.ocr_history import OcrHistory
 
 
@@ -39,42 +39,6 @@ class SettingsApplyResult:
     success: bool = False
     error: Exception | None = None
     ocr_history: list[str] = dataclasses.field(default_factory=list)
-
-
-def ui_translate(key: str) -> str:
-    """Convert a snake_case config key to a human-readable label."""
-    return key.capitalize().replace("_", " ")
-
-
-class SecondsSpinBox(QSpinBox):
-    """A spin box pre-configured for selecting a duration in seconds."""
-
-    min: int = 1
-    max: int = 120
-    suffix: str = "seconds"
-
-    def __init__(self, initial_value: int, parent: QWidget | None = None) -> None:
-        """Initialize the spin box with range, suffix, and initial value."""
-        super().__init__(parent)
-        self.setRange(self.min, self.max)
-        self.setSuffix(f" {self.suffix}")
-        self.setValue(initial_value)
-
-
-class HistorySizeSpinBox(SecondsSpinBox):
-    """A spin box for selecting the maximum number of history items."""
-
-    min: int = 1
-    max: int = 1_000
-    suffix: str = "items"
-
-
-class BorderThicknessSpinBox(SecondsSpinBox):
-    """A spin box for selecting the screenshot overlay border thickness in pixels."""
-
-    min: int = 1
-    max: int = 20
-    suffix: str = "px"
 
 
 class FormWidgets(SimpleNamespace):
