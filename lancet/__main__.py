@@ -17,6 +17,9 @@ from lancet.system_tray import LancetSystemTray
 
 
 def drop_launch_shortcut() -> None:
+    """
+    Create desktop shortcut and icon files if they don't exist.
+    """
     if IS_MAC or IS_WIN:
         return
 
@@ -43,7 +46,11 @@ def drop_launch_shortcut() -> None:
 
 
 @contextmanager
-def singleton_instance(cfg: Config):
+def singleton_instance(cfg: Config) -> socket.socket:
+    """
+    Context manager that ensures only one instance of the application is running.
+    Uses socket binding to a specific port to ensure singleton behavior.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         # Bind to a specific port (choose an unused one)
@@ -58,7 +65,9 @@ def singleton_instance(cfg: Config):
 
 
 def run_program(cfg: Config) -> None:
-    """Initialize and run the Lancet system tray application."""
+    """
+    Initialize and run the Lancet system tray application.
+    """
 
     drop_launch_shortcut()
     app = QApplication(sys.argv)
@@ -73,7 +82,10 @@ def run_program(cfg: Config) -> None:
 
 
 def main() -> None:
-    """Initialize and run the Lancet system tray application."""
+    """
+    Main entry point for the Lancet application.
+    Reads configuration, ensures singleton instance, and runs the program.
+    """
     cfg = Config.read_from_file()
     if not cfg.file_exists():
         cfg.save_to_file()
