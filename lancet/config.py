@@ -41,6 +41,7 @@ class Config:
     outline_color: str = "#7FFF0000"
     fill_brush_color: str = "#557F7F7F"
 
+    # Port used to check if the program is already running.
     bind_port: int = 13129
 
     @classmethod
