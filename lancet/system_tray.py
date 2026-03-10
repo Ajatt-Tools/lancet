@@ -208,7 +208,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify("Selection aborted")
             return
         output_path = make_output_file_path()
-        output_path.mkdir(parents=True, exist_ok=True)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         if user_selection.pixmap.save(str(output_path)):
             self._notify.notify(f"Selection saved to {output_path}")
         else:
