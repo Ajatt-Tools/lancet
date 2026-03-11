@@ -264,7 +264,13 @@ class LancetSystemTray(QSystemTrayIcon):
         """Send the OCR result to the configured destination (clipboard or GoldenDict)."""
         match self._cfg.copy_to:
             case OcrDestination.goldendict:
-                run_and_disown([find_executable("goldendict") or "goldendict", text])
+                try:
+                    run_and_disown([find_executable("goldendict") or "goldendict", text])
+                except FileNotFoundError:
+                    self._notify.notify(
+                        f"Executable not found: 'goldendict'. Ensure it is installed and added to $PATH."
+                    )
+                    return
             case OcrDestination.clipboard:
                 self._app.clipboard().setText(text)
         self._notify.notify(f"OCR result copied: {text}")
