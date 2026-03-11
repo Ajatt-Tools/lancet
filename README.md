@@ -87,10 +87,27 @@ Since [Ajatt-Tools](https://github.com/Ajatt-Tools) is a distributed effort, we 
 Install the project in development mode to easily test and commit your changes using `hatch`.
 
 - Clone the repo.
-- Install [hatch](https://github.com/pypa/hatch).
-- CD into the repo and run `hatch shell`.
-- Inside the hatch shell run `pip install -e .`.
-- To run the app, run: `hatch run lancet`.
+- Install [hatch](https://github.com/pypa/hatch):
+
+  ```
+  pipx install hatch
+  pipx upgrade hatch
+  ```
+- CD into the repo and run:
+
+  ```
+  hatch shell
+  ```
+- Inside the hatch shell run:
+
+  ```
+  pip install -e .
+  ```
+- To run the app, run:
+
+  ```
+  hatch run lancet
+  ```
 
 Try these libre code editors with [python](https://wiki.archlinux.org/title/Python) support:
 
