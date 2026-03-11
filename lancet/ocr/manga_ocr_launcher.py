@@ -1,5 +1,6 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import concurrent.futures
 import pathlib
 import typing
 from io import BytesIO
@@ -12,7 +13,7 @@ from loguru import logger
 from lancet.exceptions import PixmapConversionError
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRException
-from lancet.ocr.op import QThreadPoolOp
+from lancet.ocr.thread_op import LancetThreadOp
 
 
 class MangaOCRReadyResult(typing.NamedTuple):
@@ -40,7 +41,7 @@ class MangaOCRLauncher:
         self,
         parent: QObject,
         notify: NotifySend,
-        threadpool: QThreadPool,
+        executor: concurrent.futures.ThreadPoolExecutor,
         pretrained_model_name_or_path: str | pathlib.Path = "tatsumoto/manga-ocr-base",
         force_cpu: bool = False,
     ) -> None:
@@ -48,7 +49,7 @@ class MangaOCRLauncher:
         super().__init__()
         self._parent = parent
         self._notify = notify
-        self._threadpool = threadpool
+        self._executor = executor
         self._pretrained_model_name_or_path = pretrained_model_name_or_path
         self._force_cpu = force_cpu
         self._class_instance = None
@@ -90,7 +91,7 @@ class MangaOCRLauncher:
             self._error = e
 
         (
-            QThreadPoolOp(parent=self._parent, op=op, threadpool=self._threadpool)
+            LancetThreadOp[MangaOcrBase](op=op, executor=self._executor)
             .success(on_ready)
             .failure(on_failed)
             .run_in_background()

@@ -1,19 +1,18 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import concurrent.futures
 import datetime
 import os
 import pathlib
 import signal
 import sys
-from typing import Callable
 
-from PyQt6.QtCore import QThreadPool
 from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QWidget
 from loguru import logger
 from zala.exceptions import ZalaException
-from zala.main_window import ZalaSelect, UserSelectionResult, ScreenshotPreviewOpts
+from zala.main_window import UserSelectionResult, ScreenshotPreviewOpts
 from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 
@@ -30,12 +29,12 @@ from lancet.consts import (
 from lancet.exceptions import PixmapConversionError
 from lancet.find_executable import run_and_disown, find_executable
 from lancet.gui.about_dialog import AboutDialog
+from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum, KeyboardShortcut
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, pixmap_to_pillow_image
-from lancet.ocr.op import QThreadPoolOp
+from lancet.ocr.thread_op import LancetThreadOp
 from lancet.ocr_history import OcrHistory
-from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 
 
 def filename_compatible_datetime() -> str:
@@ -82,8 +81,8 @@ class LancetSystemTray(QSystemTrayIcon):
         super().__init__(parent)
 
         # Setup members
+        self._executor = concurrent.futures.ThreadPoolExecutor()
         self._app = app
-        self.threadpool = QThreadPool.globalInstance()
         self._cfg = cfg
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self._take = ZalaTakeScreenRegion(scr=ZalaScreenshot(app))
@@ -91,7 +90,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._ocr = MangaOCRLauncher(
             parent=self,
             notify=self._notify,
-            threadpool=self.threadpool,
+            executor=self._executor,
             pretrained_model_name_or_path=self._cfg.huggingface_model_name,
             force_cpu=self._cfg.force_cpu,
         )
@@ -189,15 +188,14 @@ class LancetSystemTray(QSystemTrayIcon):
     def restart(self) -> None:
         """Restart the application by replacing the current process with a fresh instance."""
         # https://docs.python.org/3.14/library/os.html#os.execv
-        logger.info("Restarting Lancet.")
-        self._stop_hotkeys()
-        self._app.quit()
+        self.quit()
         os.execv(sys.executable, [sys.executable, *sys.argv])
 
     def quit(self) -> None:
         """Stop hotkeys and quit the application."""
         logger.info("Quit Lancet.")
         self._stop_hotkeys()
+        self._executor.shutdown(wait=True)
         self._app.quit()
 
     def make_screenshot_area(self) -> None:
@@ -256,7 +254,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"failed to recognize image: {e}")
 
         (
-            QThreadPoolOp(parent=self, op=lambda: self._ocr.run_ocr(image), threadpool=self.threadpool)
+            LancetThreadOp[str](op=lambda: self._ocr.run_ocr(image), executor=self._executor)
             .success(on_ocr_finished)
             .failure(on_failed)
             .run_in_background()
