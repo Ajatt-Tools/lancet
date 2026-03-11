@@ -97,3 +97,8 @@ Here's an example for [i3wm](https://i3wm.org/):
 ```
 exec --no-startup-id lancet
 ```
+
+## Announcements
+
+1) [Sunsetting Transformers OCR](https://freesoftwareextremist.com/notice/B42ECp5gcevZYQMm1I)
+2) [Meet Lancet](https://freesoftwareextremist.com/notice/B43M1aarAzLKCK3n0K)
