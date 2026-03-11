@@ -34,8 +34,10 @@ def find_executable(name: str) -> str | None:
 
 def run_and_disown(args: Sequence[str]) -> None:
     """Start a subprocess detached from the current process group so it survives application exit."""
-    subprocess.Popen(
+    _ = subprocess.Popen(
         args,
         shell=False,
         start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
