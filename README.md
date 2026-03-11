@@ -43,8 +43,17 @@ pipx install ajt-lancet
 
 The `lancet` executable will be available in your `$PATH`.
 
-On [Windows-like systems](https://reactos.org/),
-you may need to add the folder containing the `lancet` executable to your `$PATH` manually.
+> [!NOTE]
+> On [Windows-like systems](https://reactos.org/),
+> you may need to add the folder containing the `lancet` executable to your `$PATH` manually.
+
+> [!NOTE]
+> If you don't have the required python version, install it first with [hatch](https://github.com/pypa/hatch).
+>
+> ```
+> hatch python install 3.13
+> pipx install ajt-lancet --python ~/.local/share/hatch/pythons/3.13/python/bin/python
+> ```
 
 ### System Requirements
 
