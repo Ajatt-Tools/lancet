@@ -37,7 +37,7 @@ dependencies = [
     "transformers>=5.2.0",
     "fugashi", # needed by bert_japanese/tokenization_bert_japanese.py
     "unidic_lite", # needed by bert_japanese/tokenization_bert_japanese.py
-    "zala>=26.3.10.0", # or use a local folder: "zala @ git+file:///home/ren/Documents/Projects/Zala"
+    "zala>=26.3.16.0", # or use a local folder: "zala @ git+file:///home/ren/Documents/Projects/Zala"
 ]
 [tool.hatch.metadata]
 allow-direct-references = true
