@@ -65,6 +65,14 @@ The PyTorch models are downloaded from HuggingFace and saved to `~/.cache/huggin
 - Disk space: ~8 GiB (PyTorch and dependencies)
 - RAM: at least 2 GiB
 
+### Wayland support
+
+Wayland support has been tested on [Sway](https://wiki.archlinux.org/title/Sway) 1.11.
+Wayland support is incomplete.
+It works best on Hyprland and Sway, but on other compositors
+you may face issues if you have multiple monitors.
+🙏 Please suggest improvements via pull requests on GitHub.
+
 ### Upgrading
 
 Running [pipx upgrade](https://pipx.pypa.io/stable/docs/#pipx-upgrade)
