@@ -38,6 +38,17 @@ jobs:
         name: python-package-distributions
         path: dist/
 
+    - name: Dispatch release for windows
+      uses: aurelien-baudet/workflow-dispatch@v4
+      with:
+        workflow: release_windows
+        token: ${{ secrets.GITHUB_TOKEN }}
+        wait-for-completion: false
+        inputs: |
+          {
+            "githubRef": "${{ github.ref_name }}"
+          }
+
   # step 2
   publish-to-pypi:
     name: Publish Python distribution to PyPI

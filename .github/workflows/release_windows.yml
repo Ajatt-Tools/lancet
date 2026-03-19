@@ -1,0 +1,76 @@
+name: Build and Release Windows Executable
+
+on:
+  workflow_dispatch:
+    inputs:
+      githubRef:
+        description: "The tag to associate with the release"
+        required: true
+
+jobs:
+  # step 1
+  build-windows-exe:
+    name: Build Windows executable
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      ref: ${{ inputs.githubRef }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pyinstaller
+        python -m pip install .
+
+    # https://pyinstaller.org/en/stable/usage.html#options
+    - name: Build exe with PyInstaller
+      run: >-
+        pyinstaller
+        --noconfirm
+        --onefile
+        --windowed
+        --name Lancet
+        --icon lancet/icons/logo.ico
+        --add-data "lancet/icons;lancet/icons"
+        --add-data "lancet/lancet.desktop;lancet"
+        --hidden-import lancet
+        lancet/__main__.py
+
+    - name: Upload Windows executable
+      uses: actions/upload-artifact@v6
+      with:
+        name: windows-exe
+        path: dist/Lancet.exe
+
+  # step 2
+  github-release:
+    name: Create GitHub release
+    needs:
+    - build-windows-exe
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download Windows executable
+      uses: actions/download-artifact@v8
+      with:
+        name: windows-exe
+        path: windows/
+
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ inputs.githubRef }}
+        name: "Lancet ${{ inputs.githubRef }}"
+        generate_release_notes: true
+        prerelease: false
+        files: |
+          windows/*.exe
