@@ -16,7 +16,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
-      ref: ${{ inputs.githubRef }}
+      with:
+        ref: ${{ inputs.githubRef }}
 
     - name: Set up Python
       uses: actions/setup-python@v6
