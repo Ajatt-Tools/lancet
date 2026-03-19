@@ -23,6 +23,10 @@ Prerequisites:
 
 - [Goldendict](https://ajatt.top/blog/setting-up-goldendict.html) for looking up words in Japanese dictionaries.
 - [nsxiv](https://wiki.archlinux.org/title/Sxiv) for reading manga.
+- Recommended:
+  [i3wm](https://i3wm.org/),
+  [dwm](https://dwm.suckless.org/),
+  or any X11-based WM or DE (i.e. [not Wayland](#wayland-support)).
 
 Launch `Goldendict`, then open a manga folder in `nsxiv`.
 Start `Lancet` and wait for the OCR model to load.
@@ -34,6 +38,8 @@ Right‑click the icon to access actions, including Preferences,
 where you can change the OCR shortcut.
 
 ## Installation
+
+### All operating systems
 
 Install via [pipx](https://pipx.pypa.io/stable/) from [pypi](https://pypi.org/project/ajt-lancet/).
 
@@ -55,6 +61,10 @@ The `lancet` executable will be available in your `$PATH`.
 > pipx install ajt-lancet --python ~/.local/share/hatch/pythons/3.13/python/bin/python
 > ```
 
+### Windows-like operating systems
+
+Download [Lancet.exe](https://github.com/Ajatt-Tools/lancet/releases/latest/download/Lancet.exe).
+
 ### System Requirements
 
 Lancet depends on large Python libraries.
@@ -67,7 +77,8 @@ The PyTorch models are downloaded from HuggingFace and saved to `~/.cache/huggin
 
 ### Wayland support
 
-Wayland support has been tested on [Sway](https://wiki.archlinux.org/title/Sway) 1.11.
+[Wayland](https://stoppromotingwayland.netlify.app/) support has been tested on
+[Sway](https://wiki.archlinux.org/title/Sway) 1.11.
 Wayland support is incomplete.
 It works best on Hyprland and Sway, but on other compositors
 you may face issues if you have multiple monitors.
