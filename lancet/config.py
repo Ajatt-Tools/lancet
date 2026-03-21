@@ -3,9 +3,9 @@
 import dataclasses
 import enum
 import json
-from typing import Self
+from typing import Self, Any
 
-from lancet.consts import CFG_PATH
+from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
 
 
@@ -22,10 +22,10 @@ class Config:
 
     copy_to: OcrDestination = OcrDestination.goldendict
     notification_duration_sec: int = 10
-    huggingface_model_name: str = "tatsumoto/manga-ocr-base"
+    huggingface_model_name: str = DEFAULT_MODEL_NAME
     huggingface_models: list[str] = dataclasses.field(
         default_factory=lambda: [
-            "tatsumoto/manga-ocr-base",
+            DEFAULT_MODEL_NAME,
             "jzhang533/manga-ocr-base-2025",
         ]
     )
@@ -49,7 +49,7 @@ class Config:
         """Read the config from the JSON file, returning defaults if the file does not exist."""
         try:
             with open(CFG_PATH, encoding="utf-8") as f:
-                data = json.load(f)
+                data: dict[str, Any] = json.load(f)
         except FileNotFoundError:
             return cls()
         if "copy_to" in data:

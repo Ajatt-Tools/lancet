@@ -5,6 +5,8 @@ from collections.abc import Sequence
 from PyQt6.QtWidgets import QGroupBox, QComboBox, QPushButton, QGridLayout, QLayout, QWidget
 from zala.utils import qconnect
 
+from lancet.consts import DEFAULT_MODEL_NAME
+
 
 class EditableSelector(QComboBox):
     """
@@ -40,7 +42,9 @@ class ModelListEditor(QGroupBox):
 
     def current_text(self) -> str:
         """Return the currently entered model name, stripped of whitespace."""
-        return self.combo.currentText().strip()
+        if model_name := self.combo.currentText().strip():
+            return model_name
+        return DEFAULT_MODEL_NAME
 
     def set_current(self, model_name: str) -> None:
         """Set the combo box text to the given model name."""
