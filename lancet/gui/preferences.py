@@ -48,6 +48,7 @@ class FormWidgets(SimpleNamespace):
     notification_duration: SecondsSpinBox
     huggingface_model: ModelListEditor
     force_cpu: QCheckBox
+    show_help_bar: QCheckBox
     ocr_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
     max_history_size: HistorySizeSpinBox
@@ -101,6 +102,10 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         # Force CPU
         self._widgets.force_cpu = QCheckBox()
         self._widgets.force_cpu.setChecked(cfg.force_cpu)
+
+        # Show help bar
+        self._widgets.show_help_bar = QCheckBox()
+        self._widgets.show_help_bar.setChecked(cfg.show_help_bar)
 
         # OCR shortcut
         self._widgets.ocr_shortcut = ShortCutGrabButton(initial_value=cfg.ocr_shortcut)
@@ -161,6 +166,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
+        self._cfg.show_help_bar = self._widgets.show_help_bar.isChecked()
         self._cfg.ocr_shortcut = self._widgets.ocr_shortcut.current_shortcut()
         self._cfg.screenshot_shortcut = self._widgets.screenshot_shortcut.current_shortcut()
 
@@ -189,6 +195,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._widgets.huggingface_model.set_current(defaults.huggingface_model_name)
         self._widgets.huggingface_model.set_items(defaults.huggingface_models)
         self._widgets.force_cpu.setChecked(defaults.force_cpu)
+        self._widgets.show_help_bar.setChecked(defaults.show_help_bar)
         self._widgets.ocr_shortcut.set_keyboard_shortcut(defaults.ocr_shortcut)
         self._widgets.screenshot_shortcut.set_keyboard_shortcut(defaults.screenshot_shortcut)
 

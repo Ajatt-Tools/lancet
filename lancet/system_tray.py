@@ -62,6 +62,7 @@ def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
         fill_color=QColor.fromString(cfg.fill_color),
         outline_color=QColor.fromString(cfg.outline_color),
         fill_brush_color=QColor.fromString(cfg.fill_brush_color),
+        show_help=cfg.show_help_bar,
     )
 
 
