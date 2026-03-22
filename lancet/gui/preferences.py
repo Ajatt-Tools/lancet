@@ -28,7 +28,13 @@ from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.ocr_model_list import ModelListEditor
-from lancet.gui.utils import ui_translate, SecondsSpinBox, HistorySizeSpinBox, BorderThicknessSpinBox, BindPortSpinBox
+from lancet.gui.utils import (
+    ui_translate,
+    SecondsSpinBox,
+    HistorySizeSpinBox,
+    BorderThicknessSpinBox,
+    BindPortSpinBox,
+)
 from lancet.ocr_history import OcrHistory
 
 
@@ -139,6 +145,23 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         )
         self._button_box.clicked.connect(self._on_button_clicked)
         columns_layout.addWidget(self._button_box, 3, 1, 1, 2)  # row, col, rowspan, colspan
+        self._add_tooltips()
+
+    def _add_tooltips(self) -> None:
+        self._widgets.copy_to.setToolTip("Destination for recognized text.")
+        self._widgets.notification_duration.setToolTip("Duration in seconds to show notifications.")
+        self._widgets.huggingface_model.setToolTip("Huggingface model to use for OCR.")
+        self._widgets.force_cpu.setToolTip("Recognize text on images using CPU instead of CUDA.")
+        self._widgets.show_help_bar.setToolTip("Show the help bar in the main window.")
+        self._widgets.ocr_shortcut.setToolTip("Keyboard shortcut to trigger OCR.")
+        self._widgets.screenshot_shortcut.setToolTip("Keyboard shortcut to take a screenshot.")
+        self._widgets.max_history_size.setToolTip("Maximum number of OCR history entries to keep.")
+        self._widgets.bind_port.setToolTip("Port number for the server to bind to.")
+        self._widgets.border_thickness.setToolTip("Thickness of the selection border in pixels.")
+        self._widgets.border_color.setToolTip("Color of the selection border.")
+        self._widgets.fill_color.setToolTip("Fill color for the selected area.")
+        self._widgets.outline_color.setToolTip("Color of the text outline.")
+        self._widgets.fill_brush_color.setToolTip("Color of the fill brush.")
 
     def _make_settings_layout(self) -> QLayout:
         """Build a form layout with labeled rows for each settings widget."""
