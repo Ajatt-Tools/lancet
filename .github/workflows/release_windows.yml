@@ -45,7 +45,7 @@ jobs:
         lancet/__main__.py
 
     - name: Upload Windows executable
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: windows-exe
         path: dist/Lancet.exe
