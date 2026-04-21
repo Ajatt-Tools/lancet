@@ -64,7 +64,7 @@ extra-dependencies = [
 check = "mypy --install-types --non-interactive {args:src/lancet tests}"
 
 [tool.hatch.build.targets.wheel]
-packages = ["lancet"]
+packages = ["lancet", "comic_text_detector"]
 
 [tool.coverage.run]
 source_pkgs = ["lancet", "tests"]
