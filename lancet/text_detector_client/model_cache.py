@@ -19,7 +19,6 @@ class ComicTextDetectorCache:
         self._file_path = CACHE_DIR_PATH / "comictextdetector.pt"
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    @property
     def comic_text_detector_path(self) -> pathlib.Path:
         self._download_if_needed()
         return self._file_path
@@ -41,7 +40,7 @@ class ComicTextDetectorCache:
 
 def main() -> None:
     cache = ComicTextDetectorCache()
-    print(f"path: {cache.comic_text_detector_path}")
+    print(f"path: {cache.comic_text_detector_path()}")
 
 
 if __name__ == "__main__":
