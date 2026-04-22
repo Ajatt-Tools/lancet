@@ -18,3 +18,7 @@ class PortAlreadyInUseError(LancetException, OSError):
 
 class PixmapConversionError(LancetException, ValueError):
     pass
+
+
+class LancetHTTPError(LancetException, OSError):
+    pass
