@@ -42,16 +42,17 @@ class MangaOcr(MangaOcrBase):
         """Load the OCR model, tokenizer, and processor, then verify with an example image."""
         self._pretrained_model_name_or_path = pretrained_model_name_or_path
         self._force_cpu = force_cpu
-        logger.info(f"Loading OCR model from {pretrained_model_name_or_path}")
+
+        logger.info(f"Loading OCR model from {self._pretrained_model_name_or_path}")
         try:
-            self._load_model(pretrained_model_name_or_path)
+            self._load_model(self._pretrained_model_name_or_path)
         except Exception as ex:
             raise MangaOCRException(f"{class_name(ex)}: {ex}") from ex
 
-        if not force_cpu and torch.cuda.is_available():
+        if not self._force_cpu and torch.cuda.is_available():
             logger.info("Using CUDA")
             self.model.cuda()
-        elif not force_cpu and torch.backends.mps.is_available():
+        elif not self._force_cpu and torch.backends.mps.is_available():
             logger.info("Using MPS")
             self.model.to("mps")
         else:
@@ -61,6 +62,19 @@ class MangaOcr(MangaOcrBase):
             raise MangaOCRFileNotFoundError(f"Missing example image {EXAMPLE_IMAGE_PATH}")
         logger.info(self.recognize(EXAMPLE_IMAGE_PATH))
         logger.info("OCR ready")
+
+    @property
+    def pretrained_model_name_or_path(self) -> pathlib.Path | str:
+        """
+        Return the HuggingFace repo ID or local path used to load the pretrained model.
+        Example: "tatsumoto/manga-ocr-base"
+        """
+        return self._pretrained_model_name_or_path
+
+    @property
+    def force_cpu(self) -> bool:
+        """Return whether the model was loaded with CPU forced."""
+        return self._force_cpu
 
     def _load_model(self, pretrained_model_name_or_path: pathlib.Path | str) -> None:
         try:
