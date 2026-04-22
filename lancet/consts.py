@@ -28,3 +28,4 @@ GITHUB_URL = "https://github.com/Ajatt-Tools/lancet"
 CHAT_URL = "https://ajatt.top/blog/join-our-community.html"
 
 DEFAULT_MODEL_NAME = "tatsumoto/manga-ocr-base"
+OCR_JOIN_STR = " "

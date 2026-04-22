@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
 )
 from zala.utils import qconnect
+from lancet.consts import OCR_JOIN_STR
 
 USER_ROLE = Qt.ItemDataRole.UserRole
 
@@ -62,7 +63,7 @@ class OcrHistoryWidget(QGroupBox):
         selected_items.sort(key=lambda item: item.data(USER_ROLE), reverse=True)
         if not selected_items:
             return
-        combined = " ".join(item.text() for item in selected_items)
+        combined = OCR_JOIN_STR.join(item.text() for item in selected_items)
         self.copy_requested.emit(combined)
 
     def _remove_selected(self) -> None:
