@@ -2,8 +2,8 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import concurrent.futures
-from typing import Any, Self
 from collections.abc import Callable
+from typing import Any, Self
 
 from lancet.ocr.manga_ocr_base import MangaOCRException
 

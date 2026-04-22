@@ -7,9 +7,9 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from loguru import logger
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
-from loguru import logger
 
 from lancet.config import Config
 from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN

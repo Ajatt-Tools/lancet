@@ -6,16 +6,22 @@ import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import (
+    QApplication,
+    QDialogButtonBox,
+    QGridLayout,
     QLabel,
     QVBoxLayout,
     QWidget,
-    QApplication,
-    QGridLayout,
-    QDialogButtonBox,
 )
 from zala.utils import qconnect
 
-from lancet.consts import APP_LOGO_PATH, APP_NAME, GITHUB_URL, CHAT_URL, GEOMETRY_FILE_PATH
+from lancet.consts import (
+    APP_LOGO_PATH,
+    APP_NAME,
+    CHAT_URL,
+    GEOMETRY_FILE_PATH,
+    GITHUB_URL,
+)
 from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 
 

@@ -2,7 +2,14 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 from collections.abc import Sequence
 
-from PyQt6.QtWidgets import QGroupBox, QComboBox, QPushButton, QGridLayout, QLayout, QWidget
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QLayout,
+    QPushButton,
+    QWidget,
+)
 from zala.utils import qconnect
 
 from lancet.consts import DEFAULT_MODEL_NAME

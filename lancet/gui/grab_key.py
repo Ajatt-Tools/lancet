@@ -5,7 +5,15 @@ from collections.abc import Sequence
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QKeyEvent, QKeySequence
-from PyQt6.QtWidgets import QDialog, QWidget, QLayout, QLabel, QVBoxLayout, QPushButton, QApplication
+from PyQt6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QLabel,
+    QLayout,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 from zala.utils import qconnect
 
 

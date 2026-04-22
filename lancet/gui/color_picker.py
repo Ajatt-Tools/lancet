@@ -1,7 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QPushButton, QColorDialog, QWidget, QHBoxLayout
+from PyQt6.QtWidgets import QColorDialog, QHBoxLayout, QPushButton, QWidget
 from zala.utils import qconnect
 
 from lancet.gui.line_edit import ColorEdit

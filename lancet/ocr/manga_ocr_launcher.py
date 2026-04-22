@@ -5,10 +5,10 @@ import pathlib
 import typing
 from io import BytesIO
 
-from PIL import Image
-from PyQt6.QtCore import QBuffer, QThreadPool, QObject
-from PyQt6.QtGui import QPixmap
 from loguru import logger
+from PIL import Image
+from PyQt6.QtCore import QBuffer, QObject, QThreadPool
+from PyQt6.QtGui import QPixmap
 
 from lancet.exceptions import PixmapConversionError
 from lancet.notifications import NotifySend

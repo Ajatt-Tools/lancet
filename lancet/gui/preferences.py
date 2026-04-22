@@ -8,32 +8,31 @@ from types import SimpleNamespace
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
+    QAbstractButton,
+    QApplication,
     QCheckBox,
     QDialogButtonBox,
     QFormLayout,
+    QGridLayout,
+    QLayout,
     QVBoxLayout,
     QWidget,
-    QApplication,
-    QAbstractButton,
-    QLayout,
-    QGridLayout,
 )
 
 from lancet.config import Config
-from lancet.consts import APP_NAME, APP_LOGO_PATH, GEOMETRY_FILE_PATH
+from lancet.consts import APP_LOGO_PATH, APP_NAME, GEOMETRY_FILE_PATH
 from lancet.gui.color_picker import ColorEditPicker
-
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.ocr_model_list import ModelListEditor
 from lancet.gui.utils import (
-    ui_translate,
-    SecondsSpinBox,
-    HistorySizeSpinBox,
-    BorderThicknessSpinBox,
     BindPortSpinBox,
+    BorderThicknessSpinBox,
+    HistorySizeSpinBox,
+    SecondsSpinBox,
+    ui_translate,
 )
 from lancet.ocr_history import OcrHistory
 

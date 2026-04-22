@@ -2,17 +2,18 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 from collections.abc import Sequence
 
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QGroupBox,
     QHBoxLayout,
     QListWidget,
     QPushButton,
     QVBoxLayout,
     QWidget,
-    QAbstractItemView,
 )
 from zala.utils import qconnect
+
 from lancet.consts import OCR_JOIN_STR
 
 USER_ROLE = Qt.ItemDataRole.UserRole

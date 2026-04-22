@@ -3,8 +3,8 @@
 import enum
 import functools
 
-from PyQt6.QtCore import QObject, pyqtSignal
 from pynput.keyboard import GlobalHotKeys
+from PyQt6.QtCore import QObject, pyqtSignal
 from zala.utils import q_emit
 
 # Modifier names (case-insensitive) that pynput expects wrapped in angle brackets.

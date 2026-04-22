@@ -3,8 +3,8 @@
 
 import pathlib
 
-from PyQt6.QtWidgets import QDialog
 from loguru import logger
+from PyQt6.QtWidgets import QDialog
 
 from lancet.consts import GEOMETRY_FILE_PATH
 

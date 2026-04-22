@@ -8,29 +8,33 @@ import pathlib
 import signal
 import sys
 
-from PyQt6.QtGui import QColor, QIcon
-from PyQt6.QtWidgets import QSystemTrayIcon, QApplication, QMenu, QWidget
 from loguru import logger
+from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 from zala.exceptions import ZalaException
-from zala.main_window import UserSelectionResult, ScreenshotPreviewOpts
+from zala.main_window import ScreenshotPreviewOpts, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 
 from lancet.config import Config, OcrDestination
 from lancet.consts import (
     APP_LOGO_PATH,
-    SCREENSHOT_ICON_PATH,
+    APP_NAME,
     EXIT_ICON_PATH,
     OCR_ICON_PATH,
-    RESTART_ICON_PATH,
     PREFERENCES_ICON_PATH,
-    APP_NAME,
+    RESTART_ICON_PATH,
+    SCREENSHOT_ICON_PATH,
 )
 from lancet.exceptions import PixmapConversionError
-from lancet.find_executable import run_and_disown, find_executable
+from lancet.find_executable import find_executable, run_and_disown
 from lancet.gui.about_dialog import AboutDialog
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
-from lancet.keyboard_shortcuts import LancetShortcutManager, LancetShortcutEnum, KeyboardShortcut
+from lancet.keyboard_shortcuts import (
+    KeyboardShortcut,
+    LancetShortcutEnum,
+    LancetShortcutManager,
+)
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, pixmap_to_pillow_image
 from lancet.ocr.thread_op import LancetThreadOp

@@ -3,7 +3,7 @@
 import dataclasses
 import enum
 import json
-from typing import Self, Any
+from typing import Any, Self
 
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError

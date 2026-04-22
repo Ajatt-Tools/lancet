@@ -6,11 +6,21 @@ import re
 
 import jaconv
 import torch
-from PIL import Image
 from loguru import logger
-from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel, GenerationMixin
+from PIL import Image
+from transformers import (
+    AutoTokenizer,
+    GenerationMixin,
+    VisionEncoderDecoderModel,
+    ViTImageProcessor,
+)
 
-from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRFileNotFoundError, MangaOCRException, EXAMPLE_IMAGE_PATH
+from lancet.ocr.manga_ocr_base import (
+    EXAMPLE_IMAGE_PATH,
+    MangaOcrBase,
+    MangaOCRException,
+    MangaOCRFileNotFoundError,
+)
 
 
 class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
