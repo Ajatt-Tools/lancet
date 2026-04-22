@@ -8,6 +8,8 @@ from PIL import Image
 
 from lancet.exceptions import LancetException
 
+EXAMPLE_IMAGE_PATH = pathlib.Path(__file__).parent / "assets/example.jpg"
+
 
 class MangaOcrBase(abc.ABC):
     """Abstract base class defining the interface for manga OCR implementations."""
