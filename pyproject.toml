@@ -34,6 +34,10 @@ dependencies = [
     "numpy>=2.4.0",
     "torch>=1.0",
     "transformers>=5.2.0",
+    "opencv-python", # needed to 'import cv2', used by comic text detector
+    "torchvision", # needed by comic text detector
+    "pyclipper", # needed by comic text detector
+    "shapely", # needed by comic text detector
     "requests", # needed to download comic_text_detector model 'comictextdetector.pt'
     "fugashi>=1.5.0", # needed by bert_japanese/tokenization_bert_japanese.py
     "unidic_lite>=1.0.8", # needed by bert_japanese/tokenization_bert_japanese.py
