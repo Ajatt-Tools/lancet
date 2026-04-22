@@ -10,6 +10,7 @@ from requests import HTTPError
 from lancet.consts import CACHE_DIR_PATH
 from lancet.exceptions import LancetHTTPError
 
+# Get from https://github.com/zyddnys/manga-image-translator/releases
 DOWNLOAD_URL = "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/comictextdetector.pt"
 
 
