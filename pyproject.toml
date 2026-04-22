@@ -89,6 +89,7 @@ exclude_lines = [
 [tool.black]
 line-length = 120
 target-version = ['py313']
+extend-exclude = "comic_text_detector"
 
 [tool.isort]
 profile = "black"
