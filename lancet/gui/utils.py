@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QSpinBox, QWidget
 
 def ui_translate(key: str) -> str:
     """Convert a snake_case config key to a human-readable label."""
-    return key.capitalize().replace("_", " ")
+    return key.capitalize().replace("_", " ").replace("cpu", "CPU").replace("Ocr", "OCR")
 
 
 class SecondsSpinBox(QSpinBox):
