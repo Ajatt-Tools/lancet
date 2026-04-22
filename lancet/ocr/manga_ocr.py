@@ -40,6 +40,8 @@ class MangaOcr(MangaOcrBase):
         force_cpu: bool = False,
     ) -> None:
         """Load the OCR model, tokenizer, and processor, then verify with an example image."""
+        self._pretrained_model_name_or_path = pretrained_model_name_or_path
+        self._force_cpu = force_cpu
         logger.info(f"Loading OCR model from {pretrained_model_name_or_path}")
         try:
             self._load_model(pretrained_model_name_or_path)
