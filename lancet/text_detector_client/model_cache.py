@@ -36,3 +36,12 @@ class ComicTextDetectorCache:
                     if chunk:
                         f.write(chunk)
             logger.info(f"Downloaded {DOWNLOAD_URL}")
+
+
+def main() -> None:
+    cache = ComicTextDetectorCache()
+    print(f"path: {cache.comic_text_detector_path}")
+
+
+if __name__ == "__main__":
+    main()
