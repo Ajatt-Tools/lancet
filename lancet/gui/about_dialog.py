@@ -116,6 +116,8 @@ class AboutDialog(SaveAndRestoreGeomDialog):
         self._button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         self._button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Close")
         self._button_box.button(QDialogButtonBox.StandardButton.Cancel).setDefault(True)
+        # the rejected signal does not send anything to the slot.
+        # https://doc.qt.io/qt-6/qdialogbuttonbox.html#rejected
         qconnect(self._button_box.rejected, self.accept)
         root_layout.addWidget(self._button_box)
 
