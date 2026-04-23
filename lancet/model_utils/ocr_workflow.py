@@ -25,7 +25,9 @@ from lancet.ocr_history import OcrHistory
 
 def ensure_cursor_restored() -> None:
     """Safety net: restore the cursor if Zala left it in an override state."""
-    if QApplication.overrideCursor() is not None:
+    # https://doc.qt.io/qt-6/qguiapplication.html#overrideCursor
+    while QApplication.overrideCursor() is not None:
+        # https://doc.qt.io/qt-6/qguiapplication.html#restoreOverrideCursor
         QApplication.restoreOverrideCursor()
 
 
