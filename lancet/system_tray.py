@@ -196,7 +196,9 @@ class LancetSystemTray(QSystemTrayIcon):
 
         qconnect(dialog.settings_applied, self._on_settings_changed)
         qconnect(dialog.history_list.copy_requested, self._ocr_workflow.copy_ocr_result)
-        qconnect(dialog.finished, disown)
+        # dialog's result code is passed to the slot.
+        # https://doc.qt.io/qt-6/qdialog.html#finished
+        qconnect(dialog.finished, lambda result: disown())
         dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
