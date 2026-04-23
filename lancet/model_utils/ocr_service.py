@@ -15,11 +15,16 @@ class OcrService:
         self._loader = loader
 
     def run_ocr(self, image: Image.Image) -> str:
-        """Run OCR directly on the image."""
+        """
+        Run OCR directly on the image.
+        Convert PIL Image object to text using the OCR model
+        """
         return self._loader.ocr.recognize(image).strip()
 
     def run_ocr_with_text_detection(self, image: Image.Image) -> str:
-        """Detect speech bubbles, run OCR on each box image, and concatenate the results."""
+        """
+        Detect speech bubbles, run OCR on each box image, and concatenate the results.
+        """
         return OCR_JOIN_STR.join(
             self._loader.ocr.recognize(block.box_image).strip()
             for block in self._loader.text_detector.get_speech_bubbles(image, include_lines=False).blocks
