@@ -147,6 +147,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
             | QDialogButtonBox.StandardButton.Cancel
             | QDialogButtonBox.StandardButton.RestoreDefaults
         )
+        # QAbstractButton is passed to the slot.
         # https://doc.qt.io/qt-6/qdialogbuttonbox.html#clicked
         qconnect(self._button_box.clicked, self._on_button_clicked)
         columns_layout.addWidget(self._button_box, 3, 1, 1, 2)  # row, col, rowspan, colspan
