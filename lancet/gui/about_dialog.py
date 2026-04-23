@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 )
 from zala.utils import qconnect
 
+from lancet.__about__ import version
 from lancet.consts import (
     APP_LOGO_PATH,
     APP_NAME,
@@ -63,10 +64,11 @@ class AppWelcomeWidget(QWidget):
         app_name_font.setBold(True)
         app_name_label.setFont(app_name_font)
 
-        header_layout.addWidget(AppIconLabel(), 1, 1, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
+        header_layout.addWidget(AppIconLabel(), 1, 1, 4, 1, alignment=Qt.AlignmentFlag.AlignTop)
         header_layout.addWidget(app_name_label, 1, 2)
         header_layout.addWidget(QLabel("OCR snipping tool for reading manga in Japanese."), 2, 2)
-        header_layout.addWidget(QLabel("License: GNU AGPL v3 or later."), 3, 2)
+        header_layout.addWidget(QLabel(f"Version: {version}."), 3, 2)
+        header_layout.addWidget(QLabel("License: GNU AGPL v3 or later."), 4, 2)
         self.setLayout(header_layout)
 
 
