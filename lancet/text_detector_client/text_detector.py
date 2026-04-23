@@ -15,6 +15,7 @@ from comic_text_detector.inference import TextDetector
 from comic_text_detector.utils.textblock import TextBlock
 from lancet.__about__ import version
 from lancet.consts import CACHE_DIR_PATH
+from lancet.model_utils.common import class_name
 from lancet.model_utils.device import get_device
 from lancet.ocr.manga_ocr_base import EXAMPLE_IMAGE_PATH
 from lancet.text_detector_client.model_cache import ComicTextDetectorCache
@@ -26,10 +27,6 @@ from lancet.text_detector_client.text_detector_base import (
     SpeechBubbleBlock,
     SpeechBubbleResult,
 )
-
-
-def class_name(obj: object) -> str:
-    return obj.__class__.__name__
 
 
 def read_image_from_path(imgpath: pathlib.Path, read_type: int = cv2.IMREAD_COLOR) -> np.ndarray:
