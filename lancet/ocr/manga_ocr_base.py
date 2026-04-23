@@ -42,6 +42,12 @@ class MangaOCRException(LancetException):
     pass
 
 
+class MangaOCRUnavailableError(MangaOCRException):
+    """Manga OCR model is still loading."""
+
+    pass
+
+
 class MangaOCRFileNotFoundError(MangaOCRException, FileNotFoundError):
     """Raised when a required file (e.g. example image) is not found."""
 

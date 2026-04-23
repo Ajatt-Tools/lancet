@@ -18,6 +18,12 @@ class ComicTextDetectorException(LancetException):
     pass
 
 
+class ComicTextDetectorUnavailableError(ComicTextDetectorException):
+    """Comic Text Detector model is still loading."""
+
+    pass
+
+
 class PointF(typing.NamedTuple):
     """A 2D point with float coordinates."""
 

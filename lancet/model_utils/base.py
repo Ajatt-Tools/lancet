@@ -4,8 +4,7 @@
 import abc
 import enum
 import typing
-from collections.abc import Collection
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 
 class LancetModel(abc.ABC):

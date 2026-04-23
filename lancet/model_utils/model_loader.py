@@ -8,13 +8,24 @@ from collections.abc import Sequence
 from loguru import logger
 
 from lancet.config import Config
-from lancet.model_utils.base import LancetModel, ModelName, ModelLoadRecipe, ModelLoaderStatus, ModelLoadError
+from lancet.model_utils.base import (
+    LancetModel,
+    ModelLoadError,
+    ModelLoaderStatus,
+    ModelLoadRecipe,
+    ModelName,
+)
 from lancet.notifications import NotifySend
-from lancet.ocr.manga_ocr_base import MangaOcrBase, MangaOCRException
+from lancet.ocr.manga_ocr_base import (
+    MangaOcrBase,
+    MangaOCRException,
+    MangaOCRUnavailableError,
+)
 from lancet.ocr.thread_op import LancetThreadOp
 from lancet.text_detector_client.text_detector_base import (
     ComicTextDetectorBase,
     ComicTextDetectorException,
+    ComicTextDetectorUnavailableError,
 )
 
 
@@ -54,14 +65,14 @@ class BackgroundModelLoader:
     def ocr(self) -> MangaOcrBase:
         """Return the OCR model, or None if not loaded."""
         if self._ocr is None:
-            raise MangaOCRException("OCR model is not loaded")
+            raise MangaOCRUnavailableError("OCR model is not loaded")
         return self._ocr
 
     @property
     def text_detector(self) -> ComicTextDetectorBase:
         """Return the text detector, or None if not loaded."""
         if self._text_detector is None:
-            raise ComicTextDetectorException("Text detector is not loaded")
+            raise ComicTextDetectorUnavailableError("Text detector is not loaded")
         return self._text_detector
 
     @classmethod
@@ -116,14 +127,14 @@ class BackgroundModelLoader:
                     f"OCR config changed, reloading model: {self._cfg.huggingface_model_name}, force_cpu={self._cfg.force_cpu}"
                 )
                 self.reload_model_by_name(ModelName.manga_ocr)
-        except MangaOCRException:
+        except MangaOCRUnavailableError:
             pass
 
         try:
             if self.text_detector.force_cpu != self._cfg.force_cpu:
                 logger.info(f"Comic Text Detector config changed, reloading with force_cpu={self._cfg.force_cpu}")
                 self.reload_model_by_name(ModelName.text_detector)
-        except ComicTextDetectorException:
+        except ComicTextDetectorUnavailableError:
             pass
 
     def load_all(self) -> None:
