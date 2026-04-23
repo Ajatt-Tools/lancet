@@ -15,6 +15,7 @@ from zala.exceptions import ZalaException
 from zala.main_window import ScreenshotPreviewOpts, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
+from zala.utils import qconnect
 
 from lancet.config import Config
 from lancet.consts import (
@@ -155,7 +156,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"failed to load keyboard shortcuts: {e}")
         else:
             self._hotkeys.start()
-            self._hotkeys.signals.shortcut_activated.connect(self.process_keyboard_shortcut)
+            qconnect(self._hotkeys.signals.shortcut_activated, self.process_keyboard_shortcut)
 
     def get_keyboard_shortcuts(self) -> dict[LancetShortcutEnum, KeyboardShortcut]:
         """Return a mapping of shortcut actions to their key combinations, excluding empty ones."""
