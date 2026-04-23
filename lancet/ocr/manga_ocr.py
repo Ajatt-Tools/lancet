@@ -16,6 +16,7 @@ from transformers import (
 )
 
 from lancet.model_utils.common import class_name
+from lancet.model_utils.device import move_model_to_device
 from lancet.ocr.manga_ocr_base import (
     EXAMPLE_IMAGE_PATH,
     MangaOcrBase,
@@ -56,14 +57,8 @@ class MangaOcr(MangaOcrBase):
         except Exception as ex:
             raise MangaOCRException(f"{class_name(ex)}: {ex}") from ex
 
-        if not self._force_cpu and torch.cuda.is_available():
-            logger.info("Using CUDA")
-            self.model.cuda()
-        elif not self._force_cpu and torch.backends.mps.is_available():
-            logger.info("Using MPS")
-            self.model.to("mps")
-        else:
-            logger.info("Using CPU")
+        device = move_model_to_device(self, force_cpu=self._force_cpu)
+        logger.info(f"Using {device.name.upper()}")
 
         if not EXAMPLE_IMAGE_PATH.is_file():
             raise MangaOCRFileNotFoundError(f"Missing example image {EXAMPLE_IMAGE_PATH}")

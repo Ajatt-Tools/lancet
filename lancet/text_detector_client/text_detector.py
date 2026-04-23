@@ -15,6 +15,7 @@ from comic_text_detector.inference import TextDetector
 from comic_text_detector.utils.textblock import TextBlock
 from lancet.__about__ import version
 from lancet.consts import CACHE_DIR_PATH
+from lancet.model_utils.device import get_device
 from lancet.ocr.manga_ocr_base import EXAMPLE_IMAGE_PATH
 from lancet.text_detector_client.model_cache import ComicTextDetectorCache
 from lancet.text_detector_client.text_detector_base import (
@@ -29,15 +30,6 @@ from lancet.text_detector_client.text_detector_base import (
 
 def class_name(obj: object) -> str:
     return obj.__class__.__name__
-
-
-def get_device(force_cpu: bool) -> str:
-    if not force_cpu and torch.cuda.is_available():
-        return "cuda"
-    elif not force_cpu and torch.backends.mps.is_available():
-        return "mps"
-    else:
-        return "cpu"
 
 
 def read_image_from_path(imgpath: pathlib.Path, read_type: int = cv2.IMREAD_COLOR) -> np.ndarray:
@@ -93,7 +85,7 @@ class ComicTextDetector(ComicTextDetectorBase):
             self._detector = TextDetector(
                 model_path=cache.comic_text_detector_path(),
                 input_size=detector_input_size,
-                device=get_device(force_cpu),
+                device=get_device(force_cpu=self._force_cpu).name.lower(),
                 act="leaky",
             )
         except Exception as ex:
