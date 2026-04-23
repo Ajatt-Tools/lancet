@@ -84,6 +84,7 @@ class ModelListEditor(QGroupBox):
 
     def connect_buttons(self) -> None:
         """Wire up the add and remove buttons to their respective actions."""
+        # bool checked is passed to the slot.
         # https://doc.qt.io/qt-6/qabstractbutton.html#clicked
         qconnect(self.add_selected.clicked, lambda: self.add_new_preset())
         qconnect(self.remove_selected.clicked, lambda: self.combo.removeItem(self.combo.currentIndex()))

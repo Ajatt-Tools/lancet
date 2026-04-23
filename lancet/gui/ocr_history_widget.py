@@ -45,6 +45,8 @@ class OcrHistoryWidget(QGroupBox):
         button_row.addWidget(self._clear_btn)
         layout.addLayout(button_row)
 
+        # bool checked is passed to the slot.
+        # https://doc.qt.io/qt-6/qabstractbutton.html#clicked
         qconnect(self._copy_btn.clicked, lambda: self._copy_selected())
         qconnect(self._remove_btn.clicked, lambda: self._remove_selected())
         qconnect(self._clear_btn.clicked, lambda: self._clear_all())

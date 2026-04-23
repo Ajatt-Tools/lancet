@@ -109,7 +109,9 @@ class ShortCutGrabButton(QPushButton):
         """Initialize the button with an optional shortcut and connect it to the grab dialog."""
         super().__init__(initial_value or self._placeholder)
         self._dialog = KeyPressDialog(self, initial_value or "")
-        qconnect(self.clicked, self._dialog.exec)
+        # bool checked is passed to the slot.
+        # https://doc.qt.io/qt-6/qabstractbutton.html#clicked
+        qconnect(self.clicked, lambda: self._dialog.exec())
         qconnect(
             self._dialog.value_accepted,
             lambda value: self.setText(value or self._placeholder),
