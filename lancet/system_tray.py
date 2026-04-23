@@ -16,7 +16,7 @@ from zala.main_window import ScreenshotPreviewOpts, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 
-from lancet.config import Config, OcrDestination
+from lancet.config import Config
 from lancet.consts import (
     APP_LOGO_PATH,
     APP_NAME,
@@ -26,8 +26,6 @@ from lancet.consts import (
     RESTART_ICON_PATH,
     SCREENSHOT_ICON_PATH,
 )
-from lancet.exceptions import PixmapConversionError
-from lancet.find_executable import find_executable, run_and_disown
 from lancet.gui.about_dialog import AboutDialog
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 from lancet.keyboard_shortcuts import (
@@ -35,9 +33,10 @@ from lancet.keyboard_shortcuts import (
     LancetShortcutEnum,
     LancetShortcutManager,
 )
+from lancet.model_utils.model_loader import BackgroundModelLoader
+from lancet.model_utils.ocr_service import OcrService
+from lancet.model_utils.ocr_workflow import OcrWorkflow
 from lancet.notifications import NotifySend
-from lancet.ocr.manga_ocr_launcher import MangaOCRLauncher, pixmap_to_pillow_image
-from lancet.ocr.thread_op import LancetThreadOp
 from lancet.ocr_history import OcrHistory
 
 
@@ -75,7 +74,8 @@ class LancetSystemTray(QSystemTrayIcon):
     System tray application containing all global actions
     """
 
-    _ocr: MangaOCRLauncher
+    _loader: BackgroundModelLoader
+    _ocr_workflow: OcrWorkflow
     _app: QApplication
     _take: ZalaTakeScreenRegion
     _cfg: Config
@@ -92,12 +92,19 @@ class LancetSystemTray(QSystemTrayIcon):
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self._take = ZalaTakeScreenRegion(scr=ZalaScreenshot(app))
         self._history = OcrHistory(self._cfg.max_history_size)
-        self._ocr = MangaOCRLauncher(
-            parent=self,
+        self._loader = BackgroundModelLoader.new(
+            cfg=self._cfg,
             notify=self._notify,
             executor=self._executor,
-            pretrained_model_name_or_path=self._cfg.huggingface_model_name,
-            force_cpu=self._cfg.force_cpu,
+        )
+        self._ocr_workflow = OcrWorkflow(
+            app=self._app,
+            cfg=self._cfg,
+            loader=self._loader,
+            ocr_service=OcrService(loader=self._loader),
+            notify=self._notify,
+            history=self._history,
+            executor=self._executor,
         )
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
 
@@ -126,8 +133,8 @@ class LancetSystemTray(QSystemTrayIcon):
             self.quit,
         )
 
-        # Init model in background
-        self._ocr.init_manga_ocr()
+        # Init models in background
+        self._loader.load_all()
         signal.signal(signal.SIGINT, self.quit)
 
         # Set keyboard shortcuts
@@ -171,7 +178,7 @@ class LancetSystemTray(QSystemTrayIcon):
         """Open the preferences dialog and reload shortcuts if settings are applied."""
         dialog = PreferencesDialog(self._cfg, self._history)
         dialog.settings_applied.connect(self._on_settings_changed)
-        dialog.history_list.copy_requested.connect(self.copy_ocr_result)
+        dialog.history_list.copy_requested.connect(self._ocr_workflow.copy_ocr_result)
         dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
@@ -180,7 +187,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self._load_keyboard_shortcuts()
             self._notify.set_duration(self._cfg.notification_duration_sec)
             self._history.set_entries(settings_applied.ocr_history, max_size=self._cfg.max_history_size)
-            self._ocr.load_new_config(self._cfg.huggingface_model_name, self._cfg.force_cpu)
+            self._loader.on_config_changed()
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
 
@@ -214,7 +221,7 @@ class LancetSystemTray(QSystemTrayIcon):
     def make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for OCR recognition of the selected area."""
         try:
-            self._take.select_area(on_finish=self.process_ocr_result, opts=make_preview_opts(self._cfg))
+            self._take.select_area(on_finish=self._ocr_workflow.run_ocr, opts=make_preview_opts(self._cfg))
         except ZalaException as ex:
             logger.error(str(ex))
             self._notify.notify(str(ex))
@@ -230,52 +237,3 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"Selection saved to {output_path}")
         else:
             self._notify.notify(f"Failed to save selection to {output_path}")
-
-    def process_ocr_result(self, user_selection: UserSelectionResult) -> None:
-        """Run OCR on the user's selection in a background thread and handle the result."""
-        if not user_selection.pixmap:
-            self._notify.notify(user_selection.error.capitalize())
-            return
-
-        if not (status := self._ocr.is_ready()).is_ready:
-            self._notify.notify(status.what())
-            return
-
-        try:
-            image = pixmap_to_pillow_image(user_selection.pixmap)
-        except PixmapConversionError as ex:
-            self._notify.notify(str(ex))
-            return
-
-        def on_ocr_finished(text: str) -> None:
-            if text:
-                self._history.add_to_history(text)
-                self.copy_ocr_result(text)
-            else:
-                self._notify.notify("OCR returned no text")
-
-        def on_failed(e: Exception) -> None:
-            logger.error(f"failed to recognize image: {e}")
-            self._notify.notify(f"failed to recognize image: {e}")
-
-        (
-            LancetThreadOp[str](op=lambda: self._ocr.run_ocr(image), executor=self._executor)
-            .success(on_ocr_finished)
-            .failure(on_failed)
-            .run_in_background()
-        )
-
-    def copy_ocr_result(self, text: str) -> None:
-        """Send the OCR result to the configured destination (clipboard or GoldenDict)."""
-        match self._cfg.copy_to:
-            case OcrDestination.goldendict:
-                try:
-                    run_and_disown([find_executable("goldendict") or "goldendict", text])
-                except FileNotFoundError:
-                    self._notify.notify(
-                        f"Executable not found: 'goldendict'. Ensure it is installed and added to $PATH."
-                    )
-                    return
-            case OcrDestination.clipboard:
-                self._app.clipboard().setText(text)
-        self._notify.notify(f"OCR result copied: {text}")
