@@ -15,6 +15,7 @@ from transformers import (
     ViTImageProcessor,
 )
 
+from lancet.model_utils.common import class_name
 from lancet.ocr.manga_ocr_base import (
     EXAMPLE_IMAGE_PATH,
     MangaOcrBase,
@@ -27,10 +28,6 @@ class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
     """Combined vision encoder-decoder model with generation capabilities for manga OCR."""
 
     pass
-
-
-def class_name(obj: object) -> str:
-    return obj.__class__.__name__
 
 
 class MangaOcr(MangaOcrBase):
