@@ -55,6 +55,7 @@ class FormWidgets(SimpleNamespace):
     force_cpu: QCheckBox
     show_help_bar: QCheckBox
     ocr_shortcut: ShortCutGrabButton
+    ocr_page_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
     max_history_size: HistorySizeSpinBox
 
@@ -115,6 +116,9 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         # OCR shortcut
         self._widgets.ocr_shortcut = ShortCutGrabButton(initial_value=cfg.ocr_shortcut)
 
+        # OCR page shortcut (detect and OCR)
+        self._widgets.ocr_page_shortcut = ShortCutGrabButton(initial_value=cfg.ocr_page_shortcut)
+
         # Screenshot shortcut
         self._widgets.screenshot_shortcut = ShortCutGrabButton(initial_value=cfg.screenshot_shortcut)
 
@@ -153,6 +157,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._widgets.force_cpu.setToolTip("Recognize text on images using CPU instead of CUDA.")
         self._widgets.show_help_bar.setToolTip("Show the help bar in the main window.")
         self._widgets.ocr_shortcut.setToolTip("Keyboard shortcut to trigger OCR.")
+        self._widgets.ocr_page_shortcut.setToolTip("Keyboard shortcut to detect speech bubbles and run OCR.")
         self._widgets.screenshot_shortcut.setToolTip("Keyboard shortcut to take a screenshot.")
         self._widgets.max_history_size.setToolTip("Maximum number of OCR history entries to keep.")
         self._widgets.bind_port.setToolTip("Port number for the server to bind to.")
@@ -190,6 +195,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
         self._cfg.show_help_bar = self._widgets.show_help_bar.isChecked()
         self._cfg.ocr_shortcut = self._widgets.ocr_shortcut.current_shortcut()
+        self._cfg.ocr_page_shortcut = self._widgets.ocr_page_shortcut.current_shortcut()
         self._cfg.screenshot_shortcut = self._widgets.screenshot_shortcut.current_shortcut()
 
         # Screenshot overlay settings
@@ -219,6 +225,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._widgets.force_cpu.setChecked(defaults.force_cpu)
         self._widgets.show_help_bar.setChecked(defaults.show_help_bar)
         self._widgets.ocr_shortcut.set_keyboard_shortcut(defaults.ocr_shortcut)
+        self._widgets.ocr_page_shortcut.set_keyboard_shortcut(defaults.ocr_page_shortcut)
         self._widgets.screenshot_shortcut.set_keyboard_shortcut(defaults.screenshot_shortcut)
 
         # Screenshot overlay settings
