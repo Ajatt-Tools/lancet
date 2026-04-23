@@ -57,7 +57,7 @@ class MangaOcr(MangaOcrBase):
         except Exception as ex:
             raise MangaOCRException(f"{class_name(ex)}: {ex}") from ex
 
-        device = move_model_to_device(self, force_cpu=self._force_cpu)
+        device = move_model_to_device(self.model, force_cpu=self._force_cpu)
         logger.info(f"Using {device.name.upper()}")
 
         if not EXAMPLE_IMAGE_PATH.is_file():
