@@ -6,8 +6,8 @@ import pathlib
 
 from PIL import Image
 
-from lancet.base import LancetModel
 from lancet.exceptions import LancetException
+from lancet.model_utils.base import LancetModel
 
 EXAMPLE_IMAGE_PATH = pathlib.Path(__file__).parent / "assets/example.jpg"
 
