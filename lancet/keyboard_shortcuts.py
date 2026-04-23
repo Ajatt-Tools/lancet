@@ -41,6 +41,7 @@ class LancetShortcutEnum(enum.Enum):
     """Enum identifying the available keyboard shortcut actions."""
 
     ocr_shortcut = enum.auto()
+    ocr_page_shortcut = enum.auto()
     screenshot_shortcut = enum.auto()
 
 

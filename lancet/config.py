@@ -31,6 +31,7 @@ class Config:
     )
     force_cpu: bool = False
     ocr_shortcut: str = "Alt+O"
+    ocr_page_shortcut: str = "Shift+Alt+O"
     screenshot_shortcut: str = ""  # unset
     max_history_size: int = 100
     show_help_bar: bool = True  # Adds hints for keyboard shortcuts, shown at the bottom.
