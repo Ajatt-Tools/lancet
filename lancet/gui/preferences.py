@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from zala.utils import qconnect
 
 from lancet.config import Config
 from lancet.consts import APP_LOGO_PATH, APP_NAME, GEOMETRY_FILE_PATH
@@ -146,7 +147,8 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
             | QDialogButtonBox.StandardButton.Cancel
             | QDialogButtonBox.StandardButton.RestoreDefaults
         )
-        self._button_box.clicked.connect(self._on_button_clicked)
+        # https://doc.qt.io/qt-6/qdialogbuttonbox.html#clicked
+        qconnect(self._button_box.clicked, self._on_button_clicked)
         columns_layout.addWidget(self._button_box, 3, 1, 1, 2)  # row, col, rowspan, colspan
         self._add_tooltips()
 
@@ -176,6 +178,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
 
     def _on_button_clicked(self, button: QAbstractButton) -> None:
         """Route button clicks to the appropriate action based on the button's role."""
+        # https://doc.qt.io/qt-6/qdialogbuttonbox.html#clicked
         match self._button_box.buttonRole(button):
             case QDialogButtonBox.ButtonRole.ApplyRole:
                 self._apply()
