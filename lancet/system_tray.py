@@ -36,7 +36,7 @@ from lancet.keyboard_shortcuts import (
 )
 from lancet.model_utils.model_loader import BackgroundModelLoader
 from lancet.model_utils.ocr_service import OcrService
-from lancet.model_utils.ocr_workflow import OcrWorkflow
+from lancet.model_utils.ocr_workflow import OcrWorkflow, ensure_cursor_restored
 from lancet.notifications import NotifySend
 from lancet.ocr_history import OcrHistory
 
@@ -257,6 +257,7 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def process_select_result(self, user_selection: UserSelectionResult) -> None:
         """Save the user's screenshot selection to a file."""
+        ensure_cursor_restored()
         if not user_selection.pixmap:
             self._notify.notify("Selection aborted")
             return

@@ -23,6 +23,12 @@ from lancet.ocr.thread_op import LancetThreadOp
 from lancet.ocr_history import OcrHistory
 
 
+def ensure_cursor_restored() -> None:
+    """Safety net: restore the cursor if Zala left it in an override state."""
+    if QApplication.overrideCursor() is not None:
+        QApplication.restoreOverrideCursor()
+
+
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image:
     """Convert a Qt QPixmap to a PIL Image. Raise if the pixmap is empty."""
     if pixmap.isNull():
@@ -76,6 +82,7 @@ class OcrWorkflow:
 
     def run_ocr(self, user_selection: UserSelectionResult) -> None:
         """Run single-region OCR from user selection."""
+        ensure_cursor_restored()
         if not self._loader.is_model_ready(ModelName.manga_ocr):
             self._notify.notify(self._loader.status().what())
             return
@@ -90,6 +97,7 @@ class OcrWorkflow:
 
     def run_speech_bubble_ocr(self, user_selection: UserSelectionResult) -> None:
         """Run speech bubble detection + OCR from user selection."""
+        ensure_cursor_restored()
         if not self._loader.is_model_ready(ModelName.manga_ocr, ModelName.text_detector):
             self._notify.notify(self._loader.status().what())
             return
