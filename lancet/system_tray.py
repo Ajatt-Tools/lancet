@@ -123,6 +123,11 @@ class LancetSystemTray(QSystemTrayIcon):
             format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
             self.make_ocr_screenshot,
         )
+        menu.addAction(
+            QIcon(str(OCR_ICON_PATH)),
+            format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
+            self.detect_and_make_ocr_screenshot,
+        )
         menu.addSeparator()
         menu.addAction(QIcon(str(PREFERENCES_ICON_PATH)), "Preferences…", self.open_preferences)
         menu.addAction(QIcon(str(RESTART_ICON_PATH)), "Restart", self.restart)
@@ -156,6 +161,7 @@ class LancetSystemTray(QSystemTrayIcon):
         """Return a mapping of shortcut actions to their key combinations, excluding empty ones."""
         hotkey_dict = {
             LancetShortcutEnum.ocr_shortcut: self._cfg.ocr_shortcut,
+            LancetShortcutEnum.ocr_page_shortcut: self._cfg.ocr_page_shortcut,
             LancetShortcutEnum.screenshot_shortcut: self._cfg.screenshot_shortcut,
         }
         hotkey_dict = {k: v.strip() for k, v in hotkey_dict.items()}
@@ -166,6 +172,8 @@ class LancetSystemTray(QSystemTrayIcon):
         match shortcut:
             case LancetShortcutEnum.ocr_shortcut:
                 self.make_ocr_screenshot()
+            case LancetShortcutEnum.ocr_page_shortcut:
+                self.detect_and_make_ocr_screenshot()
             case LancetShortcutEnum.screenshot_shortcut:
                 self.make_screenshot_area()
 
@@ -222,6 +230,17 @@ class LancetSystemTray(QSystemTrayIcon):
         """Open the full-screen selection overlay for OCR recognition of the selected area."""
         try:
             self._take.select_area(on_finish=self._ocr_workflow.run_ocr, opts=make_preview_opts(self._cfg))
+        except ZalaException as ex:
+            logger.error(str(ex))
+            self._notify.notify(str(ex))
+
+    def detect_and_make_ocr_screenshot(self) -> None:
+        """Open the full-screen selection overlay for speech bubble detection and OCR."""
+        try:
+            self._take.select_area(
+                on_finish=self._ocr_workflow.run_speech_bubble_ocr,
+                opts=make_preview_opts(self._cfg),
+            )
         except ZalaException as ex:
             logger.error(str(ex))
             self._notify.notify(str(ex))
