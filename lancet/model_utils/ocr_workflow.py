@@ -31,7 +31,9 @@ def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image:
     buffer = QBuffer()
     buffer.open(QBuffer.OpenModeFlag.ReadWrite)
     pixmap.save(buffer, "PNG")
-    bytes_io = BytesIO(buffer.data())
+    # https://doc.qt.io/qt-6/qbuffer.html#data
+    # https://doc.qt.io/qt-6/qbytearray.html#data
+    bytes_io = BytesIO(buffer.data().data())
 
     if bytes_io.getbuffer().nbytes == 0:
         raise PixmapConversionError("empty pixmap")
