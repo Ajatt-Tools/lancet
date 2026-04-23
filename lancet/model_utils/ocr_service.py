@@ -1,10 +1,13 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import os
 
+from loguru import logger
 from PIL import Image
 
-from lancet.consts import OCR_JOIN_STR
+from lancet.consts import CACHE_DIR_PATH, OCR_JOIN_STR
 from lancet.model_utils.model_loader import BackgroundModelLoader
+from lancet.text_detector_client.text_detector import save_bubble_images
 
 
 class OcrService:
@@ -25,7 +28,9 @@ class OcrService:
         """
         Detect speech bubbles, run OCR on each box image, and concatenate the results.
         """
-        return OCR_JOIN_STR.join(
-            self._loader.ocr.recognize(block.box_image).strip()
-            for block in self._loader.text_detector.get_speech_bubbles(image, include_lines=False).blocks
-        )
+        blocks = self._loader.text_detector.get_speech_bubbles(image, include_lines=False).blocks
+        if "LANCET_DEBUG" in os.environ:
+            save_bubble_images(blocks, output_dir=CACHE_DIR_PATH / "debug_speech_bubbles")
+            logger.debug(f"saved bubbles to {CACHE_DIR_PATH / "debug_speech_bubbles"}")
+
+        return OCR_JOIN_STR.join(self._loader.ocr.recognize(block.box_image).strip() for block in blocks)
