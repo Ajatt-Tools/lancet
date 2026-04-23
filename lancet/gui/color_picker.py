@@ -25,6 +25,8 @@ class ColorEditPicker(QWidget):
         layout.addWidget(b := QPushButton("Pick"))
         b.setMinimumSize(32, 16)
         b.setBaseSize(32, 22)
+        # bool checked is passed to the slot.
+        # https://doc.qt.io/qt-6/qabstractbutton.html#clicked
         qconnect(b.clicked, lambda: self.choose_color())
 
     def choose_color(self) -> None:
