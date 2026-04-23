@@ -114,7 +114,12 @@ class OcrWorkflow:
                     )
                     return
             case OcrDestination.clipboard:
-                self._app.clipboard().setText(text)
+                clipboard = self._app.clipboard()
+                if clipboard is None:
+                    logger.error("Clipboard is not available")
+                    self._notify.notify("Clipboard is not available")
+                    return
+                clipboard.setText(text)
         self._notify.notify(f"OCR result copied: {text}")
 
     def _submit_ocr_task(self, *, op: Callable[[], str]) -> None:
