@@ -11,6 +11,7 @@ from PyQt6.QtCore import QBuffer
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication
 from zala.main_window import UserSelectionResult
+from zala.utils import ensure_cursor_restored
 
 from lancet.config import Config, OcrDestination
 from lancet.exceptions import PixmapConversionError
@@ -21,14 +22,6 @@ from lancet.model_utils.ocr_service import OcrService
 from lancet.notifications import NotifySend
 from lancet.ocr.thread_op import LancetThreadOp
 from lancet.ocr_history import OcrHistory
-
-
-def ensure_cursor_restored() -> None:
-    """Safety net: restore the cursor if Zala left it in an override state."""
-    # https://doc.qt.io/qt-6/qguiapplication.html#overrideCursor
-    while QApplication.overrideCursor() is not None:
-        # https://doc.qt.io/qt-6/qguiapplication.html#restoreOverrideCursor
-        QApplication.restoreOverrideCursor()
 
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image:
