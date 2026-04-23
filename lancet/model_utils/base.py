@@ -5,7 +5,7 @@ import abc
 import enum
 import typing
 from collections.abc import Collection
-from typing import Callable
+from collections.abc import Callable
 
 
 class LancetModel(abc.ABC):
