@@ -137,6 +137,10 @@ class BackgroundModelLoader:
         except ComicTextDetectorUnavailableError:
             pass
 
+    def is_model_ready(self, *names: ModelName) -> bool:
+        """Return whether a specific model has loaded successfully."""
+        return all(name in self._models for name in names)
+
     def load_all(self) -> None:
         """Submit all recipes to the executor."""
         for recipe in self._recipes_by_name.values():
