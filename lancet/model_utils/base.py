@@ -59,5 +59,5 @@ class ModelLoaderStatus(typing.NamedTuple):
         if self.all_ready:
             return "OCR ready."
         if self.errors:
-            return " ".join(f"{name}: {err}." for name, err in self.errors.items())
+            return " ".join(f"{error.name}: {error.error}." for error in self.errors)
         return "Models are loading..."
