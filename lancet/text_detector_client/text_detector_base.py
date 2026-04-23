@@ -8,8 +8,8 @@ import typing
 
 from PIL import Image
 
-from lancet.base import LancetModel
 from lancet.exceptions import LancetException
+from lancet.model_utils.base import LancetModel
 
 
 class ComicTextDetectorException(LancetException):
