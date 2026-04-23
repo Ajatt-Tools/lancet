@@ -4,6 +4,7 @@ import enum
 
 import torch
 
+
 class TorchDevice(enum.Enum):
     cuda = enum.auto()
     mps = enum.auto()
