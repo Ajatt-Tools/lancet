@@ -81,6 +81,7 @@ class LancetSystemTray(QSystemTrayIcon):
     _take: ZalaTakeScreenRegion
     _cfg: Config
     _hotkeys: LancetShortcutManager | None = None
+    _preferences_dialog: PreferencesDialog | None = None
 
     def __init__(self, app: QApplication, cfg: Config, parent: QWidget | None = None) -> None:
         """Set up the system tray icon, context menu, OCR model, and keyboard shortcuts."""
@@ -170,6 +171,9 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def process_keyboard_shortcut(self, shortcut: LancetShortcutEnum) -> None:
         """Dispatch a keyboard shortcut event to the corresponding action."""
+        if self._preferences_dialog:
+            logger.info(f"Shortcut pressed while Preferences open: {shortcut.name}")
+            return
         match shortcut:
             case LancetShortcutEnum.ocr_shortcut:
                 self.make_ocr_screenshot()
@@ -185,9 +189,14 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def open_preferences(self) -> None:
         """Open the preferences dialog and reload shortcuts if settings are applied."""
-        dialog = PreferencesDialog(self._cfg, self._history)
-        dialog.settings_applied.connect(self._on_settings_changed)
-        dialog.history_list.copy_requested.connect(self._ocr_workflow.copy_ocr_result)
+        self._preferences_dialog = dialog = PreferencesDialog(self._cfg, self._history)
+
+        def disown() -> None:
+            self._preferences_dialog = None
+
+        qconnect(dialog.settings_applied, self._on_settings_changed)
+        qconnect(dialog.history_list.copy_requested, self._ocr_workflow.copy_ocr_result)
+        qconnect(dialog.finished, disown)
         dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
