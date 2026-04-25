@@ -30,11 +30,13 @@ class Config:
         ]
     )
     force_cpu: bool = False
+    max_history_size: int = 100
+    show_help_bar: bool = True  # Adds hints for keyboard shortcuts, shown at the bottom.
+
+    # Shortcuts
     ocr_shortcut: str = "Alt+O"
     ocr_page_shortcut: str = "Shift+Alt+O"
     screenshot_shortcut: str = ""  # unset
-    max_history_size: int = 100
-    show_help_bar: bool = True  # Adds hints for keyboard shortcuts, shown at the bottom.
 
     # Screenshot overlay colors (stored as hex ARGB strings, e.g. "#FF0000FF")
     border_thickness: int = 2

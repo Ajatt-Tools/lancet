@@ -54,11 +54,13 @@ class FormWidgets(SimpleNamespace):
     notification_duration: SecondsSpinBox
     huggingface_model: ModelListEditor
     force_cpu: QCheckBox
+    max_history_size: HistorySizeSpinBox
     show_help_bar: QCheckBox
+
+    # Shortcuts
     ocr_shortcut: ShortCutGrabButton
     ocr_page_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
-    max_history_size: HistorySizeSpinBox
 
     # Screenshot overlay colors
     border_thickness: BorderThicknessSpinBox
@@ -66,6 +68,9 @@ class FormWidgets(SimpleNamespace):
     fill_color: ColorEditPicker
     outline_color: ColorEditPicker
     fill_brush_color: ColorEditPicker
+
+    # Network
+    bind_port: BindPortSpinBox
 
 
 class PreferencesDialog(SaveAndRestoreGeomDialog):
@@ -198,6 +203,8 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
         self._cfg.show_help_bar = self._widgets.show_help_bar.isChecked()
+
+        # Shortcuts
         self._cfg.ocr_shortcut = self._widgets.ocr_shortcut.current_shortcut()
         self._cfg.ocr_page_shortcut = self._widgets.ocr_page_shortcut.current_shortcut()
         self._cfg.screenshot_shortcut = self._widgets.screenshot_shortcut.current_shortcut()
@@ -228,6 +235,8 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._widgets.huggingface_model.set_items(defaults.huggingface_models)
         self._widgets.force_cpu.setChecked(defaults.force_cpu)
         self._widgets.show_help_bar.setChecked(defaults.show_help_bar)
+
+        # Shortcuts
         self._widgets.ocr_shortcut.set_keyboard_shortcut(defaults.ocr_shortcut)
         self._widgets.ocr_page_shortcut.set_keyboard_shortcut(defaults.ocr_page_shortcut)
         self._widgets.screenshot_shortcut.set_keyboard_shortcut(defaults.screenshot_shortcut)
