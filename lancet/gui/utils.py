@@ -47,3 +47,15 @@ class BindPortSpinBox(SecondsSpinBox):
     _min: int = 1025
     _max: int = 32767
     _suffix: str = ""
+
+
+class DetectorInputSizeSpinBox(SecondsSpinBox):
+    """Spin box for selecting the text detector input resolution."""
+
+    _min: int = 512
+    _max: int = 2048
+    _suffix: str = "px"
+
+    def __init__(self, initial_value: int = 1024, parent: QWidget | None = None) -> None:
+        super().__init__(initial_value, parent)
+        self.setSingleStep(64)
