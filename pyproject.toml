@@ -105,6 +105,7 @@ dependencies = [
     "mypy>=1.0.0",
     "pytest",
     "pytest-asyncio",
+    "pytest-xdist",
 ]
 parallel = true
 randomize = true
