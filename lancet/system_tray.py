@@ -103,7 +103,7 @@ class LancetSystemTray(QSystemTrayIcon):
             app=self._app,
             cfg=self._cfg,
             loader=self._loader,
-            ocr_service=OcrService(loader=self._loader),
+            ocr_service=OcrService(loader=self._loader, cfg=self._cfg),
             notify=self._notify,
             history=self._history,
             executor=self._executor,

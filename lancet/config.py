@@ -30,6 +30,8 @@ class Config:
         ]
     )
     force_cpu: bool = False
+    recover_missed_text: bool = True
+    text_detection_resolution: int = 1024
     max_history_size: int = 100
     show_help_bar: bool = True  # Adds hints for keyboard shortcuts, shown at the bottom.
 
