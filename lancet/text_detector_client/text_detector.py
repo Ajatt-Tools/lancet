@@ -71,6 +71,7 @@ class ComicTextDetector(ComicTextDetectorBase):
     ) -> None:
         """Load the TextDetector model, tokenizer, and processor, then verify with an example image."""
         self._force_cpu = force_cpu
+        self._detector_input_size = detector_input_size
         self._text_height = text_height
         self._max_ratio_vert = max_ratio_vert
         self._max_ratio_hor = max_ratio_hor
@@ -81,7 +82,7 @@ class ComicTextDetector(ComicTextDetectorBase):
         try:
             self._detector = TextDetector(
                 model_path=cache.comic_text_detector_path(),
-                input_size=detector_input_size,
+                input_size=self._detector_input_size,
                 device=get_device(force_cpu=self._force_cpu).name.lower(),
                 act="leaky",
             )
@@ -94,6 +95,11 @@ class ComicTextDetector(ComicTextDetectorBase):
     def force_cpu(self) -> bool:
         """Return whether the model was loaded with CPU forced."""
         return self._force_cpu
+
+    @property
+    def detector_input_size(self) -> int:
+        """Return the input resolution used by the text detector."""
+        return self._detector_input_size
 
     def _detect_text(self, img: np.ndarray, *, keep_undetected_mask: bool = True) -> DetectResult:
         """Detect text in the given image."""

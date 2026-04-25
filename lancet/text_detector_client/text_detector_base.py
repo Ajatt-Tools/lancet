@@ -103,3 +103,9 @@ class ComicTextDetectorBase(LancetModel):
         Do not include lines by default because they are not used by Lancet.
         """
         raise NotImplementedError
+
+    @property
+    @abc.abstractmethod
+    def detector_input_size(self) -> int:
+        """Return the input resolution used by the text detector."""
+        raise NotImplementedError
