@@ -7,6 +7,7 @@ import os
 import pathlib
 import signal
 import sys
+import typing
 
 from loguru import logger
 from PyQt6.QtGui import QColor, QIcon
@@ -142,7 +143,7 @@ class LancetSystemTray(QSystemTrayIcon):
 
         # Init models in background
         self._loader.load_all()
-        signal.signal(signal.SIGINT, self.quit)
+        signal.signal(signal.SIGINT, self._sigint_handler)
 
         # Set keyboard shortcuts
         self._load_keyboard_shortcuts()
@@ -222,6 +223,10 @@ class LancetSystemTray(QSystemTrayIcon):
         # https://docs.python.org/3.14/library/os.html#os.execv
         self.quit()
         os.execv(sys.executable, [sys.executable, *sys.argv])
+
+    def _sigint_handler(self, _signum: int, _frame: typing.Any) -> None:
+        """Handle SIGINT by quitting the application gracefully."""
+        self.quit()
 
     def quit(self) -> None:
         """Stop hotkeys and quit the application."""
