@@ -43,6 +43,7 @@ jobs:
         --add-data "lancet/icons;lancet/icons"
         --add-data "lancet/lancet.desktop;lancet"
         --hidden-import lancet
+        --hidden-import comic_text_detector
         lancet/__main__.py
 
     - name: Upload Windows executable
