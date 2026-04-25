@@ -95,12 +95,16 @@ class ComicTextDetector(ComicTextDetectorBase):
         """Return whether the model was loaded with CPU forced."""
         return self._force_cpu
 
-    def _detect_text(self, img: np.ndarray) -> DetectResult:
+    def _detect_text(self, img: np.ndarray, *, keep_undetected_mask: bool = True) -> DetectResult:
         """Detect text in the given image."""
-        return DetectResult(*self._detector.__call__(img, refine_mode=1, keep_undetected_mask=True))
+        return DetectResult(*self._detector.__call__(img, refine_mode=1, keep_undetected_mask=keep_undetected_mask))
 
     def get_speech_bubbles(
-        self, img_or_path: pathlib.Path | Image.Image, *, include_lines: bool = False
+        self,
+        img_or_path: pathlib.Path | Image.Image,
+        *,
+        include_lines: bool = False,
+        keep_undetected_mask: bool = True,
     ) -> SpeechBubbleResult:
         """
         Detect speech bubbles in the given image or image file path.
@@ -114,7 +118,7 @@ class ComicTextDetector(ComicTextDetectorBase):
         img_height, img_width, *_ = img.shape
         result = SpeechBubbleResult(version=version, img_width=img_width, img_height=img_height)
 
-        detected = self._detect_text(img)
+        detected = self._detect_text(img, keep_undetected_mask=keep_undetected_mask)
         for blk in detected.blk_list:
             rect = Rect.new(blk.xyxy)
             result_blk = SpeechBubbleBlock(

@@ -92,7 +92,11 @@ class ComicTextDetectorBase(LancetModel):
 
     @abc.abstractmethod
     def get_speech_bubbles(
-        self, img_or_path: pathlib.Path | Image.Image, *, include_lines: bool = False
+        self,
+        img_or_path: pathlib.Path | Image.Image,
+        *,
+        include_lines: bool = False,
+        keep_undetected_mask: bool = True,
     ) -> SpeechBubbleResult:
         """
         Detect speech bubbles in the given image or image file path.
