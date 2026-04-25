@@ -1,4 +1,4 @@
-name: Build and Release Windows Executable
+name: Build and Release Binaries
 
 on:
   workflow_dispatch:
@@ -9,9 +9,13 @@ on:
 
 jobs:
   # step 1
-  build-windows-exe:
-    name: Build Windows executable
-    runs-on: windows-latest
+  build-binary:
+    name: Build executable (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
 
     steps:
     - name: Checkout repository
@@ -31,42 +35,32 @@ jobs:
         python -m pip install pyinstaller
         python -m pip install .
 
-    # https://pyinstaller.org/en/stable/usage.html#options
-    - name: Build exe with PyInstaller
-      run: >-
-        pyinstaller
-        --noconfirm
-        --onefile
-        --windowed
-        --name Lancet
-        --icon lancet/icons/logo.ico
-        --add-data "lancet/icons;lancet/icons"
-        --add-data "lancet/lancet.desktop;lancet"
-        --hidden-import lancet
-        --hidden-import comic_text_detector
-        lancet/__main__.py
+    - name: Build binary with PyInstaller
+      shell: bash
+      run: bash scripts/build-binary.sh
 
-    - name: Upload Windows executable
+    - name: Upload executable
       uses: actions/upload-artifact@v7
       with:
-        name: windows-exe
-        path: dist/Lancet.exe
+        name: lancet-${{ runner.os }}
+        path: dist/lancet*
 
   # step 2
   github-release:
     name: Create GitHub release
     needs:
-    - build-windows-exe
+    - build-binary
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-    - name: Download Windows executable
+    - name: Download all binary artifacts
       uses: actions/download-artifact@v8
       with:
-        name: windows-exe
-        path: windows/
+        path: binaries/
+        pattern: lancet-*
+        merge-multiple: true
 
     - name: Create GitHub release
       uses: softprops/action-gh-release@v3
@@ -76,4 +70,4 @@ jobs:
         generate_release_notes: true
         prerelease: false
         files: |
-          windows/*.exe
+          binaries/*

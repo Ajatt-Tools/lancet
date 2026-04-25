@@ -42,10 +42,10 @@ jobs:
         name: python-package-distributions
         path: dist/
 
-    - name: Dispatch release for windows
+    - name: Dispatch release binaries
       uses: aurelien-baudet/workflow-dispatch@v4
       with:
-        workflow: release_windows.yml
+        workflow: release_binaries.yml
         token: ${{ secrets.GITHUB_TOKEN }}
         wait-for-completion: false
         inputs: |
