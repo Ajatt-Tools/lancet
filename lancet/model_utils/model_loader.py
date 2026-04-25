@@ -96,7 +96,10 @@ class BackgroundModelLoader:
         def init_text_detector() -> ComicTextDetectorBase:
             from lancet.text_detector_client.text_detector import ComicTextDetector
 
-            detector = ComicTextDetector(force_cpu=cfg.force_cpu)
+            detector = ComicTextDetector(
+                force_cpu=cfg.force_cpu,
+                detector_input_size=cfg.text_detection_resolution,
+            )
             return detector
 
         return cls(
@@ -131,7 +134,11 @@ class BackgroundModelLoader:
             pass
 
         try:
-            if self.text_detector.force_cpu != self._cfg.force_cpu:
+            reload_needed = (
+                self.text_detector.force_cpu != self._cfg.force_cpu
+                or self.text_detector.detector_input_size != self._cfg.text_detection_resolution
+            )
+            if reload_needed:
                 logger.info(f"Comic Text Detector config changed, reloading with force_cpu={self._cfg.force_cpu}")
                 self.reload_model_by_name(ModelName.text_detector)
         except ComicTextDetectorUnavailableError:
