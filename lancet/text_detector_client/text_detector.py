@@ -6,7 +6,6 @@ import typing
 
 import cv2
 import numpy as np
-import torch
 from loguru import logger
 from PIL import Image
 from torch.signal.windows import gaussian
@@ -15,7 +14,7 @@ from comic_text_detector.inference import TextDetector
 from comic_text_detector.utils.textblock import TextBlock
 from lancet.__about__ import version
 from lancet.consts import CACHE_DIR_PATH
-from lancet.model_utils.common import class_name
+from lancet.model_utils.common import class_name, save_bubble_images
 from lancet.model_utils.device import get_device
 from lancet.ocr.manga_ocr_base import EXAMPLE_IMAGE_PATH
 from lancet.text_detector_client.model_cache import ComicTextDetectorCache
@@ -211,22 +210,6 @@ class ComicTextDetector(ComicTextDetectorBase):
                 cut_points.append(p)
 
             return np.split(line_crop, cut_points, axis=1), cut_points
-
-
-def save_bubble_images(blocks: list[SpeechBubbleBlock], *, output_dir: pathlib.Path) -> list[pathlib.Path]:
-    """Save all detected line-crop images to the output directory and return their paths."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    saved: list[pathlib.Path] = []
-    for blk_idx, block in enumerate(blocks):
-        box_path = output_dir / f"block_{blk_idx}_box.png"
-        block.box_image.save(box_path)
-        saved.append(box_path)
-        for line_idx, line_images in enumerate(block.lines):
-            for chunk_idx, img in enumerate(line_images):
-                path = output_dir / f"block_{blk_idx}_line_{line_idx}_chunk_{chunk_idx}.png"
-                img.save(path)
-                saved.append(path)
-    return saved
 
 
 def main() -> None:

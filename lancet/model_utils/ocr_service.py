@@ -8,7 +8,7 @@ from PIL import Image
 from lancet.config import Config
 from lancet.consts import CACHE_DIR_PATH, OCR_JOIN_STR
 from lancet.model_utils.model_loader import BackgroundModelLoader
-from lancet.text_detector_client.text_detector import save_bubble_images
+from lancet.model_utils.common import save_bubble_images
 
 
 class OcrService:
