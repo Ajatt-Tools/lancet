@@ -2,6 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import concurrent.futures
+import functools
 from collections.abc import Callable
 from io import BytesIO
 
@@ -103,9 +104,12 @@ class OcrWorkflow:
             self._notify.notify(str(ex))
             return
 
-        self._submit_ocr_task(op=lambda: self._ocr_service.run_ocr_with_text_detection(image))
+        self._submit_ocr_task(
+            op=lambda: self._ocr_service.run_ocr_with_text_detection(image),
+            action_name="Detect and OCR",
+        )
 
-    def copy_ocr_result(self, text: str) -> None:
+    def copy_ocr_result(self, text: str, *, action_name: str = "OCR") -> None:
         """Send the OCR result to the configured destination (clipboard or GoldenDict)."""
         match self._cfg.copy_to:
             case OcrDestination.goldendict:
@@ -123,24 +127,24 @@ class OcrWorkflow:
                     self._notify.notify("Clipboard is not available")
                     return
                 clipboard.setText(text)
-        self._notify.notify(f"OCR result copied: {text}")
+        self._notify.notify(f"{action_name} result copied: {text}")
 
-    def _submit_ocr_task(self, *, op: Callable[[], str]) -> None:
+    def _submit_ocr_task(self, *, op: Callable[[], str], action_name: str = "OCR") -> None:
         """Submit an OCR task to the background thread with shared success/failure callbacks."""
         (
             LancetThreadOp[str](op=op, executor=self._executor)
-            .success(self._on_ocr_finished)
+            .success(functools.partial(self._on_ocr_finished, action_name=action_name))
             .failure(self._on_ocr_failed)
             .run_in_background()
         )
 
-    def _on_ocr_finished(self, text: str) -> None:
+    def _on_ocr_finished(self, text: str, *, action_name: str = "OCR") -> None:
         """Handle successful OCR result."""
         if text:
             self._history.add_to_history(text)
-            self.copy_ocr_result(text)
+            self.copy_ocr_result(text, action_name=action_name)
         else:
-            self._notify.notify("OCR returned no text")
+            self._notify.notify(f"{action_name} returned no text")
 
     def _on_ocr_failed(self, e: Exception) -> None:
         """Handle failed OCR."""
