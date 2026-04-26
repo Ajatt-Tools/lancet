@@ -8,10 +8,11 @@ import pathlib
 import signal
 import sys
 import typing
+from contextlib import contextmanager
 
 from loguru import logger
 from PyQt6.QtGui import QColor, QIcon
-from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
+from PyQt6.QtWidgets import QApplication, QDialog, QMenu, QSystemTrayIcon, QWidget
 from zala.exceptions import ZalaException
 from zala.main_window import ScreenshotPreviewOpts, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
@@ -28,13 +29,12 @@ from lancet.consts import (
     RESTART_ICON_PATH,
     SCREENSHOT_ICON_PATH,
 )
+from lancet.exceptions import LancetException
 from lancet.gui.about_dialog import AboutDialog
+from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
-from lancet.keyboard_shortcuts import (
-    KeyboardShortcut,
-    LancetShortcutEnum,
-    LancetShortcutManager,
-)
+from lancet.keyboard_shortcuts.listener import LancetShortcutManager
+from lancet.keyboard_shortcuts.types import LancetShortcutEnum, PyShortcutStr
 from lancet.model_utils.model_loader import BackgroundModelLoader
 from lancet.model_utils.ocr_service import OcrService
 from lancet.model_utils.ocr_workflow import OcrWorkflow, ensure_cursor_restored
@@ -71,6 +71,31 @@ def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
     )
 
 
+class OpenDialogs:
+    _name_to_instance: dict[str, QDialog]
+
+    def __init__(self):
+        self._name_to_instance = {}
+
+    def is_locked(self) -> bool:
+        return len(self._name_to_instance) > 0
+
+    def _disown(self, name: str) -> None:
+        del self._name_to_instance[name]
+
+    @contextmanager
+    def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> typing.Generator[D]:
+        if dialog.name in self._name_to_instance:
+            raise LancetException("already locked")
+
+        self._name_to_instance[dialog.name] = dialog
+        # dialog's result code is passed to the slot.
+        # https://doc.qt.io/qt-6/qdialog.html#finished
+        qconnect(dialog.finished, lambda code: self._disown(dialog.name))
+
+        yield dialog
+
+
 class LancetSystemTray(QSystemTrayIcon):
     """
     System tray application containing all global actions
@@ -81,8 +106,8 @@ class LancetSystemTray(QSystemTrayIcon):
     _app: QApplication
     _take: ZalaTakeScreenRegion
     _cfg: Config
-    _hotkeys: LancetShortcutManager | None = None
-    _preferences_dialog: PreferencesDialog | None = None
+    _open_dialogs: OpenDialogs
+    _hotkeys: LancetShortcutManager
 
     def __init__(self, app: QApplication, cfg: Config, parent: QWidget | None = None) -> None:
         """Set up the system tray icon, context menu, OCR model, and keyboard shortcuts."""
@@ -90,6 +115,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
 
         # Setup members
+        self._open_dialogs = OpenDialogs()
         self._executor = concurrent.futures.ThreadPoolExecutor()
         self._app = app
         self._cfg = cfg
@@ -110,6 +136,7 @@ class LancetSystemTray(QSystemTrayIcon):
             history=self._history,
             executor=self._executor,
         )
+        self._hotkeys = LancetShortcutManager(self._build_shortcuts())
 
         # Menu
         menu = QMenu(parent)
@@ -146,34 +173,21 @@ class LancetSystemTray(QSystemTrayIcon):
         signal.signal(signal.SIGINT, self._sigint_handler)
 
         # Set keyboard shortcuts
-        self._load_keyboard_shortcuts()
+        self._hotkeys.start_listener()
+        qconnect(self._hotkeys.signals.shortcut_activated, self.process_keyboard_shortcut)
 
-    def _load_keyboard_shortcuts(self) -> None:
-        """Stop any existing hotkey listener and start a new one from the current config."""
-        self._stop_hotkeys()
-
-        try:
-            self._hotkeys = LancetShortcutManager(self.get_keyboard_shortcuts())
-        except Exception as e:
-            self._notify.notify(f"failed to load keyboard shortcuts: {e}")
-        else:
-            self._hotkeys.start()
-            qconnect(self._hotkeys.signals.shortcut_activated, self.process_keyboard_shortcut)
-
-    def get_keyboard_shortcuts(self) -> dict[LancetShortcutEnum, KeyboardShortcut]:
-        """Return a mapping of shortcut actions to their key combinations, excluding empty ones."""
-        hotkey_dict = {
-            LancetShortcutEnum.ocr_shortcut: self._cfg.ocr_shortcut,
-            LancetShortcutEnum.ocr_page_shortcut: self._cfg.ocr_page_shortcut,
-            LancetShortcutEnum.screenshot_shortcut: self._cfg.screenshot_shortcut,
-        }
-        hotkey_dict = {k: v.strip() for k, v in hotkey_dict.items()}
-        return {k: v for k, v in hotkey_dict.items() if v}
+    def _build_shortcuts(self) -> dict[PyShortcutStr, LancetShortcutEnum]:
+        """Parse keyboard shortcuts from config, log failures, and return valid hotkeys."""
+        result = self._cfg.get_pynput_shortcuts()
+        if error_message := result.format_failures():
+            logger.error(error_message)
+            self._notify.notify(error_message)
+        return result.hotkeys
 
     def process_keyboard_shortcut(self, shortcut: LancetShortcutEnum) -> None:
         """Dispatch a keyboard shortcut event to the corresponding action."""
-        if self._preferences_dialog:
-            logger.info(f"Shortcut pressed while Preferences open: {shortcut.name}")
+        if self._open_dialogs.is_locked():
+            logger.info(f"Shortcut pressed while dialog open: {shortcut.name}")
             return
         match shortcut:
             case LancetShortcutEnum.ocr_shortcut:
@@ -185,38 +199,25 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def open_about(self) -> None:
         """Open the About dialog."""
-        dialog = AboutDialog()
-        dialog.exec()
+        with self._open_dialogs.lock(AboutDialog()) as dialog:
+            dialog.exec()
 
     def open_preferences(self) -> None:
         """Open the preferences dialog and reload shortcuts if settings are applied."""
-        self._preferences_dialog = dialog = PreferencesDialog(self._cfg, self._history)
-
-        def disown() -> None:
-            self._preferences_dialog = None
-
-        qconnect(dialog.settings_applied, self._on_settings_changed)
-        qconnect(dialog.history_list.copy_requested, self._ocr_workflow.copy_ocr_result)
-        # dialog's result code is passed to the slot.
-        # https://doc.qt.io/qt-6/qdialog.html#finished
-        qconnect(dialog.finished, lambda result: disown())
-        dialog.exec()
+        with self._open_dialogs.lock(PreferencesDialog(self._cfg, self._history)) as dialog:
+            qconnect(dialog.settings_applied, self._on_settings_changed)
+            qconnect(dialog.history_list.copy_requested, self._ocr_workflow.copy_ocr_result)
+            dialog.exec()
 
     def _on_settings_changed(self, settings_applied: SettingsApplyResult) -> None:
         """Handle the result of applying settings, reloading all affected components on success."""
         if settings_applied.success:
-            self._load_keyboard_shortcuts()
+            self._hotkeys.restart_listener(self._build_shortcuts())
             self._notify.set_duration(self._cfg.notification_duration_sec)
             self._history.set_entries(settings_applied.ocr_history, max_size=self._cfg.max_history_size)
             self._loader.on_config_changed()
         else:
             self._notify.notify(f"failed to apply config: {settings_applied.error}")
-
-    def _stop_hotkeys(self) -> None:
-        """Stop and discard the current hotkey listener if one is active."""
-        if self._hotkeys:
-            self._hotkeys.stop()
-            self._hotkeys = None
 
     def restart(self) -> None:
         """Restart the application by replacing the current process with a fresh instance."""
@@ -231,7 +232,7 @@ class LancetSystemTray(QSystemTrayIcon):
     def quit(self) -> None:
         """Stop hotkeys and quit the application."""
         logger.info("Quit Lancet.")
-        self._stop_hotkeys()
+        self._hotkeys.stop_listener()
         self._executor.shutdown(wait=True)
         self._app.quit()
 
