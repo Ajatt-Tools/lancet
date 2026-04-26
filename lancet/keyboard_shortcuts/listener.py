@@ -105,6 +105,7 @@ class LancetShortcutManager:
 
     def start_listener(self) -> None:
         self._listener.start()
+        logger.info("Started shortcut listener")
 
     def restart_listener(self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]) -> None:
         self.stop_listener()
@@ -113,6 +114,7 @@ class LancetShortcutManager:
 
     def stop_listener(self) -> None:
         self._listener.stop()
+        logger.info("Stopped shortcut listener")
 
     def _bind_shortcuts(
         self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]
