@@ -10,7 +10,12 @@ from lancet.consts import GEOMETRY_FILE_PATH
 
 
 class SaveAndRestoreGeomDialog(QDialog):
+    _name: str = "dialog"
     _geom_file: pathlib.Path = GEOMETRY_FILE_PATH
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
