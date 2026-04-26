@@ -7,6 +7,8 @@ from typing import Any, Self
 
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
+from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
+from lancet.keyboard_shortcuts.types import QtShortcutStr, ShortcutConversionResult, LancetShortcutEnum
 
 
 class OcrDestination(enum.Enum):
@@ -76,3 +78,13 @@ class Config:
         CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CFG_PATH, "w", encoding="utf-8") as of:
             json.dump(data, of, ensure_ascii=False, indent=4)
+
+    def get_pynput_shortcuts(self) -> ShortcutConversionResult:
+        """Return a mapping of key combinations to their shortcut actions."""
+        return to_pynput_shortcuts(
+            {
+                QtShortcutStr(self.ocr_shortcut): LancetShortcutEnum.ocr_shortcut,
+                QtShortcutStr(self.ocr_page_shortcut): LancetShortcutEnum.ocr_page_shortcut,
+                QtShortcutStr(self.screenshot_shortcut): LancetShortcutEnum.screenshot_shortcut,
+            }
+        )
