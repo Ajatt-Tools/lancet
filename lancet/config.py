@@ -8,7 +8,11 @@ from typing import Any, Self
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
 from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
-from lancet.keyboard_shortcuts.types import QtShortcutStr, ShortcutConversionResult, LancetShortcutEnum
+from lancet.keyboard_shortcuts.types import (
+    LancetShortcutEnum,
+    QtShortcutStr,
+    ShortcutConversionResult,
+)
 
 
 class OcrDestination(enum.Enum):
