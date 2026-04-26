@@ -30,6 +30,18 @@ def _linked(url: str, label: str) -> str:
     return f'<a href="{url}">{label or url}</a>'
 
 
+FREE_SW_URL = "https://www.gnu.org/philosophy/free-sw.html"
+ABOUT_TEXT = f"""
+<h2>Become a contributor!</h2>
+Lancet is {_linked(FREE_SW_URL, "libre software")} maintained by
+{_linked(GITHUB_URL, 'Ajatt-Tools')} and its community.
+We highly welcome new contributors!
+Visit {_linked(GITHUB_URL, 'the GitHub')} to get started.
+If you have any questions, {_linked(CHAT_URL, 'join our community')}.
+"""
+RELEASES_URL = f"{GITHUB_URL}/releases"
+
+
 class AppIconLabel(QLabel):
     _size: int = 128
 
@@ -43,6 +55,13 @@ class AppIconLabel(QLabel):
         )
         self.setPixmap(pixmap)
         self.setFixedSize(self._size, self._size)
+
+
+class LinksLabel(QLabel):
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self.setOpenExternalLinks(True)
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
 
 
 class AppWelcomeWidget(QWidget):
@@ -67,20 +86,9 @@ class AppWelcomeWidget(QWidget):
         header_layout.addWidget(AppIconLabel(), 1, 1, 4, 1, alignment=Qt.AlignmentFlag.AlignTop)
         header_layout.addWidget(app_name_label, 1, 2)
         header_layout.addWidget(QLabel("OCR snipping tool for reading manga in Japanese."), 2, 2)
-        header_layout.addWidget(QLabel(f"Version: {version}."), 3, 2)
+        header_layout.addWidget(LinksLabel(f"Version: {_linked(f'{RELEASES_URL}', version)}."), 3, 2)
         header_layout.addWidget(QLabel("License: GNU AGPL v3 or later."), 4, 2)
         self.setLayout(header_layout)
-
-
-FREE_SW_URL = "https://www.gnu.org/philosophy/free-sw.html"
-ABOUT_TEXT = f"""
-<h2>Become a contributor!</h2>
-Lancet is {_linked(FREE_SW_URL, "libre software")} maintained by
-{_linked(GITHUB_URL, 'Ajatt-Tools')} and its community.
-We highly welcome new contributors!
-Visit {_linked(GITHUB_URL, 'the GitHub')} to get started.
-If you have any questions, {_linked(CHAT_URL, 'join our community')}.
-"""
 
 
 class AboutDialog(SaveAndRestoreGeomDialog):
@@ -107,9 +115,7 @@ class AboutDialog(SaveAndRestoreGeomDialog):
         root_layout.addWidget(AppWelcomeWidget())
 
         # Contribute
-        contribute_label = QLabel(ABOUT_TEXT)
-        contribute_label.setOpenExternalLinks(True)
-        contribute_label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        contribute_label = LinksLabel(ABOUT_TEXT)
         contribute_label.setWordWrap(True)
         root_layout.addWidget(contribute_label)
 
