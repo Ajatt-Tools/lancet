@@ -86,6 +86,7 @@ class OcrWorkflow:
         try:
             image = prepare_pillow_image(user_selection)
         except PixmapConversionError as ex:
+            logger.warning(str(ex))
             self._notify.notify(str(ex))
             return
 
@@ -101,6 +102,7 @@ class OcrWorkflow:
         try:
             image = prepare_pillow_image(user_selection)
         except PixmapConversionError as ex:
+            logger.warning(str(ex))
             self._notify.notify(str(ex))
             return
 
