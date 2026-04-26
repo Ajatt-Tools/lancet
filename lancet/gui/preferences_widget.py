@@ -1,10 +1,9 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-from PyQt6.QtWidgets import QWidget, QFormLayout, QTabWidget
+from PyQt6.QtWidgets import QFormLayout, QTabWidget, QWidget
 
 from lancet.config import Config
-from lancet.gui.form_widgets import create_form_widgets, FormWidgets
-
+from lancet.gui.form_widgets import FormWidgets, create_form_widgets
 from lancet.gui.utils import ui_translate
 from lancet.model_utils.common import round_to_stride
 

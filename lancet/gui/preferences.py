@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
     QApplication,
     QDialogButtonBox,
     QGridLayout,
-    QWidget, )
+    QWidget,
+)
 from zala.utils import qconnect
 
 from lancet.config import Config
@@ -70,7 +71,6 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
     def _add_tooltips(self) -> None:
         self._tabs.add_tooltips()
 
-
     def _on_button_clicked(self, button: QAbstractButton) -> None:
         """Route button clicks to the appropriate action based on the button's role."""
         # https://doc.qt.io/qt-6/qdialogbuttonbox.html#clicked
@@ -97,7 +97,6 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
     def _restore_defaults(self) -> None:
         """Reset all form widgets to the default config values."""
         self._tabs.set_widget_values(values=Config())
-
 
 
 def playground() -> None:

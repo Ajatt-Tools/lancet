@@ -9,8 +9,13 @@ from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_model_list import ModelListEditor
-from lancet.gui.utils import SecondsSpinBox, DetectorInputSizeSpinBox, HistorySizeSpinBox, BorderThicknessSpinBox, \
-    BindPortSpinBox
+from lancet.gui.utils import (
+    BindPortSpinBox,
+    BorderThicknessSpinBox,
+    DetectorInputSizeSpinBox,
+    HistorySizeSpinBox,
+    SecondsSpinBox,
+)
 
 
 class FormWidgets(SimpleNamespace):
