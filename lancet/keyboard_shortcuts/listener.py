@@ -1,7 +1,5 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-import dataclasses
-import enum
 import functools
 import typing
 from collections.abc import Callable
@@ -11,8 +9,14 @@ from pynput.keyboard import GlobalHotKeys, Key
 from PyQt6.QtCore import QObject, pyqtSignal
 from zala.utils import q_emit
 
-from lancet.config import Config
 from lancet.exceptions import KeyboardShortcutParseError
+from lancet.keyboard_shortcuts.types import (
+    LancetShortcutEnum,
+    PyShortcutStr,
+    QtShortcutStr,
+    ShortcutConversionResult,
+    ShortcutParseFailure,
+)
 
 # Canonical pynput special-key names, derived from the pynput.keyboard.Key enum.
 # This ensures we stay in sync with whatever pynput version is installed.
@@ -39,10 +43,6 @@ PYNPUT_MODIFIERS: typing.Final[frozenset[str]] = frozenset(
 )
 
 
-QtShortcutStr = typing.NewType("QtShortcutStr", str)
-PyShortcutStr = typing.NewType("PyShortcutStr", str)
-
-
 def convert_token(token: str, shortcut: str) -> str:
     """
     Convert a single lowercased token to its pynput representation.
@@ -55,7 +55,7 @@ def convert_token(token: str, shortcut: str) -> str:
     raise KeyboardShortcutParseError(f"unknown key in shortcut {shortcut!r}: {token!r}")
 
 
-def to_pynput_hotkey(shortcut: str) -> PyShortcutStr:
+def to_pynput_hotkey(shortcut: QtShortcutStr) -> PyShortcutStr:
     """
     Convert a human-readable shortcut string (e.g. "Ctrl+Shift+F5", "Meta+O")
     to pynput's format (e.g. "<ctrl>+<shift>+<f5>", "<cmd>+o").
@@ -73,48 +73,17 @@ def to_pynput_hotkey(shortcut: str) -> PyShortcutStr:
     return PyShortcutStr("+".join(converted))
 
 
-class LancetShortcutEnum(enum.Enum):
-    """Enum identifying the available keyboard shortcut actions."""
-
-    ocr_shortcut = enum.auto()
-    ocr_page_shortcut = enum.auto()
-    screenshot_shortcut = enum.auto()
-
-
 class LancetShortcutSignals(QObject):
     """Qt signals emitted when a global keyboard shortcut is activated."""
 
     shortcut_activated = pyqtSignal(LancetShortcutEnum)
 
 
-class ShortcutParseFailure(typing.NamedTuple):
-    """Records a single shortcut that failed to parse."""
-
-    action: LancetShortcutEnum
-    shortcut: str
-    error: str
-
-
-@dataclasses.dataclass(frozen=True)
-class ShortcutConversionResult:
-    """Result of converting a batch of shortcuts to pynput format."""
-
-    hotkeys: dict[PyShortcutStr, LancetShortcutEnum] = dataclasses.field(default_factory=dict)
-    failures: list[ShortcutParseFailure] = dataclasses.field(default_factory=list)
-
-    def format_failures(self) -> str:
-        """Return a formatted message if any shortcuts failed to convert."""
-        if not self.failures:
-            return ""
-        detail = "; ".join(f"{f.action.name}={f.shortcut!r} ({f.error})" for f in self.failures)
-        return f"failed to parse {len(self.failures)} shortcut(s): {detail}"
-
-
 def to_pynput_shortcuts(shortcuts: dict[QtShortcutStr, LancetShortcutEnum]) -> ShortcutConversionResult:
     """Convert shortcuts to pynput format, collecting any that fail to parse."""
     result = ShortcutConversionResult()
     for shortcut, action_name in shortcuts.items():
-        shortcut = shortcut.strip()
+        shortcut = QtShortcutStr(shortcut.strip())
         if not shortcut:
             continue
         try:
@@ -124,17 +93,6 @@ def to_pynput_shortcuts(shortcuts: dict[QtShortcutStr, LancetShortcutEnum]) -> S
             logger.warning(f"skipping shortcut {action_name.name}={shortcut!r}: {ex}")
             continue
     return result
-
-
-def get_keyboard_shortcuts(cfg: Config) -> ShortcutConversionResult:
-    """Return a mapping of key combinations to their shortcut actions."""
-    return to_pynput_shortcuts(
-        {
-            QtShortcutStr(cfg.ocr_shortcut): LancetShortcutEnum.ocr_shortcut,
-            QtShortcutStr(cfg.ocr_page_shortcut): LancetShortcutEnum.ocr_page_shortcut,
-            QtShortcutStr(cfg.screenshot_shortcut): LancetShortcutEnum.screenshot_shortcut,
-        }
-    )
 
 
 class LancetShortcutManager:
