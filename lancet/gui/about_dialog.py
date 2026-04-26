@@ -86,13 +86,14 @@ If you have any questions, {_linked(CHAT_URL, 'join our community')}.
 class AboutDialog(SaveAndRestoreGeomDialog):
     """Dialog that shows information about the Lancet application."""
 
+    _name: str = "about"
     _geom_file: pathlib.Path = GEOMETRY_FILE_PATH.with_suffix(".about")
     _content_margins = (24, 16, 24, 16)
     _spacing: int = 8
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"About {APP_NAME}")
+        self.setWindowTitle(f"{self.name.capitalize()} {APP_NAME}")
         self.setWindowIcon(QIcon(str(APP_LOGO_PATH)))
         self.setMinimumWidth(440)
         self._setup_ui()
