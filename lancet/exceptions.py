@@ -22,3 +22,9 @@ class PixmapConversionError(LancetException, ValueError):
 
 class LancetHTTPError(LancetException, OSError):
     pass
+
+
+class KeyboardShortcutParseError(LancetException, ValueError):
+    """Raised when a keyboard shortcut string cannot be converted to pynput format."""
+
+    pass
