@@ -35,6 +35,7 @@ class SettingsApplyResult:
 class PreferencesDialog(SaveAndRestoreGeomDialog):
     """Preferences dialog for editing all Config fields, with an OCR history panel on the right."""
 
+    _name: str = "preferences"
     _geom_file: pathlib.Path = GEOMETRY_FILE_PATH.with_suffix(".preferences")
     settings_applied = pyqtSignal(SettingsApplyResult)
 
@@ -47,7 +48,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self.history_list = OcrHistoryWidget(history.entries())
 
         self.setWindowIcon(QIcon(str(APP_LOGO_PATH)))
-        self.setWindowTitle(f"{APP_NAME} Preferences")
+        self.setWindowTitle(f"{APP_NAME} {self.name.capitalize()}")
         self.setMinimumWidth(700)
 
         # Dialog buttons
