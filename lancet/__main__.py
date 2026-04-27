@@ -1,5 +1,6 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import multiprocessing
 import pathlib
 import shutil
 import socket
@@ -87,6 +88,10 @@ def main() -> None:
     Main entry point for the Lancet application.
     Reads configuration, ensures singleton instance, and runs the program.
     """
+    # Required for PyInstaller and Python 3.14+ when using libraries that spawn subprocesses.
+    # No-op when running under a normal Python interpreter.
+    multiprocessing.freeze_support()
+
     cfg = Config.read_from_file()
     if not cfg.file_exists():
         cfg.save_to_file()
