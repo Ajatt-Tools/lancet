@@ -84,7 +84,21 @@ class MangaOcr(MangaOcrBase):
         except OSError as ex:
             logger.error(f"{class_name(ex)}: {ex}")
             logger.info(f"trying with local_files_only=False")
+            self._try_load_model_with_web_download_enabled(pretrained_model_name_or_path)
+
+    def _try_load_model_with_web_download_enabled(self, pretrained_model_name_or_path: pathlib.Path | str) -> None:
+        try:
             self._load_from_pretrained(pretrained_model_name_or_path, local_files_only=False)
+        except OSError as ex:
+            # The "Unable to load vocabulary" error often means PyInstaller didn't bundle
+            # fugashi/unidic_lite data files, not that the vocabulary file is corrupted.
+            if "vocabulary" in str(ex).lower():
+                raise OSError(
+                    f"{ex}. "
+                    f"This may indicate missing files for fugashi/unidic_lite "
+                    f"(commonly happens in PyInstaller builds)."
+                ) from ex
+            raise
 
     def _load_from_pretrained(
         self, pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
