@@ -77,18 +77,26 @@ main() {
 		exit 1
 	fi
 
+	local -a pyinstaller_args=(
+		--noconfirm
+		--onefile
+		--windowed
+		--name "$app_name"
+		--icon "$icon"
+		--add-data "lancet/icons${sep}lancet/icons"
+		--add-data "lancet/lancet.desktop${sep}lancet"
+		--hidden-import lancet
+		--hidden-import comic_text_detector
+	)
+
+	if [[ "$os" != "windows" ]]; then
+		# https://pyinstaller.org/en/stable/usage.html#cmdoption-s
+		# The doc: not recommended for Windows
+		pyinstaller_args+=(--strip)
+	fi
+
 	# https://pyinstaller.org/en/stable/usage.html#options
-	pyinstaller \
-		--noconfirm \
-		--onefile \
-		--windowed \
-		--name "$app_name" \
-		--icon "$icon" \
-		--add-data "lancet/icons${sep}lancet/icons" \
-		--add-data "lancet/lancet.desktop${sep}lancet" \
-		--hidden-import lancet \
-		--hidden-import comic_text_detector \
-		lancet/__main__.py
+	pyinstaller "${pyinstaller_args[@]}" lancet/__main__.py
 }
 
 main "$@"
