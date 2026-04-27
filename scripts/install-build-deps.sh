@@ -10,7 +10,8 @@ set -euo pipefail
 
 python -m pip install --upgrade pip
 python -m pip install pyinstaller
-# Install CPU only torch first to avoid CUDA deps.
-python -m pip install --index-url 'https://download.pytorch.org/whl/cpu' torch
-# Now install the project; pip sees torch already satisfied and skips it.
+# Install CPU only torch and torchvision from PyTorch's CPU index
+# to avoid CUDA deps and ensure torchvision ops (e.g., nms) are available.
+python -m pip install --index-url 'https://download.pytorch.org/whl/cpu' torch torchvision
+# Now install the project. pip sees torch and torchvision already satisfied.
 python -m pip install --extra-index-url 'https://pypi.org/simple' .
