@@ -1,0 +1,22 @@
+# Default: detect text vs binary automatically, normalise text files to LF in the repo,
+# and force LF on checkout (even on Windows).
+* text=auto eol=lf
+
+# Shell scripts must always use LF, even on Windows checkouts. Otherwise bash chokes on CRLF shebangs.
+*.sh text eol=lf
+
+# Python files must always use LF (PEP 8 compliance, CI consistency).
+*.py text eol=lf
+
+# Explicit binary types
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz  binary
+*.tar binary
+*.pt  binary
