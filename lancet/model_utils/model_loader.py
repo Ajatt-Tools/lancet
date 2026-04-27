@@ -2,6 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import concurrent.futures
+import threading
 import typing
 from collections.abc import Sequence
 
@@ -18,13 +19,11 @@ from lancet.model_utils.base import (
 from lancet.notifications import NotifySend
 from lancet.ocr.manga_ocr_base import (
     MangaOcrBase,
-    MangaOCRException,
     MangaOCRUnavailableError,
 )
 from lancet.ocr.thread_op import LancetThreadOp
 from lancet.text_detector_client.text_detector_base import (
     ComicTextDetectorBase,
-    ComicTextDetectorException,
     ComicTextDetectorUnavailableError,
 )
 
@@ -83,24 +82,26 @@ class BackgroundModelLoader:
         notify: NotifySend,
         executor: concurrent.futures.ThreadPoolExecutor,
     ) -> typing.Self:
+        # Have a lock ensure that pytorch is not imported twice at the same time.
+        torch_lock = threading.Lock()
 
         def init_manga_ocr() -> MangaOcrBase:
-            from lancet.ocr.manga_ocr import MangaOcr
+            with torch_lock:
+                from lancet.ocr.manga_ocr import MangaOcr
 
-            mocr = MangaOcr(
-                pretrained_model_name_or_path=cfg.huggingface_model_name,
-                force_cpu=cfg.force_cpu,
-            )
-            return mocr
+                return MangaOcr(
+                    pretrained_model_name_or_path=cfg.huggingface_model_name,
+                    force_cpu=cfg.force_cpu,
+                )
 
         def init_text_detector() -> ComicTextDetectorBase:
-            from lancet.text_detector_client.text_detector import ComicTextDetector
+            with torch_lock:
+                from lancet.text_detector_client.text_detector import ComicTextDetector
 
-            detector = ComicTextDetector(
-                force_cpu=cfg.force_cpu,
-                detector_input_size=cfg.text_detection_resolution,
-            )
-            return detector
+                return ComicTextDetector(
+                    force_cpu=cfg.force_cpu,
+                    detector_input_size=cfg.text_detection_resolution,
+                )
 
         return cls(
             cfg=cfg,
