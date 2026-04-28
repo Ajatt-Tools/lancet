@@ -88,7 +88,12 @@ main() {
 		--add-data "lancet/ocr/assets${sep}lancet/ocr/assets"
 		--hidden-import lancet
 		--hidden-import comic_text_detector
-		# Enable Python optimization level 1
+		# Bundle the Japanese tokenizer dictionary and MeCab data files.
+		# Without these, manga_ocr fails.
+		--collect-data unidic_lite
+		--collect-all fugashi
+		--collect-submodules transformers.models.bert_japanese
+		# Enable Python optimization level 1: removes assert statements, keeps docstrings.
 		# https://pyinstaller.org/en/stable/feature-notes.html#using-the-optimize-command-line-option
 		--optimize 1
 	)
