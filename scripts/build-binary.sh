@@ -87,6 +87,9 @@ main() {
 		--add-data "lancet/lancet.desktop${sep}lancet"
 		--hidden-import lancet
 		--hidden-import comic_text_detector
+		# Enable Python optimization level 1
+		# https://pyinstaller.org/en/stable/feature-notes.html#using-the-optimize-command-line-option
+		--optimize 1
 	)
 
 	if [[ "$os" != "windows" ]]; then
