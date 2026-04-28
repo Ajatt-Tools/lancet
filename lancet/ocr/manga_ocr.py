@@ -24,11 +24,11 @@ from lancet.ocr.manga_ocr_base import (
     MangaOCRFileNotFoundError,
 )
 
-
-class MangaOcrModel(VisionEncoderDecoderModel, GenerationMixin):
-    """Combined vision encoder-decoder model with generation capabilities for manga OCR."""
-
-    pass
+# Verify that VisionEncoderDecoderModel inherits GenerationMixin.
+if not issubclass(VisionEncoderDecoderModel, GenerationMixin):
+    raise ImportError(
+        "VisionEncoderDecoderModel should inherit GenerationMixin. This is required in transformers 5.6.2+."
+    )
 
 
 class MangaOcr(MangaOcrBase):
@@ -113,7 +113,7 @@ class MangaOcr(MangaOcrBase):
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
         )
-        self.model = MangaOcrModel.from_pretrained(
+        self.model = VisionEncoderDecoderModel.from_pretrained(
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
         )
