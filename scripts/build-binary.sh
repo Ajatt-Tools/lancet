@@ -85,6 +85,7 @@ main() {
 		--icon "$icon"
 		--add-data "lancet/icons${sep}lancet/icons"
 		--add-data "lancet/lancet.desktop${sep}lancet"
+		--add-data "lancet/ocr/assets${sep}lancet/ocr/assets"
 		--hidden-import lancet
 		--hidden-import comic_text_detector
 		# Enable Python optimization level 1
