@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QApplication
 from lancet.config import Config
 from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN
 from lancet.exceptions import PortAlreadyInUseError
+from lancet.find_executable import is_running_frozen
 from lancet.system_tray import LancetSystemTray
 
 
@@ -94,7 +95,7 @@ def setup_frozen_binary() -> None:
 
     # Enable system certificate verification in PyInstaller binaries.
     # This allows SSL connections to work in environments with custom CA certificates.
-    if getattr(sys, "frozen", False):
+    if is_running_frozen():
         try:
             import pip_system_certs.wrapt_requests
 

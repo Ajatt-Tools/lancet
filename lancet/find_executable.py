@@ -4,6 +4,7 @@ import functools
 import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Sequence
 
 HARDCODED_PATHS = (
@@ -32,6 +33,29 @@ def find_executable(name: str) -> str | None:
     return shutil.which(name) or find_executable_hardcoded(name)
 
 
+def is_running_frozen() -> bool:
+    """
+    Frozen usually means running a binary created by pyinstaller.
+    """
+    return bool(getattr(sys, "frozen", False))
+
+
+def make_clean_env() -> dict[str, str] | None:
+    # Clean environment for frozen binaries to prevent library conflicts with external Qt applications
+    env = None
+    if is_running_frozen():
+        env = os.environ.copy()
+        # Remove PyInstaller-specific environment variables that cause Qt version conflicts
+        env.pop("LD_LIBRARY_PATH", None)
+        # Remove Qt plugin paths that might conflict
+        env.pop("QT_PLUGIN_PATH", None)
+        env.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
+        # Also remove Python-specific variables (not needed for external programs)
+        env.pop("PYTHONPATH", None)
+        env.pop("PYTHONHOME", None)
+    return env
+
+
 def run_and_disown(args: Sequence[str]) -> None:
     """Start a subprocess detached from the current process group so it survives application exit."""
     _ = subprocess.Popen(
@@ -40,4 +64,5 @@ def run_and_disown(args: Sequence[str]) -> None:
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=make_clean_env(),  # Use cleaned environment
     )
