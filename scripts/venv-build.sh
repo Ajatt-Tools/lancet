@@ -9,7 +9,7 @@ cd -- "$ROOT" || exit 1
 echo "Using $(python --version)"
 
 echo "Cleaning up old build artifacts..."
-rm -rfv -- dist/ build/ ./*.spec
+rm -rfv -- .venv/ dist/ build/ ./*.spec
 
 echo "Creating .venv..."
 python -m venv .venv
