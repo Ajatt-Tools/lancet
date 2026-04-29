@@ -40,20 +40,49 @@ def is_running_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def filter_pyinstaller_paths(path_str: str) -> list[str]:
+    """
+    PyInstaller prepends to the original LD_LIBRARY_PATH and QT_PLUGIN_PATH values:
+    LD_LIBRARY_PATH=/tmp/_MEIz10LqR
+    QT_PLUGIN_PATH=/tmp/_MEIz10LqR/PyQt6/Qt6/plugins
+    Remove PyInstaller's temporary extraction paths from the passed env var while preserving the user's original paths.
+    """
+    return [p for p in path_str.split(":") if not p.startswith("/tmp/_MEI")]
+
+
+def clean_ld_library_path(env: dict[str, str], *, env_key: str="LD_LIBRARY_PATH") -> dict[str, str]:
+    """
+    Restore original LD_LIBRARY_PATH (remove PyInstaller's prefix)
+    """
+    if env_key in env:
+        if cleaned_parts := filter_pyinstaller_paths(env[env_key]):
+            env[env_key] = ":".join(cleaned_parts)
+        else:
+            env.pop(env_key)
+    return env
+
+
 def make_clean_env() -> dict[str, str] | None:
     """
     Clean environment for frozen binaries to prevent library conflicts with external Qt applications.
-    Without this, GoldenDict fails to start when running the Lancet binary produced by pyinstaller.
+
+    PyInstaller sets LD_LIBRARY_PATH and QT_PLUGIN_PATH to its extracted bundle,
+    which causes external Qt applications (like GoldenDict) to crash
+    when they try to load incompatible libraries/plugins.
+    This function removes PyInstaller's paths while preserving the user's original LD_LIBRARY_PATH (if any).
     """
     env = None
     if is_running_frozen():
         env = os.environ.copy()
-        # Remove PyInstaller-specific environment variables that cause Qt version conflicts
-        env.pop("LD_LIBRARY_PATH", None)
-        # Remove Qt plugin paths that might conflict
-        env.pop("QT_PLUGIN_PATH", None)
-        env.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
-        # Also remove Python-specific variables (not needed for external programs)
+
+        # Restore original LD_LIBRARY_PATH (remove PyInstaller's prefix)
+        env = clean_ld_library_path(env, env_key="LD_LIBRARY_PATH")
+
+        # Remove Qt plugin paths (these are always PyInstaller-specific)
+        env = clean_ld_library_path(env, env_key="QT_PLUGIN_PATH")
+        env = clean_ld_library_path(env, env_key="QT_QPA_PLATFORM_PLUGIN_PATH")
+
+        # Remove Python-specific variables (not needed for external programs)
         env.pop("PYTHONPATH", None)
         env.pop("PYTHONHOME", None)
     return env
