@@ -16,5 +16,11 @@ python -m pip install --upgrade pip
 # Install CPU only torch and torchvision from PyTorch's CPU index
 # to avoid CUDA deps and ensure torchvision ops (e.g., nms) are available.
 python -m pip install --index-url 'https://download.pytorch.org/whl/cpu' torch torchvision
-# Now install the project. pip sees torch and torchvision already satisfied.
+
+# Install opencv-python-headless BEFORE the project to ensure it's used.
+python -m pip install opencv-python-headless
+
+# Install the project LAST.
+# pip sees torch, torchvision, opencv-python-headless already satisfied and will use them automatically.
+# The group "binary" installs build-only dependencies (pyinstaller).
 python -m pip install --group="binary" --extra-index-url 'https://pypi.org/simple' .

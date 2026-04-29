@@ -34,7 +34,7 @@ dependencies = [
     "numpy>=2.4.0",
     "torch>=2.11", # https://pypi.org/project/torch/
     "transformers>=5.6.2", # needed by manga_ocr
-    "opencv-python", # needed to 'import cv2', used by comic text detector
+    "opencv-python-headless", # needed to 'import cv2', used by comic text detector
     "torchvision", # needed by comic text detector
     "pyclipper", # needed by comic text detector
     "shapely", # needed by comic text detector
@@ -45,6 +45,13 @@ dependencies = [
     # Or use a local folder:
     #"zala @ git+file:///home/ren/Documents/Projects/Zala",
 ]
+
+[project.optional-dependencies]
+# To use: hatch shell dev (or pip install .[dev])
+dev = [
+    "opencv-python>=4.5.0",  # Full version with GUI support for comic_text_detector training/debug scripts
+]
+
 [tool.hatch.metadata]
 allow-direct-references = true
 
@@ -115,6 +122,10 @@ randomize = true
 [[tool.hatch.envs.hatch-test.matrix]]
 # https://hatch.pypa.io/latest/tutorials/testing/overview/#testing-projects
 python = ["3.13", ]
+
+[tool.hatch.envs.dev]
+features = ["dev"]
+description = "Development environment with full opencv-python (includes GUI support)"
 
 [tool.hatch.envs.hatch-static-analysis]
 # https://hatch.pypa.io/latest/how-to/static-analysis/behavior/
