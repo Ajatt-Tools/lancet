@@ -41,7 +41,10 @@ def is_running_frozen() -> bool:
 
 
 def make_clean_env() -> dict[str, str] | None:
-    # Clean environment for frozen binaries to prevent library conflicts with external Qt applications
+    """
+    Clean environment for frozen binaries to prevent library conflicts with external Qt applications.
+    Without this, GoldenDict fails to start when running the Lancet binary produced by pyinstaller.
+    """
     env = None
     if is_running_frozen():
         env = os.environ.copy()
