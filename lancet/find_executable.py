@@ -70,6 +70,8 @@ def make_clean_env() -> dict[str, str] | None:
     which causes external Qt applications (like GoldenDict) to crash
     when they try to load incompatible libraries/plugins.
     This function removes PyInstaller's paths while preserving the user's original LD_LIBRARY_PATH (if any).
+
+    https://pyinstaller.org/en/stable/advanced-topics.html#bootloader
     """
     env = None
     if is_running_frozen():
