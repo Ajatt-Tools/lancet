@@ -83,14 +83,33 @@ def run_program(cfg: Config) -> None:
     sys.exit(app.exec())
 
 
+def setup_frozen_binary() -> None:
+    """
+    Configure the environment for PyInstaller frozen binaries.
+    """
+
+    # Required for PyInstaller and Python 3.14+ when using libraries that spawn subprocesses.
+    # No-op when running under a normal Python interpreter.
+    multiprocessing.freeze_support()
+
+    # Enable system certificate verification in PyInstaller binaries.
+    # This allows SSL connections to work in environments with custom CA certificates.
+    if getattr(sys, "frozen", False):
+        try:
+            import pip_system_certs.wrapt_requests
+
+            pip_system_certs.wrapt_requests.inject_truststore()
+        except ImportError:
+            # pip_system_certs not available (shouldn't happen in binary builds)
+            pass
+
+
 def main() -> None:
     """
     Main entry point for the Lancet application.
     Reads configuration, ensures singleton instance, and runs the program.
     """
-    # Required for PyInstaller and Python 3.14+ when using libraries that spawn subprocesses.
-    # No-op when running under a normal Python interpreter.
-    multiprocessing.freeze_support()
+    setup_frozen_binary()
 
     cfg = Config.read_from_file()
     if not cfg.file_exists():

@@ -152,4 +152,5 @@ filterwarnings = [
 [dependency-groups]
 binary = [
     "pyinstaller",
+    "pip_system_certs",  # For SSL verification in PyInstaller binaries
 ]
