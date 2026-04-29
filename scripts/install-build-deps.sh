@@ -8,6 +8,9 @@
 
 set -euo pipefail
 
+# Clear pip cache to avoid corruption issues
+python -m pip cache purge
+
 python -m pip install --upgrade pip
 python -m pip install pyinstaller
 # Install CPU only torch and torchvision from PyTorch's CPU index
