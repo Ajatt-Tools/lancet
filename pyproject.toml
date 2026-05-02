@@ -89,7 +89,7 @@ omit = [
 ]
 
 [tool.coverage.paths]
-lancet = ["src/lancet", "*/lancet/src/lancet"]
+lancet = ["lancet", "*/lancet/lancet"]
 tests = ["tests", "*/lancet/tests"]
 
 [tool.coverage.report]
