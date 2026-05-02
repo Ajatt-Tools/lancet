@@ -121,29 +121,30 @@ class BackgroundModelLoader:
 
     def on_config_changed(self) -> None:
         """Update model configuration and reload the model in the background if it changed."""
-        try:
-            reload_needed = (
-                self.ocr.pretrained_model_name_or_path != self._cfg.huggingface_model_name
-                or self.ocr.force_cpu != self._cfg.force_cpu
-            )
-            if reload_needed:
-                logger.info(
-                    f"OCR config changed, reloading model: {self._cfg.huggingface_model_name}, force_cpu={self._cfg.force_cpu}"
-                )
-                self.reload_model_by_name(ModelName.manga_ocr)
-        except MangaOCRUnavailableError:
-            pass
+        self._maybe_reload_manga_ocr()
+        self._maybe_reload_text_detector()
 
-        try:
-            reload_needed = (
-                self.text_detector.force_cpu != self._cfg.force_cpu
-                or self.text_detector.detector_input_size != self._cfg.text_detection_resolution
+    def _maybe_reload_manga_ocr(self) -> None:
+        reload_needed = (
+            self._ocr is None  # the model is not loaded. try to load it again.
+            or self.ocr.pretrained_model_name_or_path != self._cfg.huggingface_model_name
+            or self.ocr.force_cpu != self._cfg.force_cpu
+        )
+        if reload_needed:
+            logger.info(
+                f"OCR config changed, reloading model: {self._cfg.huggingface_model_name}, force_cpu={self._cfg.force_cpu}"
             )
-            if reload_needed:
-                logger.info(f"Comic Text Detector config changed, reloading with force_cpu={self._cfg.force_cpu}")
-                self.reload_model_by_name(ModelName.text_detector)
-        except ComicTextDetectorUnavailableError:
-            pass
+            self.reload_model_by_name(ModelName.manga_ocr)
+
+    def _maybe_reload_text_detector(self) -> None:
+        reload_needed = (
+            self._text_detector is None  # the model is not loaded. try to load it again.
+            or self.text_detector.force_cpu != self._cfg.force_cpu
+            or self.text_detector.detector_input_size != self._cfg.text_detection_resolution
+        )
+        if reload_needed:
+            logger.info(f"Comic Text Detector config changed, reloading with force_cpu={self._cfg.force_cpu}")
+            self.reload_model_by_name(ModelName.text_detector)
 
     def is_model_ready(self, *names: ModelName) -> bool:
         """Return whether a specific model has loaded successfully."""
