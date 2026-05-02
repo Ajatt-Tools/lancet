@@ -67,6 +67,8 @@ class Config:
         except FileNotFoundError:
             logger.warning("config file does not exist, falling back to default.")
             return cls()
+        except json.JSONDecodeError as ex:
+            raise ConfigReadError(f"failed to decode json config file: {ex}") from ex
         try:
             data["copy_to"] = OcrDestination[data["copy_to"]]
         except KeyError:
