@@ -3,6 +3,8 @@
 
 import os
 import sys
+import typing
+from collections.abc import Sequence
 
 import pytest
 
@@ -28,12 +30,12 @@ class TestFilterPyinstallerPaths:
             # Multiple PyInstaller paths
             ("/tmp/_MEIaaa:/usr/lib:/tmp/_MEIbbb:/opt/lib", ["/usr/lib", "/opt/lib"]),
             # Empty string
-            ("", [""]),
+            ("", []),
             # Single path (no colons)
             ("/usr/lib", ["/usr/lib"]),
         ],
     )
-    def test_filter_pyinstaller_paths(self, input_path: str, expected: list[str]) -> None:
+    def test_filter_pyinstaller_paths(self, input_path: str, expected: Sequence[str]) -> None:
         """Test that PyInstaller paths are correctly filtered out."""
         assert filter_pyinstaller_paths(input_path) == expected
 
@@ -74,21 +76,23 @@ class TestCleanLdLibraryPath:
         assert result == expected_env
 
 
-class TestMakeCleanEnv:
-    """Test environment cleaning for frozen binaries."""
+class MakeCleanEnvScenario(typing.NamedTuple):
+    """A make_clean_env() frozen-binary test scenario.
 
-    def test_make_clean_env_not_frozen(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that make_clean_env returns None when not running as frozen binary."""
-        monkeypatch.delattr(sys, "frozen", raising=False)
-        assert make_clean_env() is None
+    'input_env' is the simulated os.environ.
+    'expected' lists the expectations on the returned dict:
+    a string value means "key must be present and equal to this", and None means "key must be absent".
+    """
 
-    def test_make_clean_env_frozen_removes_pyinstaller_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that make_clean_env removes PyInstaller-specific environment variables."""
-        # Simulate frozen binary
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
+    input_env: dict[str, str]
+    expected: dict[str, str | None]
 
-        # Set up environment with PyInstaller variables
-        test_env = {
+
+# Each scenario simulates a frozen binary with a specific environment shape and
+# encodes both the values that must survive and the keys that must be removed.
+FROZEN_SCENARIOS: dict[str, MakeCleanEnvScenario] = {
+    "removes_pyinstaller_vars_and_cleans_ld_path": MakeCleanEnvScenario(
+        input_env={
             "PATH": "/usr/bin",
             "HOME": "/home/user",
             "LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/usr/lib",
@@ -96,68 +100,72 @@ class TestMakeCleanEnv:
             "QT_QPA_PLATFORM_PLUGIN_PATH": "/tmp/_MEIxxxxx/platforms",
             "PYTHONPATH": "/tmp/_MEIxxxxx",
             "PYTHONHOME": "/tmp/_MEIxxxxx",
-        }
-        monkeypatch.setattr(os, "environ", test_env)
-
-        result = make_clean_env()
-
-        assert result is not None
-        assert result["PATH"] == "/usr/bin"
-        assert result["HOME"] == "/home/user"
-        assert result["LD_LIBRARY_PATH"] == "/usr/lib"  # PyInstaller path removed
-        assert "QT_PLUGIN_PATH" not in result
-        assert "QT_QPA_PLATFORM_PLUGIN_PATH" not in result
-        assert "PYTHONPATH" not in result
-        assert "PYTHONHOME" not in result
-
-    def test_make_clean_env_frozen_preserves_user_ld_library_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that make_clean_env preserves user's original LD_LIBRARY_PATH."""
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
-
-        test_env = {
+        },
+        expected={
+            "PATH": "/usr/bin",
+            "HOME": "/home/user",
+            "LD_LIBRARY_PATH": "/usr/lib",  # PyInstaller path removed
+            "QT_PLUGIN_PATH": None,
+            "QT_QPA_PLATFORM_PLUGIN_PATH": None,
+            "PYTHONPATH": None,
+            "PYTHONHOME": None,
+        },
+    ),
+    "preserves_user_ld_library_path_and_qt_plugin_path": MakeCleanEnvScenario(
+        input_env={
             "PATH": "/usr/bin",
             "LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/opt/custom/lib:/usr/local/lib",
             "QT_PLUGIN_PATH": "/tmp/_MEIxxxxx/PyQt6/Qt6/plugins:/opt/custom/plugins:/usr/local/plugins",
-        }
-        monkeypatch.setattr(os, "environ", test_env)
-
-        result = make_clean_env()
-
-        assert result is not None
-        assert result["LD_LIBRARY_PATH"] == "/opt/custom/lib:/usr/local/lib"
-        assert result["QT_PLUGIN_PATH"] == "/opt/custom/plugins:/usr/local/plugins"
-        assert result["PATH"] == "/usr/bin"
-
-    def test_make_clean_env_frozen_removes_ld_library_path_if_only_pyinstaller(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Test that make_clean_env removes LD_LIBRARY_PATH if it only contains PyInstaller paths."""
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
-
-        test_env = {
+        },
+        expected={
+            "PATH": "/usr/bin",
+            "LD_LIBRARY_PATH": "/opt/custom/lib:/usr/local/lib",
+            "QT_PLUGIN_PATH": "/opt/custom/plugins:/usr/local/plugins",
+        },
+    ),
+    "removes_ld_library_path_if_only_pyinstaller": MakeCleanEnvScenario(
+        input_env={
             "PATH": "/usr/bin",
             "LD_LIBRARY_PATH": "/tmp/_MEIxxxxx",
-        }
-        monkeypatch.setattr(os, "environ", test_env)
-
-        result = make_clean_env()
-
-        assert result is not None
-        assert "LD_LIBRARY_PATH" not in result
-
-    def test_make_clean_env_frozen_no_ld_library_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that make_clean_env works when LD_LIBRARY_PATH is not set."""
-        monkeypatch.setattr(sys, "frozen", True, raising=False)
-
-        test_env = {
+        },
+        expected={
+            "PATH": "/usr/bin",
+            "LD_LIBRARY_PATH": None,
+        },
+    ),
+    "no_ld_library_path_set": MakeCleanEnvScenario(
+        input_env={
             "PATH": "/usr/bin",
             "HOME": "/home/user",
-        }
-        monkeypatch.setattr(os, "environ", test_env)
+        },
+        expected={
+            "PATH": "/usr/bin",
+            "HOME": "/home/user",
+            "LD_LIBRARY_PATH": None,
+        },
+    ),
+}
+
+
+class TestMakeCleanEnv:
+    """Test environment cleaning for frozen binaries."""
+
+    def test_make_clean_env_not_frozen(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """make_clean_env returns None when not running as a frozen binary."""
+        monkeypatch.delattr(sys, "frozen", raising=False)
+        assert make_clean_env() is None
+
+    @pytest.mark.parametrize("scenario", FROZEN_SCENARIOS.values(), ids=list(FROZEN_SCENARIOS.keys()))
+    def test_make_clean_env_frozen(self, scenario: MakeCleanEnvScenario, monkeypatch: pytest.MonkeyPatch) -> None:
+        """For each frozen-binary scenario, verify the cleaned env matches expectations."""
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(os, "environ", dict(scenario.input_env))
 
         result = make_clean_env()
-
         assert result is not None
-        assert result["PATH"] == "/usr/bin"
-        assert result["HOME"] == "/home/user"
-        assert "LD_LIBRARY_PATH" not in result
+
+        for key, expected_value in scenario.expected.items():
+            if expected_value is None:
+                assert key not in result
+            else:
+                assert result[key] == expected_value
