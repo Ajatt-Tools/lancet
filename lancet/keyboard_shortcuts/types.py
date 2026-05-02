@@ -3,6 +3,7 @@
 import dataclasses
 import enum
 import typing
+from collections.abc import MutableSequence
 
 QtShortcutStr = typing.NewType("QtShortcutStr", str)
 PyShortcutStr = typing.NewType("PyShortcutStr", str)
@@ -26,10 +27,13 @@ class ShortcutParseFailure(typing.NamedTuple):
 
 @dataclasses.dataclass(frozen=True)
 class ShortcutConversionResult:
-    """Result of converting a batch of shortcuts to pynput format."""
+    """
+    Result of converting a batch of shortcuts to pynput format.
+    The list of failures gets appended to, thus marked as mutable.
+    """
 
     hotkeys: dict[PyShortcutStr, LancetShortcutEnum] = dataclasses.field(default_factory=dict)
-    failures: list[ShortcutParseFailure] = dataclasses.field(default_factory=list)
+    failures: MutableSequence[ShortcutParseFailure] = dataclasses.field(default_factory=list)
 
     def format_failures(self) -> str:
         """Return a formatted message if any shortcuts failed to convert."""
