@@ -5,11 +5,12 @@ import typing
 from collections.abc import Callable, Sequence
 
 from loguru import logger
-from pynput.keyboard import GlobalHotKeys, Key
+from pynput.keyboard import Key
 from PyQt6.QtCore import QObject, pyqtSignal
 from zala.utils import q_emit
 
 from lancet.exceptions import KeyboardShortcutParseError
+from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import (
     LancetShortcutEnum,
     PyShortcutStr,
@@ -103,18 +104,21 @@ class LancetShortcutManager:
     def __init__(self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]) -> None:
         """Register shortcuts and start listening."""
         self.signals = LancetShortcutSignals()
-        self._listener = GlobalHotKeys(self._bind_shortcuts(shortcuts))
+        self._listener = LancetHotKeyListener(self._bind_shortcuts(shortcuts))
 
     def start_listener(self) -> None:
+        """Start listening for keyboard shortcuts in a background thread."""
         self._listener.start()
         logger.info("Started shortcut listener")
 
     def restart_listener(self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]) -> None:
+        """Stop the current listener and start a new one with updated shortcuts."""
         self.stop_listener()
-        self._listener = GlobalHotKeys(self._bind_shortcuts(shortcuts))
+        self._listener = LancetHotKeyListener(self._bind_shortcuts(shortcuts))
         self.start_listener()
 
     def stop_listener(self) -> None:
+        """Stop listening for keyboard shortcuts."""
         self._listener.stop()
         logger.info("Stopped shortcut listener")
 
