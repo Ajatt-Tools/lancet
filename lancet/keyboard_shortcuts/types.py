@@ -4,6 +4,9 @@ import dataclasses
 import enum
 import typing
 from collections.abc import MutableSequence
+from typing import Callable
+
+from pynput.keyboard import KeyCode, Key
 
 QtShortcutStr = typing.NewType("QtShortcutStr", str)
 PyShortcutStr = typing.NewType("PyShortcutStr", str)
@@ -41,3 +44,11 @@ class ShortcutConversionResult:
             return ""
         detail = "; ".join(f"{f.action.name}={f.shortcut!r} ({f.error})" for f in self.failures)
         return f"failed to parse {len(self.failures)} shortcut(s): {detail}"
+
+
+class ParsedEntry(typing.NamedTuple):
+    """A parsed hotkey entry: the original shortcut string, its key set, and its callback."""
+
+    shortcut: PyShortcutStr
+    key_set: frozenset[KeyCode | Key]
+    action: Callable[[], None]
