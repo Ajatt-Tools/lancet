@@ -34,3 +34,20 @@ CHAT_URL: S = "https://ajatt.top/blog/join-our-community.html"
 
 DEFAULT_MODEL_NAME: S = "tatsumoto/manga-ocr-base"
 OCR_JOIN_STR: S = " "
+
+
+def self_check() -> None:
+    for file in (
+        DESKTOP_FILE,
+        APP_LOGO_PATH,
+        SCREENSHOT_ICON_PATH,
+        OCR_ICON_PATH,
+        EXIT_ICON_PATH,
+        RESTART_ICON_PATH,
+        PREFERENCES_ICON_PATH,
+    ):
+        if not file.is_file():
+            raise FileNotFoundError(f"file '{file}' does not exist.")
+
+
+self_check()
