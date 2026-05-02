@@ -47,7 +47,7 @@ def filter_pyinstaller_paths(path_str: str) -> list[str]:
     QT_PLUGIN_PATH=/tmp/_MEIz10LqR/PyQt6/Qt6/plugins
     Remove PyInstaller's temporary extraction paths from the passed env var while preserving the user's original paths.
     """
-    return [p for p in path_str.split(os.pathsep) if not p.startswith("/tmp/_MEI")]
+    return [path for path in path_str.split(os.pathsep) if path.strip() and not path.startswith("/tmp/_MEI")]
 
 
 def clean_ld_library_path(env: dict[str, str], *, env_key: str = "LD_LIBRARY_PATH") -> dict[str, str]:
