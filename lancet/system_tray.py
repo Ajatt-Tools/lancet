@@ -278,3 +278,6 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"Selection saved to {output_path}")
         else:
             self._notify.notify(f"Failed to save selection to {output_path}")
+
+    def notify_user(self, msg: str) -> None:
+        self._notify.notify(msg)

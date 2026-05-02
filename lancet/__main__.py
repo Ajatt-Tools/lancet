@@ -12,9 +12,15 @@ from loguru import logger
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
-from lancet.config import Config
-from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN, CFG_PATH
-from lancet.exceptions import PortAlreadyInUseError, ConfigReadError
+from lancet.config import Config, try_backup_config_file, read_config_file, ConfigFileReadResult
+from lancet.consts import (
+    APP_LOGO_PATH,
+    APP_NAME,
+    DESKTOP_FILE,
+    IS_MAC,
+    IS_WIN,
+)
+from lancet.exceptions import ConfigReadError, PortAlreadyInUseError
 from lancet.find_executable import is_running_frozen
 from lancet.system_tray import LancetSystemTray
 
@@ -67,7 +73,7 @@ def singleton_instance(cfg: Config) -> Iterator[socket.socket]:
         sock.close()
 
 
-def run_program(cfg: Config) -> None:
+def run_program(res: ConfigFileReadResult) -> None:
     """
     Initialize and run the Lancet system tray application.
     """
@@ -78,8 +84,10 @@ def run_program(cfg: Config) -> None:
     app.setWindowIcon(QIcon(str(APP_LOGO_PATH)))
     app.setQuitOnLastWindowClosed(False)
 
-    widget = LancetSystemTray(app, cfg)
+    widget = LancetSystemTray(app, res.cfg)
     widget.show()
+    if res.error:
+        widget.notify_user(res.error)
 
     sys.exit(app.exec())
 
@@ -112,20 +120,14 @@ def main() -> None:
     """
     setup_frozen_binary()
 
-    try:
-        cfg = Config.read_from_file()
-    except ConfigReadError as ex:
-        logger.error(str(ex))
-        # unconditionally overwrites target
-        CFG_PATH.replace(CFG_PATH.with_suffix(".old"))
-        return
+    res = read_config_file()
 
-    if not cfg.file_exists():
-        cfg.save_to_file()
+    if not res.cfg.file_exists():
+        res.cfg.save_to_file()
 
     try:
-        with singleton_instance(cfg):
-            run_program(cfg)
+        with singleton_instance(res.cfg):
+            run_program(res)
     except PortAlreadyInUseError as ex:
         logger.warning(str(ex))
 
