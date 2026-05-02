@@ -20,6 +20,7 @@ class SiblingAwareHotKey:
     _more_specific_siblings: Sequence["SiblingAwareHotKey"]
 
     def __init__(self, keys: Iterable[KeyCode | Key], on_activate: Callable[[], None]) -> None:
+        """Initialize a hotkey with its key combination and activation callback."""
         self._keys = frozenset(keys)
         self._state = set()
         self._on_activate = on_activate
