@@ -2,7 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import functools
 import typing
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from loguru import logger
 from pynput.keyboard import GlobalHotKeys, Key
@@ -63,7 +63,9 @@ def to_pynput_hotkey(shortcut: QtShortcutStr) -> PyShortcutStr:
     Raises KeyboardShortcutParseError if the shortcut is empty, contains an
     unrecognized token, or has no non-modifier trigger key.
     """
-    converted: list[str] = [convert_token(tok.strip().lower(), shortcut) for tok in shortcut.split("+") if tok.strip()]
+    converted: Sequence[str] = [
+        convert_token(tok.strip().lower(), shortcut) for tok in shortcut.split("+") if tok.strip()
+    ]
     if not converted:
         raise KeyboardShortcutParseError(f"empty shortcut: {shortcut!r}")
     # A token is a trigger key if its pynput name is not a modifier.
