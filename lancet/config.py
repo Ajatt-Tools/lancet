@@ -65,6 +65,7 @@ class Config:
             with open(CFG_PATH, encoding="utf-8") as f:
                 data: dict[str, Any] = json.load(f)
         except FileNotFoundError:
+            logger.warning("config file does not exist, falling back to default.")
             return cls()
         try:
             data["copy_to"] = OcrDestination[data["copy_to"]]
