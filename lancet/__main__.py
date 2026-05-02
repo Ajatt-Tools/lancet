@@ -13,8 +13,8 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from lancet.config import Config
-from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN
-from lancet.exceptions import PortAlreadyInUseError
+from lancet.consts import APP_LOGO_PATH, APP_NAME, DESKTOP_FILE, IS_MAC, IS_WIN, CFG_PATH
+from lancet.exceptions import PortAlreadyInUseError, ConfigReadError
 from lancet.find_executable import is_running_frozen
 from lancet.system_tray import LancetSystemTray
 
@@ -112,7 +112,14 @@ def main() -> None:
     """
     setup_frozen_binary()
 
-    cfg = Config.read_from_file()
+    try:
+        cfg = Config.read_from_file()
+    except ConfigReadError as ex:
+        logger.error(str(ex))
+        # unconditionally overwrites target
+        CFG_PATH.replace(CFG_PATH.with_suffix(".old"))
+        return
+
     if not cfg.file_exists():
         cfg.save_to_file()
 
