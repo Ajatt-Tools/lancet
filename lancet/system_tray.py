@@ -80,8 +80,8 @@ class OpenDialogs:
     def is_locked(self) -> bool:
         return len(self._name_to_instance) > 0
 
-    def _disown(self, name: str) -> None:
-        del self._name_to_instance[name]
+    def _disown_if_present(self, name: str) -> None:
+        self._name_to_instance.pop(name, None)
 
     @contextmanager
     def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> typing.Generator[D]:
@@ -91,9 +91,12 @@ class OpenDialogs:
         self._name_to_instance[dialog.name] = dialog
         # dialog's result code is passed to the slot.
         # https://doc.qt.io/qt-6/qdialog.html#finished
-        qconnect(dialog.finished, lambda code: self._disown(dialog.name))
+        qconnect(dialog.finished, lambda code: self._disown_if_present(dialog.name))
 
-        yield dialog
+        try:
+            yield dialog
+        finally:
+            self._disown_if_present(dialog.name)
 
 
 class LancetSystemTray(QSystemTrayIcon):
