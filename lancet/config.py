@@ -102,3 +102,24 @@ class Config:
                 QtShortcutStr(self.screenshot_shortcut): LancetShortcutEnum.screenshot_shortcut,
             }
         )
+
+
+def try_backup_config_file() -> None:
+    try:
+        CFG_PATH.replace(CFG_PATH.with_suffix(".old"))  # unconditionally overwrites target
+    except OSError as ex:
+        logger.error(f"failed to rename invalid config file: {ex}")
+
+
+class ConfigFileReadResult(typing.NamedTuple):
+    cfg: Config
+    error: str = ""
+
+
+def read_config_file() -> ConfigFileReadResult:
+    try:
+        return ConfigFileReadResult(Config.read_from_file())
+    except ConfigReadError as ex:
+        logger.error(str(ex))
+        try_backup_config_file()
+        return ConfigFileReadResult(Config(), error=str(ex))
