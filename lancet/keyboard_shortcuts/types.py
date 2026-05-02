@@ -3,10 +3,9 @@
 import dataclasses
 import enum
 import typing
-from collections.abc import MutableSequence
-from typing import Callable
+from collections.abc import Callable, MutableSequence
 
-from pynput.keyboard import KeyCode, Key
+from pynput.keyboard import Key, KeyCode
 
 QtShortcutStr = typing.NewType("QtShortcutStr", str)
 PyShortcutStr = typing.NewType("PyShortcutStr", str)
