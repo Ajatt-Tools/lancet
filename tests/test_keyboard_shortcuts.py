@@ -52,7 +52,7 @@ class TestToPynputHotkeyValid:
 
 # Real Qt modifier+key combinations the grab dialog could produce.
 # Each is paired with the pynput format we expect to round-trip to.
-VALID_QT_SHORTCUTS: list[QtShortcut] = [
+VALID_QT_SHORTCUTS: Sequence[QtShortcut] = [
     # Single-letter triggers
     QtShortcut(Qt.KeyboardModifier.AltModifier, Qt.Key.Key_O, "<alt>+o"),
     QtShortcut(Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_O, "<ctrl>+o"),
@@ -158,7 +158,7 @@ class TestInvalidQtShortcutSentinels:
             to_pynput_hotkey(QtShortcutStr(rendered))
 
 
-def _non_empty_default_shortcuts() -> list[str]:
+def non_empty_default_shortcuts() -> Sequence[str]:
     """Return the non-empty default shortcuts from the Config dataclass."""
     return [s for s in (Config.ocr_shortcut, Config.ocr_page_shortcut, Config.screenshot_shortcut) if s]
 
