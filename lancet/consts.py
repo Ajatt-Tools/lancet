@@ -7,6 +7,7 @@ import typing
 
 P = typing.Final[pathlib.Path]
 S = typing.Final[str]
+B = typing.Final[bool]
 
 APP_NAME: S = "Lancet"
 THIS_DIR: P = pathlib.Path(__file__).resolve().parent
@@ -25,8 +26,8 @@ CACHE_DIR_PATH: P = pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.h
 HISTORY_FILE_PATH: P = CACHE_DIR_PATH / "ocr_history.json"
 GEOMETRY_FILE_PATH: P = CACHE_DIR_PATH / "geometry"
 
-IS_MAC = sys.platform.startswith("darwin")
-IS_WIN = sys.platform.startswith("win32")
+IS_MAC: B = sys.platform.startswith("darwin")
+IS_WIN: B = sys.platform.startswith("win32")
 
 GITHUB_URL: S = "https://github.com/Ajatt-Tools/lancet"
 CHAT_URL: S = "https://ajatt.top/blog/join-our-community.html"
