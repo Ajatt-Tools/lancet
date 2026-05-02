@@ -2,11 +2,11 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 from collections.abc import Callable, Iterable, Sequence
 
-from pynput.keyboard import HotKey, KeyCode, Key, Listener
+from pynput.keyboard import HotKey, Key, KeyCode, Listener
 
 from lancet.exceptions import DuplicateShortcutError
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
-from lancet.keyboard_shortcuts.types import PyShortcutStr, ParsedEntry
+from lancet.keyboard_shortcuts.types import ParsedEntry, PyShortcutStr
 
 
 def build_parsed_entries(hotkeys: dict[PyShortcutStr, Callable[[], None]]) -> Sequence[ParsedEntry]:
