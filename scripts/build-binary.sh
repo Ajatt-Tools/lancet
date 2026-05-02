@@ -45,10 +45,14 @@ detect_icon() {
 main() {
 	cd -- "$(git rev-parse --show-toplevel)" || exit 1
 
-	local -r os=$(detect_os)
-	local -r icon=$(detect_icon "$os")
-	local -r sep=$(python -c 'import os; print(os.pathsep)')
-	local -r app_name="lancet-$os"
+	local os sep
+	os=$(detect_os)
+	sep=$(python -c 'import os; print(os.pathsep)')
+	local -r os sep
+
+	local icon app_name
+	icon=$(detect_icon "$os")
+	app_name="lancet-$os"
 
 	while (($# > 0)); do
 		case "$1" in
@@ -71,6 +75,7 @@ main() {
 				;;
 		esac
 	done
+	local -r icon app_name
 
 	if ! [[ -f "$icon" ]]; then
 		echo "icon not found: $icon" >&2
