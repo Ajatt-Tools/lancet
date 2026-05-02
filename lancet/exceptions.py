@@ -28,3 +28,9 @@ class KeyboardShortcutParseError(LancetException, ValueError):
     """Raised when a keyboard shortcut string cannot be converted to pynput format."""
 
     pass
+
+
+class DuplicateShortcutError(KeyboardShortcutParseError):
+    """Raised when two registered shortcuts resolve to the same set of keys."""
+
+    pass
