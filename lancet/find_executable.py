@@ -50,7 +50,7 @@ def filter_pyinstaller_paths(path_str: str) -> list[str]:
     return [p for p in path_str.split(os.pathsep) if not p.startswith("/tmp/_MEI")]
 
 
-def clean_ld_library_path(env: dict[str, str], *, env_key: str="LD_LIBRARY_PATH") -> dict[str, str]:
+def clean_ld_library_path(env: dict[str, str], *, env_key: str = "LD_LIBRARY_PATH") -> dict[str, str]:
     """
     Restore original LD_LIBRARY_PATH (remove PyInstaller's prefix)
     """
