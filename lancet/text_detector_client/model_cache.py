@@ -30,7 +30,7 @@ class ComicTextDetectorCache:
             try:
                 r.raise_for_status()
             except HTTPError as ex:
-                raise LancetHTTPError(f"Failed to download {DOWNLOAD_URL}: {ex}")
+                raise LancetHTTPError(f"Failed to download {DOWNLOAD_URL}: {ex}") from ex
             with self._file_path.open("wb") as f:
                 for chunk in r.iter_content(1024):
                     if chunk:
