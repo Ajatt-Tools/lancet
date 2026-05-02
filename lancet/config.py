@@ -3,7 +3,7 @@
 import dataclasses
 import enum
 import json
-from typing import Any, Self
+import typing
 
 from loguru import logger
 
@@ -59,21 +59,21 @@ class Config:
     bind_port: int = 13129
 
     @classmethod
-    def read_from_file(cls) -> Self:
+    def read_from_file(cls) -> typing.Self:
         """Read the config from the JSON file, returning defaults if the file does not exist."""
         try:
             with open(CFG_PATH, encoding="utf-8") as f:
-                data: dict[str, Any] = json.load(f)
+                data: dict[str, typing.Any] = json.load(f)
         except FileNotFoundError:
-            logger.warning("config file does not exist, falling back to default.")
-            return cls()
+            logger.info("config file does not exist, falling back to default.")
+            return cls()  # Mising config file is not an error.
         except json.JSONDecodeError as ex:
             raise ConfigReadError(f"failed to decode json config file: {ex}") from ex
         try:
             data["copy_to"] = OcrDestination[data["copy_to"]]
         except KeyError:
             logger.warning(
-                f"Unknown copy_to value {data.get('copy_to', 'missing')!r} in config, falling back to default."
+                f"Cannot handle copy_to='{data.get('copy_to', 'missing')!r}' value in config. Falling back to default."
             )
             data.pop("copy_to", None)
         try:
