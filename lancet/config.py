@@ -69,7 +69,7 @@ class Config:
         try:
             data["copy_to"] = OcrDestination[data["copy_to"]]
         except KeyError:
-            logger.warning(f"Unknown copy_to value {data['copy_to']!r} in config, falling back to default.")
+            logger.warning(f"Unknown copy_to value {data.get('copy_to', 'missing')!r} in config, falling back to default.")
             data.pop("copy_to", None)
         try:
             return cls(**data)
