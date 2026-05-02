@@ -23,6 +23,7 @@ jobs:
       with:
         ref: ${{ inputs.githubRef }}
         submodules: 'recursive'
+        fetch-depth: 0 # needed by hatch-vcs version detection
 
     - name: Set up Python
       uses: actions/setup-python@v6
