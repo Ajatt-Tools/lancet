@@ -5,6 +5,8 @@ import enum
 import json
 from typing import Any, Self
 
+from loguru import logger
+
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
 from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
@@ -64,8 +66,11 @@ class Config:
                 data: dict[str, Any] = json.load(f)
         except FileNotFoundError:
             return cls()
-        if "copy_to" in data:
+        try:
             data["copy_to"] = OcrDestination[data["copy_to"]]
+        except KeyError:
+            logger.warning(f"Unknown copy_to value {data['copy_to']!r} in config, falling back to default.")
+            data.pop("copy_to", None)
         try:
             return cls(**data)
         except TypeError as ex:
