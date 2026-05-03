@@ -12,7 +12,7 @@ from loguru import logger
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
-from lancet.config import Config, try_backup_config_file, read_config_file, ConfigFileReadResult
+from lancet.config import Config, ConfigFileReadResult, read_config_file
 from lancet.consts import (
     APP_LOGO_PATH,
     APP_NAME,
@@ -20,7 +20,7 @@ from lancet.consts import (
     IS_MAC,
     IS_WIN,
 )
-from lancet.exceptions import ConfigReadError, PortAlreadyInUseError
+from lancet.exceptions import PortAlreadyInUseError
 from lancet.find_executable import is_running_frozen
 from lancet.system_tray import LancetSystemTray
 
