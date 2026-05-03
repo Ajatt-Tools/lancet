@@ -69,6 +69,9 @@ class Config:
             return cls()  # Mising config file is not an error.
         except json.JSONDecodeError as ex:
             raise ConfigReadError(f"failed to decode json config file: {ex}") from ex
+        except OSError as ex:
+            # Permission denied, is a directory, I/O error, etc. Treat as a recoverable read failure.
+            raise ConfigReadError(f"failed to open config file: {ex}") from ex
         try:
             data["copy_to"] = OcrDestination[data["copy_to"]]
         except KeyError:
