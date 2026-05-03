@@ -8,6 +8,7 @@ import pytest
 
 from lancet.config import Config, OcrDestination
 from lancet.exceptions import ConfigReadError
+from lancet.keyboard_shortcuts.types import LancetShortcutEnum
 
 
 class ConfigFileScenario(typing.NamedTuple):
@@ -120,3 +121,68 @@ class TestConfigReadInvalidFile:
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
         with pytest.raises(ConfigReadError):
             Config.read_from_file()
+
+
+class GetPynputShortcutsScenario(typing.NamedTuple):
+    """A scenario describing how Config's three shortcut fields convert to pynput hotkeys."""
+
+    ocr_shortcut: str
+    ocr_page_shortcut: str
+    screenshot_shortcut: str
+    expected_hotkey_count: int
+    expected_failure_count: int
+    expected_actions: frozenset[LancetShortcutEnum]
+
+
+GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
+    "all_defaults_two_hotkeys": GetPynputShortcutsScenario(
+        ocr_shortcut="Alt+O",
+        ocr_page_shortcut="Shift+Alt+O",
+        screenshot_shortcut="",
+        expected_hotkey_count=2,
+        expected_failure_count=0,
+        expected_actions=frozenset({LancetShortcutEnum.ocr_shortcut, LancetShortcutEnum.ocr_page_shortcut}),
+    ),
+    "all_blank_yields_nothing": GetPynputShortcutsScenario(
+        ocr_shortcut="",
+        ocr_page_shortcut="",
+        screenshot_shortcut="",
+        expected_hotkey_count=0,
+        expected_failure_count=0,
+        expected_actions=frozenset(),
+    ),
+    "one_invalid_one_valid": GetPynputShortcutsScenario(
+        ocr_shortcut="Alt+O",
+        ocr_page_shortcut="GibberishKey+X",
+        screenshot_shortcut="",
+        expected_hotkey_count=1,
+        expected_failure_count=1,
+        expected_actions=frozenset({LancetShortcutEnum.ocr_shortcut}),
+    ),
+    "all_three_distinct_valid": GetPynputShortcutsScenario(
+        ocr_shortcut="Alt+O",
+        ocr_page_shortcut="Shift+Alt+O",
+        screenshot_shortcut="Ctrl+Shift+S",
+        expected_hotkey_count=3,
+        expected_failure_count=0,
+        expected_actions=frozenset(LancetShortcutEnum),
+    ),
+}
+
+
+class TestConfigGetPynputShortcuts:
+    """Verify Config.get_pynput_shortcuts converts the three shortcut fields correctly."""
+
+    @pytest.mark.parametrize("scenario_name", GET_PYNPUT_SHORTCUTS_SCENARIOS.keys())
+    def test_hotkey_count(self, scenario_name: str) -> None:
+        """The number of resulting pynput hotkeys matches the scenario's expectation."""
+        scenario = GET_PYNPUT_SHORTCUTS_SCENARIOS[scenario_name]
+        cfg = Config(
+            ocr_shortcut=scenario.ocr_shortcut,
+            ocr_page_shortcut=scenario.ocr_page_shortcut,
+            screenshot_shortcut=scenario.screenshot_shortcut,
+        )
+        result = cfg.get_pynput_shortcuts()
+        assert len(result.hotkeys) == scenario.expected_hotkey_count
+        assert len(result.failures) == scenario.expected_failure_count
+        assert frozenset(result.hotkeys.values()) == scenario.expected_actions
