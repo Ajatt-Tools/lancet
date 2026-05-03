@@ -133,7 +133,7 @@ class ComicTextDetector(ComicTextDetectorBase):
 
         detected = self._detect_text(img, keep_undetected_mask=keep_undetected_mask)
         for blk in detected.blk_list:
-            rect = Rect.new(blk.xyxy)
+            rect = Rect.new(blk.xyxy).clamp(img_width=img_width, img_height=img_height)
             if not rect.has_area():
                 logger.warning(f"Skipping degenerate text block with zero area rect: {rect}")
                 continue

@@ -12,6 +12,11 @@ from lancet.exceptions import LancetException
 from lancet.model_utils.base import LancetModel
 
 
+def clamp[T: typing.SupportsInt | typing.SupportsFloat](min_val: T, val: T, max_val: T) -> T:
+    """Clamp val to the range [min_val, max_val]."""
+    return max(min_val, min(val, max_val))
+
+
 class ComicTextDetectorException(LancetException):
     """Base exception for all comic text detector related errors."""
 
@@ -61,6 +66,18 @@ class Rect(typing.NamedTuple):
     def new(cls, xyxy: typing.Sequence[typing.SupportsInt]) -> typing.Self:
         """Create a Rect from four integer-like values, converting numpy types to native int."""
         return cls(*map(int, xyxy))
+
+    def clamp(self, *, img_width: int, img_height: int) -> typing.Self:
+        """
+        Return a new Rect with coordinates clamped to [0, img_width) x [0, img_height).
+        The caller should check has_area() afterward.
+        """
+        return type(self)(
+            x1=clamp(0, self.x1, img_width),
+            y1=clamp(0, self.y1, img_height),
+            x2=clamp(0, self.x2, img_width),
+            y2=clamp(0, self.y2, img_height),
+        )
 
 
 @dataclasses.dataclass(frozen=True)
