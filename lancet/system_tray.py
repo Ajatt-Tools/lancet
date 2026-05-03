@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 from loguru import logger
 from PyQt6.QtGui import QColor, QIcon
-from PyQt6.QtWidgets import QApplication, QDialog, QMenu, QSystemTrayIcon, QWidget
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 from zala.exceptions import ZalaException
 from zala.main_window import ScreenshotPreviewOpts, UserSelectionResult
 from zala.screenshot import ZalaScreenshot
@@ -29,8 +29,8 @@ from lancet.consts import (
     RESTART_ICON_PATH,
     SCREENSHOT_ICON_PATH,
 )
-from lancet.exceptions import LancetException
 from lancet.gui.about_dialog import AboutDialog
+from lancet.gui.dialog_registry import DialogRegistry
 from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 from lancet.keyboard_shortcuts.listener import LancetShortcutManager
@@ -72,31 +72,24 @@ def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
 
 
 class OpenDialogs:
-    _name_to_instance: dict[str, QDialog]
+    """Qt-aware wrapper that ties dialog lifetime to a DialogRegistry entry."""
 
-    def __init__(self):
-        self._name_to_instance = {}
+    _registry: DialogRegistry
+
+    def __init__(self) -> None:
+        self._registry = DialogRegistry()
 
     def is_locked(self) -> bool:
-        return len(self._name_to_instance) > 0
-
-    def _disown_if_present(self, name: str) -> None:
-        self._name_to_instance.pop(name, None)
+        return self._registry.is_locked()
 
     @contextmanager
     def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> typing.Generator[D]:
-        if dialog.name in self._name_to_instance:
-            raise LancetException("already locked")
-
-        self._name_to_instance[dialog.name] = dialog
-        # dialog's result code is passed to the slot.
-        # https://doc.qt.io/qt-6/qdialog.html#finished
-        qconnect(dialog.finished, lambda code: self._disown_if_present(dialog.name))
-
-        try:
+        with self._registry.acquire(dialog.name):
+            # The dialog's result code is passed to the slot:
+            # https://doc.qt.io/qt-6/qdialog.html#finished
+            # Wiring 'finished' to disown_if_present clears the registry entry as soon as the dialog closes.
+            qconnect(dialog.finished, lambda exit_code: self._registry.disown_if_present(dialog.name))
             yield dialog
-        finally:
-            self._disown_if_present(dialog.name)
 
 
 class LancetSystemTray(QSystemTrayIcon):
