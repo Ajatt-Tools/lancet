@@ -1,15 +1,25 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import typing
+from collections.abc import Sequence
+
 import pytest
 from pynput.keyboard import HotKey
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence
 
 from lancet.config import Config
-from lancet.exceptions import KeyboardShortcutParseError, LancetException
-from lancet.keyboard_shortcuts.listener import to_pynput_hotkey
-from lancet.keyboard_shortcuts.types import QtShortcutStr, PyShortcutStr
-from tests.helpers import QtShortcut, qt_shortcut_to_string
+from lancet.exceptions import KeyboardShortcutParseError
+from lancet.keyboard_shortcuts.listener import to_pynput_hotkey, to_pynput_shortcuts
+from lancet.keyboard_shortcuts.types import (
+    LancetShortcutEnum,
+    PyShortcutStr,
+    QtShortcutStr,
+)
+from tests.helpers import (
+    QtShortcut,
+    qt_shortcut_to_string,
+)
 
 
 class TestToPynputHotkeyValid:
@@ -166,13 +176,83 @@ def non_empty_default_shortcuts() -> Sequence[str]:
 class TestDefaultConfigShortcuts:
     """Ensure the default shortcuts shipped in Config are valid and pynput-compatible."""
 
-    @pytest.mark.parametrize("shortcut", _non_empty_default_shortcuts())
+    @pytest.mark.parametrize("shortcut", non_empty_default_shortcuts())
     def test_default_shortcut_converts(self, shortcut: str) -> None:
         """to_pynput_hotkey must not raise for default Config shortcuts."""
         assert to_pynput_hotkey(QtShortcutStr(shortcut))  # non-empty result
 
-    @pytest.mark.parametrize("shortcut", _non_empty_default_shortcuts())
+    @pytest.mark.parametrize("shortcut", non_empty_default_shortcuts())
     def test_default_shortcut_accepted_by_pynput(self, shortcut: str) -> None:
         """pynput's HotKey.parse must accept the converted default shortcuts."""
         keys = HotKey.parse(to_pynput_hotkey(QtShortcutStr(shortcut)))
         assert len(keys) >= 2  # at least one modifier + one trigger key
+
+
+class ConversionScenario(typing.NamedTuple):
+    """A test scenario for to_pynput_shortcuts batch conversion."""
+
+    shortcuts: dict[QtShortcutStr, LancetShortcutEnum]
+    expected_hotkey_count: int
+    expected_failure_count: int
+
+
+CONVERSION_SCENARIOS: dict[str, ConversionScenario] = {
+    "two_valid": ConversionScenario(
+        shortcuts={
+            QtShortcutStr("Alt+O"): LancetShortcutEnum.ocr_shortcut,
+            QtShortcutStr("Shift+Alt+O"): LancetShortcutEnum.ocr_page_shortcut,
+        },
+        expected_hotkey_count=2,
+        expected_failure_count=0,
+    ),
+    "empty_skipped": ConversionScenario(
+        shortcuts={
+            QtShortcutStr(""): LancetShortcutEnum.screenshot_shortcut,
+            QtShortcutStr("Alt+O"): LancetShortcutEnum.ocr_shortcut,
+        },
+        expected_hotkey_count=1,
+        expected_failure_count=0,
+    ),
+    "whitespace_skipped": ConversionScenario(
+        shortcuts={
+            QtShortcutStr("   "): LancetShortcutEnum.screenshot_shortcut,
+        },
+        expected_hotkey_count=0,
+        expected_failure_count=0,
+    ),
+    "invalid_collected": ConversionScenario(
+        shortcuts={
+            QtShortcutStr("Alt+O"): LancetShortcutEnum.ocr_shortcut,
+            QtShortcutStr("InvalidKey+X"): LancetShortcutEnum.ocr_page_shortcut,
+        },
+        expected_hotkey_count=1,
+        expected_failure_count=1,
+    ),
+    "modifier_only_collected": ConversionScenario(
+        shortcuts={
+            QtShortcutStr("Ctrl+Shift"): LancetShortcutEnum.ocr_shortcut,
+        },
+        expected_hotkey_count=0,
+        expected_failure_count=1,
+    ),
+    "all_empty": ConversionScenario(
+        shortcuts={
+            QtShortcutStr(""): LancetShortcutEnum.ocr_shortcut,
+            QtShortcutStr(""): LancetShortcutEnum.ocr_page_shortcut,
+        },
+        expected_hotkey_count=0,
+        expected_failure_count=0,
+    ),
+}
+
+
+class TestToPynputShortcuts:
+    """Test batch conversion of shortcuts to pynput format."""
+
+    @pytest.mark.parametrize("scenario_name", CONVERSION_SCENARIOS.keys())
+    def test_hotkey_count(self, scenario_name: str) -> None:
+        """Test that the correct number of hotkeys are converted."""
+        scenario = CONVERSION_SCENARIOS[scenario_name]
+        result = to_pynput_shortcuts(scenario.shortcuts)
+        assert len(result.hotkeys) == scenario.expected_hotkey_count
+        assert len(result.failures) == scenario.expected_failure_count
