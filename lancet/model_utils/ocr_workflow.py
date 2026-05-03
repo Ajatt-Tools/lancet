@@ -43,7 +43,9 @@ def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image:
     image = Image.open(bytes_io)
     if not (image.width > 0 and image.height > 0):
         raise PixmapConversionError("image is empty")
-    return image
+    # PIL's Image.open() is lazy. Pixel data is not decoded until first access.
+    # Force eager pixel decoding and normalize to 3-channel RGB.
+    return image.convert("RGB")
 
 
 def prepare_pillow_image(user_selection: UserSelectionResult) -> Image.Image:
