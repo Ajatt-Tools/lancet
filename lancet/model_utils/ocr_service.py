@@ -39,4 +39,8 @@ class OcrService:
             save_bubble_images(bubbles.blocks, output_dir=CACHE_DIR_PATH / "debug_speech_bubbles")
             logger.debug(f"saved bubbles to {CACHE_DIR_PATH / "debug_speech_bubbles"}")
 
-        return OCR_JOIN_STR.join(self._loader.ocr.recognize(block.box_image).strip() for block in bubbles.blocks)
+        return OCR_JOIN_STR.join(
+            self._loader.ocr.recognize(block.box_image).strip()
+            for block in bubbles.blocks
+            if block.box_image.height > 0 and block.box_image.width > 0
+        )
