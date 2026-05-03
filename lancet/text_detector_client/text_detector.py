@@ -40,12 +40,22 @@ def read_image_from_path(imgpath: pathlib.Path, read_type: int = cv2.IMREAD_COLO
 
 def crop_box_region(img: np.ndarray, rect: Rect) -> Image.Image:
     """Crop the bounding box region from a BGR image and return it as a PIL Image."""
-    return Image.fromarray(cv2.cvtColor(img[rect.y1 : rect.y2, rect.x1 : rect.x2], cv2.COLOR_BGR2RGB))
+    cropped = img[rect.y1 : rect.y2, rect.x1 : rect.x2]
+    if cropped.size <= 0:
+        raise ComicTextDetectorException(
+            f"crop region is empty: rect={rect}, image shape={img.shape}"
+        )
+    return Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
 
 
 def pil_image_to_bgr_array(image: Image.Image) -> np.ndarray:
     """Convert a PIL Image to a BGR numpy array as expected by OpenCV."""
-    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    rgb = np.array(image)
+    if rgb.size <= 0:
+        raise ComicTextDetectorException(
+            f"cannot convert an empty PIL image to BGR (mode={image.mode}, size={image.size})"
+        )
+    return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
 class DetectResult(typing.NamedTuple):
