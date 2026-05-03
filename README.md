@@ -63,7 +63,11 @@ The `lancet` executable will be available in your `$PATH`.
 
 ### Windows-like operating systems
 
-Download [Lancet.exe](https://github.com/Ajatt-Tools/lancet/releases/latest/download/Lancet.exe).
+Download [lancet-windows.exe](https://github.com/Ajatt-Tools/lancet/releases/latest/download/lancet-windows.exe).
+
+### GNU/Linux
+
+Download [lancet-gnulinux](https://github.com/Ajatt-Tools/lancet/releases/latest/download/lancet-gnulinux).
 
 ### System Requirements
 
