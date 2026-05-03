@@ -34,7 +34,7 @@ dependencies = [
     "numpy>=2.4.0",
     "torch>=2.11", # https://pypi.org/project/torch/
     "transformers>=5.6.2", # needed by manga_ocr
-    "opencv-python-headless", # needed to 'import cv2', used by comic text detector
+    "opencv-python-headless>=4.13", # needed to 'import cv2', used by comic text detector
     "torchvision", # needed by comic text detector
     "pyclipper", # needed by comic text detector
     "shapely", # needed by comic text detector
