@@ -126,6 +126,9 @@ class ComicTextDetector(ComicTextDetectorBase):
         detected = self._detect_text(img, keep_undetected_mask=keep_undetected_mask)
         for blk in detected.blk_list:
             rect = Rect.new(blk.xyxy)
+            if not rect.has_area():
+                logger.warning(f"Skipping degenerate text block with zero area rect: {rect}")
+                continue
             result_blk = SpeechBubbleBlock(
                 box=rect,
                 box_image=crop_box_region(img, rect),
