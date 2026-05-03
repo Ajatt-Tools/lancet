@@ -42,9 +42,7 @@ def crop_box_region(img: np.ndarray, rect: Rect) -> Image.Image:
     """Crop the bounding box region from a BGR image and return it as a PIL Image."""
     cropped = img[rect.y1 : rect.y2, rect.x1 : rect.x2]
     if cropped.size <= 0:
-        raise ComicTextDetectorException(
-            f"crop region is empty: rect={rect}, image shape={img.shape}"
-        )
+        raise ComicTextDetectorException(f"crop region is empty: rect={rect}, image shape={img.shape}")
     return Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
 
 
