@@ -58,14 +58,14 @@ class Rect(typing.NamedTuple):
     x2: int
     y2: int
 
-    def has_area(self) -> bool:
-        """Return True if the rectangle has positive width and height."""
-        return self.x2 > self.x1 and self.y2 > self.y1
-
     @classmethod
     def new(cls, xyxy: typing.Sequence[typing.SupportsInt]) -> typing.Self:
         """Create a Rect from four integer-like values, converting numpy types to native int."""
         return cls(*map(int, xyxy))
+
+    def has_area(self) -> bool:
+        """Return True if the rectangle has positive width and height."""
+        return self.x2 > self.x1 and self.y2 > self.y1
 
     def clamp(self, *, img_width: int, img_height: int) -> typing.Self:
         """
