@@ -9,10 +9,10 @@ from pynput.keyboard import Key
 from PyQt6.QtCore import QObject, pyqtSignal
 from zala.utils import q_emit
 
+from lancet.actions import LancetShortcutEnum
 from lancet.exceptions import KeyboardShortcutParseError
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import (
-    LancetShortcutEnum,
     PyShortcutStr,
     QtShortcutStr,
     ShortcutConversionResult,

@@ -1,22 +1,15 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import dataclasses
-import enum
 import typing
 from collections.abc import Callable, MutableSequence
 
 from pynput.keyboard import Key, KeyCode
 
+from lancet.actions import LancetShortcutEnum
+
 QtShortcutStr = typing.NewType("QtShortcutStr", str)
 PyShortcutStr = typing.NewType("PyShortcutStr", str)
-
-
-class LancetShortcutEnum(enum.Enum):
-    """Enum identifying the available keyboard shortcut actions."""
-
-    ocr_shortcut = enum.auto()
-    ocr_page_shortcut = enum.auto()
-    screenshot_shortcut = enum.auto()
 
 
 class ShortcutParseFailure(typing.NamedTuple):

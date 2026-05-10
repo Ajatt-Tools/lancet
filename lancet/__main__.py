@@ -3,14 +3,13 @@
 import multiprocessing
 import pathlib
 import shutil
-import socket
 import sys
-from collections.abc import Iterator
-from contextlib import contextmanager
 
+import fire
 from loguru import logger
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
+from zala.utils import qconnect
 
 from lancet.config import Config, ConfigFileReadResult, read_config_file
 from lancet.consts import (
@@ -22,7 +21,30 @@ from lancet.consts import (
 )
 from lancet.exceptions import PortAlreadyInUseError
 from lancet.find_executable import is_running_frozen
+from lancet.ipc.client import LancetIpcClient
+from lancet.ipc.server import IpcServer
 from lancet.system_tray import LancetSystemTray
+
+
+class CLI:
+    """Send a command to the running Lancet daemon and print the response."""
+
+    def __init__(self, cfg: Config) -> None:
+        self._cfg = cfg
+        self._client = LancetIpcClient(cfg)
+
+    def screenshot(self) -> None:
+        """Tell the running Lancet to open the screenshot area selector."""
+        r = self._client.ask_screenshot()
+        logger.info(f"{r.status.name}: {r.message}")
+
+    def ocr(self, detect: bool = False) -> None:
+        """
+        Tell the running Lancet to run OCR.
+        --detect: use the speech-bubble detector first.
+        """
+        r = self._client.ask_ocr(detect=detect)
+        logger.info(f"{r.status.name}: {r.message}")
 
 
 def drop_launch_shortcut() -> None:
@@ -54,26 +76,7 @@ def drop_launch_shortcut() -> None:
             pass
 
 
-@contextmanager
-def singleton_instance(cfg: Config) -> Iterator[socket.socket]:
-    """
-    Context manager that ensures only one instance of the application is running.
-    Uses socket binding to a specific port to ensure singleton behavior.
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        # Bind to a specific port (choose an unused one)
-        try:
-            sock.bind(("127.0.0.1", cfg.bind_port))
-        except OSError as ex:
-            raise PortAlreadyInUseError("Another instance of this program is already running") from ex
-        yield sock
-    finally:
-        # Code to release resource, e.g.:
-        sock.close()
-
-
-def run_program(res: ConfigFileReadResult) -> None:
+def run_program(res: ConfigFileReadResult, ipc: IpcServer) -> None:
     """
     Initialize and run the Lancet system tray application.
     """
@@ -88,6 +91,7 @@ def run_program(res: ConfigFileReadResult) -> None:
     widget.show()
     if res.error:
         widget.notify_user(res.error)
+    qconnect(ipc.signals.command_received, widget.dispatch_ipc_command)
 
     sys.exit(app.exec())
 
@@ -121,13 +125,20 @@ def main() -> None:
     setup_frozen_binary()
 
     res = read_config_file()
+    if res.error:
+        # log the error and continue.
+        logger.error(res.error)
 
     if not res.cfg.file_exists():
         res.cfg.save_to_file()
 
+    if sys.argv[1:]:
+        fire.Fire(CLI(res.cfg))
+        return
+
     try:
-        with singleton_instance(res.cfg):
-            run_program(res)
+        with IpcServer(res.cfg) as ipc:
+            run_program(res, ipc)
     except PortAlreadyInUseError as ex:
         logger.warning(str(ex))
 

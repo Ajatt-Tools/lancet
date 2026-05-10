@@ -19,6 +19,7 @@ from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 from zala.utils import qconnect
 
+from lancet.actions import LancetAction, LancetShortcutEnum
 from lancet.config import Config
 from lancet.consts import (
     APP_LOGO_PATH,
@@ -34,7 +35,7 @@ from lancet.gui.dialog_registry import DialogRegistry
 from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 from lancet.keyboard_shortcuts.listener import LancetShortcutManager
-from lancet.keyboard_shortcuts.types import LancetShortcutEnum, PyShortcutStr
+from lancet.keyboard_shortcuts.types import PyShortcutStr
 from lancet.model_utils.model_loader import BackgroundModelLoader
 from lancet.model_utils.ocr_service import OcrService
 from lancet.model_utils.ocr_workflow import OcrWorkflow, ensure_cursor_restored
@@ -191,6 +192,19 @@ class LancetSystemTray(QSystemTrayIcon):
             case LancetShortcutEnum.ocr_page_shortcut:
                 self.detect_and_make_ocr_screenshot()
             case LancetShortcutEnum.screenshot_shortcut:
+                self.make_screenshot_area()
+
+    def dispatch_ipc_command(self, action: LancetAction) -> None:
+        """Dispatch a command received from a CLI invocation via IPC."""
+        if self._open_dialogs.is_locked():
+            logger.info(f"IPC command {action.name} while dialog open, skipping")
+            return
+        match action:
+            case LancetAction.ocr:
+                self.make_ocr_screenshot()
+            case LancetAction.detect_and_ocr:
+                self.detect_and_make_ocr_screenshot()
+            case LancetAction.screenshot:
                 self.make_screenshot_area()
 
     def open_about(self) -> None:
