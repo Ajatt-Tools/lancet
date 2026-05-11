@@ -63,7 +63,7 @@ class IpcRequestHandler(http.server.BaseHTTPRequestHandler):
 
     server: LancetIpcHTTPServer
 
-    def do_POST(self) -> None:
+    def do_POST(self) -> None:  # noqa: N802
         """Parse the JSON body, emit the action on the Qt main thread, and respond."""
         try:
             request = self._parse_request()
