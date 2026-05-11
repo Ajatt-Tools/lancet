@@ -4,18 +4,18 @@ import typing
 from collections.abc import Sequence
 
 import pytest
-from pynput.keyboard import HotKey
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence
+from pynput.keyboard import HotKey
 
 from lancet.config import Config
 from lancet.exceptions import KeyboardShortcutParseError
 from lancet.keyboard_shortcuts.listener import to_pynput_hotkey, to_pynput_shortcuts
 from lancet.keyboard_shortcuts.types import (
-    LancetShortcutEnum,
     PyShortcutStr,
     QtShortcutStr,
 )
+from lancet.actions import LancetAction
 from tests.helpers import (
     QtShortcut,
     qt_shortcut_to_string,
@@ -191,7 +191,7 @@ class TestDefaultConfigShortcuts:
 class ConversionScenario(typing.NamedTuple):
     """A test scenario for to_pynput_shortcuts batch conversion."""
 
-    shortcuts: dict[QtShortcutStr, LancetShortcutEnum]
+    shortcuts: dict[QtShortcutStr, LancetAction]
     expected_hotkey_count: int
     expected_failure_count: int
 
@@ -199,46 +199,46 @@ class ConversionScenario(typing.NamedTuple):
 CONVERSION_SCENARIOS: dict[str, ConversionScenario] = {
     "two_valid": ConversionScenario(
         shortcuts={
-            QtShortcutStr("Alt+O"): LancetShortcutEnum.ocr_shortcut,
-            QtShortcutStr("Shift+Alt+O"): LancetShortcutEnum.ocr_page_shortcut,
+            QtShortcutStr("Alt+O"): LancetAction.ocr,
+            QtShortcutStr("Shift+Alt+O"): LancetAction.detect_and_ocr,
         },
         expected_hotkey_count=2,
         expected_failure_count=0,
     ),
     "empty_skipped": ConversionScenario(
         shortcuts={
-            QtShortcutStr(""): LancetShortcutEnum.screenshot_shortcut,
-            QtShortcutStr("Alt+O"): LancetShortcutEnum.ocr_shortcut,
+            QtShortcutStr(""): LancetAction.screenshot,
+            QtShortcutStr("Alt+O"): LancetAction.ocr,
         },
         expected_hotkey_count=1,
         expected_failure_count=0,
     ),
     "whitespace_skipped": ConversionScenario(
         shortcuts={
-            QtShortcutStr("   "): LancetShortcutEnum.screenshot_shortcut,
+            QtShortcutStr("   "): LancetAction.screenshot,
         },
         expected_hotkey_count=0,
         expected_failure_count=0,
     ),
     "invalid_collected": ConversionScenario(
         shortcuts={
-            QtShortcutStr("Alt+O"): LancetShortcutEnum.ocr_shortcut,
-            QtShortcutStr("InvalidKey+X"): LancetShortcutEnum.ocr_page_shortcut,
+            QtShortcutStr("Alt+O"): LancetAction.ocr,
+            QtShortcutStr("InvalidKey+X"): LancetAction.detect_and_ocr,
         },
         expected_hotkey_count=1,
         expected_failure_count=1,
     ),
     "modifier_only_collected": ConversionScenario(
         shortcuts={
-            QtShortcutStr("Ctrl+Shift"): LancetShortcutEnum.ocr_shortcut,
+            QtShortcutStr("Ctrl+Shift"): LancetAction.ocr,
         },
         expected_hotkey_count=0,
         expected_failure_count=1,
     ),
     "all_empty": ConversionScenario(
         shortcuts={
-            QtShortcutStr(""): LancetShortcutEnum.ocr_shortcut,
-            QtShortcutStr(""): LancetShortcutEnum.ocr_page_shortcut,
+            QtShortcutStr(""): LancetAction.ocr,
+            QtShortcutStr(" "): LancetAction.detect_and_ocr,
         },
         expected_hotkey_count=0,
         expected_failure_count=0,
@@ -249,10 +249,9 @@ CONVERSION_SCENARIOS: dict[str, ConversionScenario] = {
 class TestToPynputShortcuts:
     """Test batch conversion of shortcuts to pynput format."""
 
-    @pytest.mark.parametrize("scenario_name", CONVERSION_SCENARIOS.keys())
-    def test_hotkey_count(self, scenario_name: str) -> None:
+    @pytest.mark.parametrize("scenario", CONVERSION_SCENARIOS.values())
+    def test_hotkey_count(self, scenario: ConversionScenario) -> None:
         """Test that the correct number of hotkeys are converted."""
-        scenario = CONVERSION_SCENARIOS[scenario_name]
         result = to_pynput_shortcuts(scenario.shortcuts)
         assert len(result.hotkeys) == scenario.expected_hotkey_count
         assert len(result.failures) == scenario.expected_failure_count

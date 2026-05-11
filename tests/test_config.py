@@ -2,13 +2,14 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import json
+import pathlib
 import typing
 
 import pytest
 
+from lancet.actions import LancetAction
 from lancet.config import Config, OcrDestination
 from lancet.exceptions import ConfigReadError
-from lancet.keyboard_shortcuts.types import LancetShortcutEnum
 
 
 class ConfigFileScenario(typing.NamedTuple):
@@ -56,13 +57,11 @@ READ_SCENARIOS: dict[str, ConfigFileScenario] = {
 class TestConfigReadFromFile:
     """Test Config.read_from_file with various JSON file contents."""
 
-    @pytest.mark.parametrize("scenario_name", READ_SCENARIOS.keys())
+    @pytest.mark.parametrize("scenario", READ_SCENARIOS.values())
     def test_copy_to(
-        self, scenario_name: str, monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory
+        self, scenario: ConfigFileScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
     ) -> None:
         """Test that copy_to and force_cpu are parsed correctly from config file."""
-
-        scenario = READ_SCENARIOS[scenario_name]
         cfg_path = tmp_path / "lancet.json"
         if scenario.json_data is not None:
             cfg_path.write_text(json.dumps(scenario.json_data), encoding="utf-8")
@@ -87,7 +86,7 @@ class TestConfigSaveToFile:
         copy_to: OcrDestination,
         config_relpath: str,
         monkeypatch: pytest.MonkeyPatch,
-        tmp_path: pytest.TempPathFactory,
+        tmp_path: pathlib.Path,
     ) -> None:
         """Test that saving and reading a config produces the same values."""
         cfg_path = tmp_path / config_relpath
@@ -113,7 +112,7 @@ class TestConfigReadInvalidFile:
         ],
     )
     def test_malformed_json_raises(
-        self, file_content: str, monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory
+        self, file_content: str, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
     ) -> None:
         """Test that malformed JSON or unknown fields raise ConfigReadError."""
         cfg_path = tmp_path / "lancet.json"
@@ -131,7 +130,7 @@ class GetPynputShortcutsScenario(typing.NamedTuple):
     screenshot_shortcut: str
     expected_hotkey_count: int
     expected_failure_count: int
-    expected_actions: frozenset[LancetShortcutEnum]
+    expected_actions: frozenset[LancetAction]
 
 
 GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
@@ -141,7 +140,7 @@ GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
         screenshot_shortcut="",
         expected_hotkey_count=2,
         expected_failure_count=0,
-        expected_actions=frozenset({LancetShortcutEnum.ocr_shortcut, LancetShortcutEnum.ocr_page_shortcut}),
+        expected_actions=frozenset({LancetAction.ocr, LancetAction.detect_and_ocr}),
     ),
     "all_blank_yields_nothing": GetPynputShortcutsScenario(
         ocr_shortcut="",
@@ -157,7 +156,7 @@ GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
         screenshot_shortcut="",
         expected_hotkey_count=1,
         expected_failure_count=1,
-        expected_actions=frozenset({LancetShortcutEnum.ocr_shortcut}),
+        expected_actions=frozenset({LancetAction.ocr}),
     ),
     "all_three_distinct_valid": GetPynputShortcutsScenario(
         ocr_shortcut="Alt+O",
@@ -165,7 +164,7 @@ GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
         screenshot_shortcut="Ctrl+Shift+S",
         expected_hotkey_count=3,
         expected_failure_count=0,
-        expected_actions=frozenset(LancetShortcutEnum),
+        expected_actions=frozenset(LancetAction),
     ),
 }
 
@@ -173,10 +172,9 @@ GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
 class TestConfigGetPynputShortcuts:
     """Verify Config.get_pynput_shortcuts converts the three shortcut fields correctly."""
 
-    @pytest.mark.parametrize("scenario_name", GET_PYNPUT_SHORTCUTS_SCENARIOS.keys())
-    def test_hotkey_count(self, scenario_name: str) -> None:
+    @pytest.mark.parametrize("scenario", GET_PYNPUT_SHORTCUTS_SCENARIOS.values())
+    def test_hotkey_count(self, scenario: GetPynputShortcutsScenario) -> None:
         """The number of resulting pynput hotkeys matches the scenario's expectation."""
-        scenario = GET_PYNPUT_SHORTCUTS_SCENARIOS[scenario_name]
         cfg = Config(
             ocr_shortcut=scenario.ocr_shortcut,
             ocr_page_shortcut=scenario.ocr_page_shortcut,
