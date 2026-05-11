@@ -26,7 +26,7 @@ def decode_response(body: str) -> IpcResponse:
     """Parse a JSON response body into an "IpcResponse"."""
     data: ResponsePayloadDict = typing.cast(ResponsePayloadDict, json.loads(body))
     try:
-        status = IpcStatus(data["status"])
+        status = IpcStatus[data["status"]]
     except KeyError as ex:
         raise LancetIpcParseError(f"Status was not received: {ex}") from ex
     except ValueError as ex:
