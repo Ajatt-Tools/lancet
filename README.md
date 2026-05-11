@@ -147,6 +147,25 @@ Here's an example for [i3wm](https://i3wm.org/):
 exec --no-startup-id lancet
 ```
 
+## System keyboard shortcuts
+
+On some setups (like Wayland),
+applications can't register global keyboard shortcuts,
+so Lancet's shortcuts won't work.
+You can define shortcuts in your Wayland compositor instead.
+
+Below is an example for [Sway](https://wiki.archlinux.org/title/Sway).
+Add the following to your `~/.config/sway/config`:
+
+```
+# Run OCR
+bindsym $mod+o          exec lancet ocr
+# Run OCR with the speech-bubble detector
+bindsym $mod+Shift+o    exec lancet ocr --detect
+# Take a screenshot
+bindsym $mod+Print      exec lancet screenshot
+```
+
 ## Announcements
 
 1) [Sunsetting Transformers OCR](https://freesoftwareextremist.com/notice/B42ECp5gcevZYQMm1I)
