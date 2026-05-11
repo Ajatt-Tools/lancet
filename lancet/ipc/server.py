@@ -181,7 +181,7 @@ class IpcServer:
         self._server.shutdown()
         self._thread.join()
 
-    def __enter__(self) -> "IpcServer":
+    def __enter__(self) -> typing.Self:
         """Start the server and return self."""
         self.start()
         return self
