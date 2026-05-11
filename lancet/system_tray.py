@@ -19,7 +19,7 @@ from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 from zala.utils import qconnect
 
-from lancet.actions import LancetAction, LancetShortcutEnum
+from lancet.actions import LancetAction
 from lancet.config import Config
 from lancet.consts import (
     APP_LOGO_PATH,
@@ -171,9 +171,9 @@ class LancetSystemTray(QSystemTrayIcon):
 
         # Set keyboard shortcuts
         self._hotkeys.start_listener()
-        qconnect(self._hotkeys.signals.shortcut_activated, self.process_keyboard_shortcut)
+        qconnect(self._hotkeys.signals.shortcut_activated, self.process_received_command)
 
-    def _build_shortcuts(self) -> dict[PyShortcutStr, LancetShortcutEnum]:
+    def _build_shortcuts(self) -> dict[PyShortcutStr, LancetAction]:
         """Parse keyboard shortcuts from config, log failures, and return valid hotkeys."""
         result = self._cfg.get_pynput_shortcuts()
         if error_message := result.format_failures():
@@ -181,23 +181,13 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(error_message)
         return result.hotkeys
 
-    def process_keyboard_shortcut(self, shortcut: LancetShortcutEnum) -> None:
-        """Dispatch a keyboard shortcut event to the corresponding action."""
+    def process_received_command(self, action: LancetAction) -> None:
+        """
+        Dispatch a command received from a CLI invocation via IPC
+        or a keyboard shortcut event to the corresponding action.
+        """
         if self._open_dialogs.is_locked():
-            logger.info(f"Shortcut pressed while dialog open: {shortcut.name}")
-            return
-        match shortcut:
-            case LancetShortcutEnum.ocr_shortcut:
-                self.make_ocr_screenshot()
-            case LancetShortcutEnum.ocr_page_shortcut:
-                self.detect_and_make_ocr_screenshot()
-            case LancetShortcutEnum.screenshot_shortcut:
-                self.make_screenshot_area()
-
-    def dispatch_ipc_command(self, action: LancetAction) -> None:
-        """Dispatch a command received from a CLI invocation via IPC."""
-        if self._open_dialogs.is_locked():
-            logger.info(f"IPC command {action.name} while dialog open, skipping")
+            logger.info(f"Command '{action.name}' requested while dialog open, skipping")
             return
         match action:
             case LancetAction.ocr:

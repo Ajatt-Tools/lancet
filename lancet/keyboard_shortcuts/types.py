@@ -6,7 +6,7 @@ from collections.abc import Callable, MutableSequence
 
 from pynput.keyboard import Key, KeyCode
 
-from lancet.actions import LancetShortcutEnum
+from lancet.actions import LancetAction
 
 QtShortcutStr = typing.NewType("QtShortcutStr", str)
 PyShortcutStr = typing.NewType("PyShortcutStr", str)
@@ -15,7 +15,7 @@ PyShortcutStr = typing.NewType("PyShortcutStr", str)
 class ShortcutParseFailure(typing.NamedTuple):
     """Records a single shortcut that failed to parse."""
 
-    action: LancetShortcutEnum
+    action: LancetAction
     shortcut: str
     error: str
 
@@ -27,7 +27,7 @@ class ShortcutConversionResult:
     The list of failures gets appended to, thus marked as mutable.
     """
 
-    hotkeys: dict[PyShortcutStr, LancetShortcutEnum] = dataclasses.field(default_factory=dict)
+    hotkeys: dict[PyShortcutStr, LancetAction] = dataclasses.field(default_factory=dict)
     failures: MutableSequence[ShortcutParseFailure] = dataclasses.field(default_factory=list)
 
     def format_failures(self) -> str:

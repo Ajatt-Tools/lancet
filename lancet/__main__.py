@@ -91,7 +91,7 @@ def run_program(res: ConfigFileReadResult, ipc: IpcServer) -> None:
     widget.show()
     if res.error:
         widget.notify_user(res.error)
-    qconnect(ipc.signals.command_received, widget.dispatch_ipc_command)
+    qconnect(ipc.signals.command_received, widget.process_received_command)
 
     sys.exit(app.exec())
 

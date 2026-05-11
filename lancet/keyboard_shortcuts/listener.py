@@ -9,7 +9,7 @@ from pynput.keyboard import Key
 from PyQt6.QtCore import QObject, pyqtSignal
 from zala.utils import q_emit
 
-from lancet.actions import LancetShortcutEnum
+from lancet.actions import LancetAction
 from lancet.exceptions import KeyboardShortcutParseError
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import (
@@ -79,10 +79,10 @@ def to_pynput_hotkey(shortcut: QtShortcutStr) -> PyShortcutStr:
 class LancetShortcutSignals(QObject):
     """Qt signals emitted when a global keyboard shortcut is activated."""
 
-    shortcut_activated = pyqtSignal(LancetShortcutEnum)
+    shortcut_activated = pyqtSignal(LancetAction)
 
 
-def to_pynput_shortcuts(shortcuts: dict[QtShortcutStr, LancetShortcutEnum]) -> ShortcutConversionResult:
+def to_pynput_shortcuts(shortcuts: dict[QtShortcutStr, LancetAction]) -> ShortcutConversionResult:
     """Convert shortcuts to pynput format, collecting any that fail to parse."""
     result = ShortcutConversionResult()
     for shortcut, action_name in shortcuts.items():
@@ -101,7 +101,7 @@ def to_pynput_shortcuts(shortcuts: dict[QtShortcutStr, LancetShortcutEnum]) -> S
 class LancetShortcutManager:
     """Listens for global keyboard shortcuts and emits Qt signals when they are pressed."""
 
-    def __init__(self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]) -> None:
+    def __init__(self, shortcuts: dict[PyShortcutStr, LancetAction]) -> None:
         """Register shortcuts and start listening."""
         self.signals = LancetShortcutSignals()
         self._listener = LancetHotKeyListener(self._bind_shortcuts(shortcuts))
@@ -111,7 +111,7 @@ class LancetShortcutManager:
         self._listener.start()
         logger.info("Started shortcut listener")
 
-    def restart_listener(self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]) -> None:
+    def restart_listener(self, shortcuts: dict[PyShortcutStr, LancetAction]) -> None:
         """Stop the current listener and start a new one with updated shortcuts."""
         self.stop_listener()
         self._listener = LancetHotKeyListener(self._bind_shortcuts(shortcuts))
@@ -122,15 +122,13 @@ class LancetShortcutManager:
         self._listener.stop()
         logger.info("Stopped shortcut listener")
 
-    def _bind_shortcuts(
-        self, shortcuts: dict[PyShortcutStr, LancetShortcutEnum]
-    ) -> dict[PyShortcutStr, Callable[[], None]]:
+    def _bind_shortcuts(self, shortcuts: dict[PyShortcutStr, LancetAction]) -> dict[PyShortcutStr, Callable[[], None]]:
         """Bind shortcut enums to signal-emitting callbacks."""
         return {
             pynput_form: functools.partial(self._on_shortcut_activated, action_name)
             for pynput_form, action_name in shortcuts.items()
         }
 
-    def _on_shortcut_activated(self, action_name: LancetShortcutEnum) -> None:
+    def _on_shortcut_activated(self, action_name: LancetAction) -> None:
         """Emit the shortcut_activated signal for the given action."""
         q_emit(self.signals.shortcut_activated, action_name)

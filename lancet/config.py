@@ -7,7 +7,7 @@ import typing
 
 from loguru import logger
 
-from lancet.actions import LancetShortcutEnum
+from lancet.actions import LancetAction
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
 from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
@@ -100,9 +100,9 @@ class Config:
         """Return a mapping of key combinations to their shortcut actions."""
         return to_pynput_shortcuts(
             {
-                QtShortcutStr(self.ocr_shortcut): LancetShortcutEnum.ocr_shortcut,
-                QtShortcutStr(self.ocr_page_shortcut): LancetShortcutEnum.ocr_page_shortcut,
-                QtShortcutStr(self.screenshot_shortcut): LancetShortcutEnum.screenshot_shortcut,
+                QtShortcutStr(self.ocr_shortcut): LancetAction.ocr,
+                QtShortcutStr(self.ocr_page_shortcut): LancetAction.detect_and_ocr,
+                QtShortcutStr(self.screenshot_shortcut): LancetAction.screenshot,
             }
         )
 
