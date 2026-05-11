@@ -58,35 +58,6 @@ class IpcSignals(QObject):
     command_received = pyqtSignal(LancetAction)
 
 
-class LancetIpcHTTPServer(http.server.HTTPServer):
-    """
-    HTTPServer subclass that holds a reference to IpcSignals for use by request handlers.
-
-    Uses HTTPServer rather than ThreadingHTTPServer because the IPC channel handles
-    one CLI command at a time (tiny JSON POST, immediate acknowledgment).
-    ThreadingHTTPServer would spawn a thread per request, adding overhead and
-    concurrency concerns (e.g. concurrent q_emit calls) with no benefit for
-    sequential localhost-only traffic.
-    """
-
-    _signals: IpcSignals
-
-    def __init__(
-        self,
-        server_address: tuple[str, int],
-        *,
-        handler_class: "type[IpcRequestHandler]",
-        signals: IpcSignals,
-        bind_and_activate: bool = True,
-    ) -> None:
-        super().__init__(server_address, RequestHandlerClass=handler_class, bind_and_activate=bind_and_activate)
-        self._signals = signals
-
-    @property
-    def signals(self) -> IpcSignals:
-        return self._signals
-
-
 class IpcRequestHandler(http.server.BaseHTTPRequestHandler):
     """Handle POST /command requests from lancet CLI invocations."""
 
@@ -132,6 +103,35 @@ class IpcRequestHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: object) -> None:
         """Route http.server access log through loguru instead of stderr."""
         logger.debug(fmt % args)
+
+
+class LancetIpcHTTPServer(http.server.HTTPServer):
+    """
+    HTTPServer subclass that holds a reference to IpcSignals for use by request handlers.
+
+    Uses HTTPServer rather than ThreadingHTTPServer because the IPC channel handles
+    one CLI command at a time (tiny JSON POST, immediate acknowledgment).
+    ThreadingHTTPServer would spawn a thread per request, adding overhead and
+    concurrency concerns (e.g. concurrent q_emit calls) with no benefit for
+    sequential localhost-only traffic.
+    """
+
+    _signals: IpcSignals
+
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        *,
+        handler_class: type[IpcRequestHandler],
+        signals: IpcSignals,
+        bind_and_activate: bool = True,
+    ) -> None:
+        super().__init__(server_address, RequestHandlerClass=handler_class, bind_and_activate=bind_and_activate)
+        self._signals = signals
+
+    @property
+    def signals(self) -> IpcSignals:
+        return self._signals
 
 
 class IpcServer:
