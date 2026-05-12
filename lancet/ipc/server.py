@@ -61,7 +61,7 @@ class IpcSignals(QObject):
 class IpcRequestHandler(http.server.BaseHTTPRequestHandler):
     """Handle POST /command requests from lancet CLI invocations."""
 
-    server: LancetIpcHTTPServer
+    server: "LancetIpcHTTPServer"
 
     def do_POST(self) -> None:  # noqa: N802
         """Parse the JSON body, emit the action on the Qt main thread, and respond."""
