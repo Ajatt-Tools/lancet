@@ -8,6 +8,7 @@ import pathlib
 import signal
 import sys
 import typing
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from loguru import logger
@@ -84,7 +85,7 @@ class OpenDialogs:
         return self._registry.is_locked()
 
     @contextmanager
-    def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> typing.Generator[D]:
+    def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> Generator[D]:
         with self._registry.acquire(dialog.name):
             # The dialog's result code is passed to the slot:
             # https://doc.qt.io/qt-6/qdialog.html#finished

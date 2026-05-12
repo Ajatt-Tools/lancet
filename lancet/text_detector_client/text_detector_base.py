@@ -5,6 +5,7 @@ import abc
 import dataclasses
 import pathlib
 import typing
+from collections.abc import Sequence
 
 from PIL import Image
 
@@ -59,7 +60,7 @@ class Rect(typing.NamedTuple):
     y2: int
 
     @classmethod
-    def new(cls, xyxy: typing.Sequence[typing.SupportsInt]) -> typing.Self:
+    def new(cls, xyxy: Sequence[typing.SupportsInt]) -> typing.Self:
         """Create a Rect from four integer-like values, converting numpy types to native int."""
         return cls(*map(int, xyxy))
 

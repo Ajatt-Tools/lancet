@@ -1,6 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import typing
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from lancet.exceptions import LancetException
@@ -28,7 +29,7 @@ class DialogRegistry:
         self._names.discard(name)
 
     @contextmanager
-    def acquire(self, name: str) -> typing.Generator[typing.Self]:
+    def acquire(self, name: str) -> Generator[typing.Self]:
         """
         Register 'name' for the duration of the with block.
 
