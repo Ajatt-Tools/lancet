@@ -53,7 +53,12 @@ class LancetIpcClient:
         body = json.dumps(payload).encode(IPC_ENCODING)
         conn = http.client.HTTPConnection(IPC_HOST, self._cfg.bind_port, timeout=IPC_TIMEOUT_SEC)
         try:
-            conn.request("POST", IPC_COMMAND_PATH, body=body, headers={"Content-Type": "application/json"})
+            conn.request(
+                "POST",
+                IPC_COMMAND_PATH,
+                body=body,
+                headers={"Content-Type": "application/json", "Content-Length": str(len(body))},
+            )
             return decode_response(conn.getresponse().read().decode(IPC_ENCODING))
         except OSError as ex:
             raise LancetIpcConnectError(f"Could not reach the running Lancet instance: {ex}") from ex
