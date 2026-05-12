@@ -36,13 +36,15 @@ def parse_ipc_request(body: str) -> IpcRequest:
     Raises "LancetIpcParseError" if the body is not valid JSON.
     """
     try:
-        data: RequestPayloadDict = typing.cast(RequestPayloadDict, json.loads(body))
+        data = typing.cast(RequestPayloadDict, json.loads(body))
     except json.JSONDecodeError as ex:
         raise LancetIpcParseError(f"Failed to parse JSON: {ex}") from ex
     try:
         action = LancetAction[data["action"]]
     except KeyError as ex:
         raise LancetIpcParseError(f"Unknown action '{data.get('action')}': {ex}") from ex
+    except TypeError as ex:
+        raise LancetIpcParseError(f"Request was not a JSON object: {ex}") from ex
     return IpcRequest(action=action)
 
 

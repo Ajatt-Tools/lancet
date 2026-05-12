@@ -25,13 +25,15 @@ from lancet.ipc.types import (
 def decode_response(body: str) -> IpcResponse:
     """Parse a JSON response body into an "IpcResponse"."""
     try:
-        data: ResponsePayloadDict = typing.cast(ResponsePayloadDict, json.loads(body))
+        data = typing.cast(ResponsePayloadDict, json.loads(body))
     except json.JSONDecodeError as ex:
         raise LancetIpcParseError(f"Failed to parse JSON: {ex}") from ex
     try:
         status = IpcStatus[data["status"]]
     except KeyError as ex:
         raise LancetIpcParseError(f"Status was not received: {ex}") from ex
+    except TypeError as ex:
+        raise LancetIpcParseError(f"Response was not a JSON object: {ex}") from ex
     return IpcResponse(status=status, message=str(data.get("message", "")))
 
 
