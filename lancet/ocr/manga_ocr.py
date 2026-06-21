@@ -90,15 +90,7 @@ class MangaOcr(MangaOcrBase):
         try:
             self._load_from_pretrained(pretrained_model_name_or_path, local_files_only=False)
         except OSError as ex:
-            # The "Unable to load vocabulary" error often means PyInstaller didn't bundle
-            # fugashi/unidic_lite data files, not that the vocabulary file is corrupted.
-            if "vocabulary" in str(ex).lower():
-                raise OSError(
-                    f"{ex}. "
-                    f"This may indicate missing files for fugashi/unidic_lite "
-                    f"(commonly happens in PyInstaller builds)."
-                ) from ex
-            raise
+            raise adjust_error_message(ex, pretrained_model_name_or_path) from ex
 
     def _load_from_pretrained(
         self, pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
@@ -139,6 +131,32 @@ class MangaOcr(MangaOcrBase):
         """Convert a PIL image to a tensor suitable for the model's input."""
         pixel_values = self.processor(img, return_tensors="pt").pixel_values
         return pixel_values.squeeze()
+
+
+def adjust_error_message(ex: OSError, model_name: pathlib.Path | str) -> OSError:
+    """Return a copy of ex with a more helpful message when the error is a known OSError from HuggingFace transformers."""
+    error_msg = str(ex).lower()
+    # The "Unable to load vocabulary" error often means PyInstaller didn't bundle
+    # fugashi/unidic_lite data files, not that the vocabulary file is corrupted.
+    if "vocabulary" in error_msg:
+        return OSError(
+            f"{ex}. "
+            f"This may indicate missing files for fugashi/unidic_lite "
+            f"(commonly happens in PyInstaller builds)."
+        )
+    elif "preprocessor_config" in error_msg or "image processor" in error_msg:
+        return OSError(
+            f"'{model_name}' is not a compatible HuggingFace transformers model. "
+            f"It may be in TFLite, ONNX, or another unsupported format. "
+            f"Lancet supports safetensors models like 'tatsumoto/manga-ocr-base' or 'jzhang533/manga-ocr-base-2025'."
+        )
+    elif "not a valid model identifier" in error_msg or "couldn't find" in error_msg:
+        return OSError(
+            f"Model '{model_name}' was not found on HuggingFace Hub. " f"Check the spelling or verify the model exists."
+        )
+    elif "connection" in error_msg or "offline" in error_msg or "couldn't connect" in error_msg:
+        return OSError(f"Cannot reach HuggingFace Hub to load '{model_name}'. " f"Check your internet connection.")
+    return ex
 
 
 def post_process(text: str) -> str:
