@@ -152,10 +152,10 @@ def adjust_error_message(ex: OSError, model_name: pathlib.Path | str) -> OSError
         )
     elif "not a valid model identifier" in error_msg or "couldn't find" in error_msg:
         return OSError(
-            f"Model '{model_name}' was not found on HuggingFace Hub. " f"Check the spelling or verify the model exists."
+            f"Model '{model_name}' was not found on HuggingFace Hub. Check the spelling or verify the model exists."
         )
     elif "connection" in error_msg or "offline" in error_msg or "couldn't connect" in error_msg:
-        return OSError(f"Cannot reach HuggingFace Hub to load '{model_name}'. " f"Check your internet connection.")
+        return OSError(f"Cannot reach HuggingFace Hub to load '{model_name}'. Check your internet connection.")
     return ex
 
 
