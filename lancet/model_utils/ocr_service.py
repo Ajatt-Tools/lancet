@@ -1,6 +1,8 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import itertools
 import os
+from collections.abc import Iterable
 
 from loguru import logger
 from PIL import Image
@@ -9,6 +11,11 @@ from lancet.config import Config
 from lancet.consts import CACHE_DIR_PATH, OCR_JOIN_STR
 from lancet.model_utils.common import save_bubble_images
 from lancet.model_utils.model_loader import BackgroundModelLoader
+
+
+def deduplicate[T](items: Iterable[T]) -> Iterable[T]:
+    """Yield items from the input, dropping consecutive duplicates."""
+    yield from (key for key, _ in itertools.groupby(items))
 
 
 class OcrService:
@@ -40,7 +47,13 @@ class OcrService:
             logger.debug(f"saved bubbles to {CACHE_DIR_PATH / "debug_speech_bubbles"}")
 
         return OCR_JOIN_STR.join(
-            self._loader.ocr.recognize(block.box_image).strip()
-            for block in bubbles.blocks
-            if block.box_image.height > 0 and block.box_image.width > 0
+            deduplicate(
+                text
+                for text in (
+                    self._loader.ocr.recognize(block.box_image).strip()
+                    for block in bubbles.blocks
+                    if block.box_image.height > 0 and block.box_image.width > 0
+                )
+                if text
+            )
         )
