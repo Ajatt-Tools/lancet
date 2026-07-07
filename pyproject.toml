@@ -41,6 +41,7 @@ dependencies = [
     "requests", # needed to download comic_text_detector model 'comictextdetector.pt'
     "fugashi>=1.5.0", # needed by bert_japanese/tokenization_bert_japanese.py
     "unidic_lite>=1.0.8", # needed by bert_japanese/tokenization_bert_japanese.py
+    "sentencepiece>=0.2.0", # needed by transformers to convert slow to fast tokenizer
     "zala>=26.4.26.0",
     # Or use a local folder:
     #"zala @ git+file:///home/ren/Documents/Projects/Zala",
