@@ -16,8 +16,8 @@ def adjust_auto_tokenizer_error_message(ex: Exception, model_name: pathlib.Path 
             f"Transformers could not load the fast tokenizer backend. "
             f"This usually means the cached model snapshot is outdated or missing tokenizer.json. "
             f"Lancet will try the slow BertJapaneseTokenizer fallback. "
-            f"Try clearing the model cache at "
-            f"~/.cache/huggingface/hub/models--tatsumoto--manga-ocr-base and restart Lancet."
+            f"Try clearing the cached snapshot for this model under "
+            f"~/.cache/huggingface/hub/ and restart Lancet."
         )
     return MangaOCRTokenizerLoadError(
         f"Failed to load OCR tokenizer for '{model_name}'. " f"AutoTokenizer failed with {class_name(ex)}: {ex}."
