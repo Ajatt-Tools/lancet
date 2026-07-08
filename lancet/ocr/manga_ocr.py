@@ -10,7 +10,9 @@ from loguru import logger
 from PIL import Image
 from transformers import (
     AutoTokenizer,
+    BertJapaneseTokenizer,
     GenerationMixin,
+    PreTrainedTokenizerBase,
     VisionEncoderDecoderModel,
     ViTImageProcessor,
 )
@@ -29,6 +31,40 @@ if not issubclass(VisionEncoderDecoderModel, GenerationMixin):
     raise ImportError(
         "VisionEncoderDecoderModel should inherit GenerationMixin. This is required in transformers 5.6.2+."
     )
+
+
+def load_slow_tokenizer(
+    pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
+) -> PreTrainedTokenizerBase:
+    try:
+        tokenizer = BertJapaneseTokenizer.from_pretrained(  # type: ignore[return-value]
+            pretrained_model_name_or_path,
+            local_files_only=local_files_only,
+        )
+    except Exception as slow_ex:
+        logger.error(
+            f"Failed to load both AutoTokenizer and BertJapaneseTokenizer for "
+            f"{pretrained_model_name_or_path}: {slow_ex}"
+        )
+        raise
+    logger.info(f"Loaded tokenizer via BertJapaneseTokenizer: {class_name(tokenizer)} (is_fast={tokenizer.is_fast}).")
+    return tokenizer
+
+
+def load_tokenizer(
+    pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
+) -> PreTrainedTokenizerBase:
+    """Load the tokenizer, trying AutoTokenizer first and falling back to BertJapaneseTokenizer on failure."""
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(  # type: ignore[return-value]
+            pretrained_model_name_or_path,
+            local_files_only=local_files_only,
+        )
+        logger.info(f"Loaded tokenizer via AutoTokenizer: {class_name(tokenizer)} (is_fast={tokenizer.is_fast}).")
+        return tokenizer
+    except (ValueError, ImportError) as ex:
+        logger.warning(f"Failed to load tokenizer via AutoTokenizer: {ex}. " f"Falling back to BertJapaneseTokenizer.")
+        return load_slow_tokenizer(pretrained_model_name_or_path, local_files_only=local_files_only)
 
 
 class MangaOcr(MangaOcrBase):
@@ -101,10 +137,7 @@ class MangaOcr(MangaOcrBase):
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path,
-            local_files_only=local_files_only,
-        )
+        self.tokenizer = load_tokenizer(pretrained_model_name_or_path, local_files_only=local_files_only)
         self.model = VisionEncoderDecoderModel.from_pretrained(
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
