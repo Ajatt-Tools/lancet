@@ -24,7 +24,11 @@ from lancet.ocr.manga_ocr_base import (
     MangaOcrBase,
     MangaOCRException,
     MangaOCRFileNotFoundError,
+    MangaOCRLoadError,
+    MangaOCRTokenizerLoadError,
 )
+
+BACKEND_TOKENIZER_ERROR: str = "Couldn't instantiate the backend tokenizer"
 
 # Verify that VisionEncoderDecoderModel inherits GenerationMixin.
 if not issubclass(VisionEncoderDecoderModel, GenerationMixin):
@@ -38,6 +42,42 @@ def tokenizer_is_fast_label(tokenizer: object) -> str:
     return str(getattr(tokenizer, "is_fast", "unknown"))
 
 
+def adjust_auto_tokenizer_error_message(
+    ex: Exception, model_name: pathlib.Path | str
+) -> MangaOCRTokenizerLoadError:
+    """Return a user-facing error for AutoTokenizer failures."""
+    if BACKEND_TOKENIZER_ERROR in str(ex):
+        return MangaOCRTokenizerLoadError(
+            f"Failed to load OCR tokenizer for '{model_name}'. "
+            f"Transformers could not load the fast tokenizer backend. "
+            f"This usually means the cached model snapshot is outdated or missing tokenizer.json. "
+            f"Lancet will try the slow BertJapaneseTokenizer fallback. "
+            f"Try clearing the model cache at "
+            f"~/.cache/huggingface/hub/models--tatsumoto--manga-ocr-base and restart Lancet."
+        )
+    return MangaOCRTokenizerLoadError(
+        f"Failed to load OCR tokenizer for '{model_name}'. "
+        f"AutoTokenizer failed with {class_name(ex)}: {ex}."
+    )
+
+
+def adjust_slow_tokenizer_error_message(
+    ex: Exception, model_name: pathlib.Path | str
+) -> MangaOCRTokenizerLoadError:
+    """Return a user-facing error for BertJapaneseTokenizer fallback failures."""
+    error_msg = str(ex).lower()
+    if "fugashi" in error_msg or "unidic" in error_msg or "mecab" in error_msg:
+        return MangaOCRTokenizerLoadError(
+            f"Failed to load OCR tokenizer for '{model_name}'. "
+            f"BertJapaneseTokenizer fallback failed with {class_name(ex)}: {ex}. "
+            f"This may indicate missing Japanese tokenizer files for fugashi/unidic_lite."
+        )
+    return MangaOCRTokenizerLoadError(
+        f"Failed to load OCR tokenizer for '{model_name}'. "
+        f"BertJapaneseTokenizer fallback failed with {class_name(ex)}: {ex}."
+    )
+
+
 def load_slow_tokenizer(
     pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
 ) -> PreTrainedTokenizerBase:
@@ -47,11 +87,9 @@ def load_slow_tokenizer(
             local_files_only=local_files_only,
         )
     except Exception as slow_ex:
-        logger.error(
-            f"Failed to load both AutoTokenizer and BertJapaneseTokenizer for "
-            f"{pretrained_model_name_or_path}: {slow_ex}"
-        )
-        raise
+        adjusted = adjust_slow_tokenizer_error_message(slow_ex, pretrained_model_name_or_path)
+        logger.error(str(adjusted))
+        raise adjusted from slow_ex
     logger.info(
         f"Loaded tokenizer via BertJapaneseTokenizer: {class_name(tokenizer)} "
         f"(is_fast={tokenizer_is_fast_label(tokenizer)})."
@@ -74,7 +112,7 @@ def load_tokenizer(
         )
         return tokenizer
     except (ValueError, ImportError) as ex:
-        logger.warning(f"Failed to load tokenizer via AutoTokenizer: {ex}. " f"Falling back to BertJapaneseTokenizer.")
+        logger.warning(f"{adjust_auto_tokenizer_error_message(ex, pretrained_model_name_or_path)}")
         return load_slow_tokenizer(pretrained_model_name_or_path, local_files_only=local_files_only)
 
 
@@ -101,8 +139,10 @@ class MangaOcr(MangaOcrBase):
         logger.info(f"Loading OCR model from {self._pretrained_model_name_or_path}")
         try:
             self._load_model(self._pretrained_model_name_or_path)
+        except MangaOCRException:
+            raise
         except Exception as ex:
-            raise MangaOCRException(f"{class_name(ex)}: {ex}") from ex
+            raise MangaOCRLoadError(f"{class_name(ex)}: {ex}") from ex
 
         device = move_model_to_device(self.model, force_cpu=self._force_cpu)
         logger.info(f"Using {device.name.upper()}")
