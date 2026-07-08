@@ -42,6 +42,18 @@ class MangaOCRException(LancetException):
     pass
 
 
+class MangaOCRLoadError(MangaOCRException):
+    """Raised when the OCR model, tokenizer, or processor fails to load."""
+
+    pass
+
+
+class MangaOCRTokenizerLoadError(MangaOCRLoadError):
+    """Raised when the OCR tokenizer cannot be loaded."""
+
+    pass
+
+
 class MangaOCRUnavailableError(MangaOCRException):
     """Manga OCR model is still loading."""
 
