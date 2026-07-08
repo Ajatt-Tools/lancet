@@ -33,6 +33,11 @@ if not issubclass(VisionEncoderDecoderModel, GenerationMixin):
     )
 
 
+def tokenizer_is_fast_label(tokenizer: object) -> str:
+    """Return tokenizer is_fast status for logs without making logging fatal."""
+    return str(getattr(tokenizer, "is_fast", "unknown"))
+
+
 def load_slow_tokenizer(
     pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
 ) -> PreTrainedTokenizerBase:
@@ -47,7 +52,10 @@ def load_slow_tokenizer(
             f"{pretrained_model_name_or_path}: {slow_ex}"
         )
         raise
-    logger.info(f"Loaded tokenizer via BertJapaneseTokenizer: {class_name(tokenizer)} (is_fast={tokenizer.is_fast}).")
+    logger.info(
+        f"Loaded tokenizer via BertJapaneseTokenizer: {class_name(tokenizer)} "
+        f"(is_fast={tokenizer_is_fast_label(tokenizer)})."
+    )
     return tokenizer
 
 
@@ -60,7 +68,10 @@ def load_tokenizer(
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
         )
-        logger.info(f"Loaded tokenizer via AutoTokenizer: {class_name(tokenizer)} (is_fast={tokenizer.is_fast}).")
+        logger.info(
+            f"Loaded tokenizer via AutoTokenizer: {class_name(tokenizer)} "
+            f"(is_fast={tokenizer_is_fast_label(tokenizer)})."
+        )
         return tokenizer
     except (ValueError, ImportError) as ex:
         logger.warning(f"Failed to load tokenizer via AutoTokenizer: {ex}. " f"Falling back to BertJapaneseTokenizer.")
