@@ -1,5 +1,6 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+import importlib.metadata
 import multiprocessing
 import pathlib
 import shutil
@@ -117,12 +118,21 @@ def setup_frozen_binary() -> None:
             pass
 
 
+def log_dependency_versions() -> None:
+    """Log dependency versions useful for debugging user reports."""
+    try:
+        logger.info(f"Using transformers {importlib.metadata.version('transformers')}")
+    except importlib.metadata.PackageNotFoundError:
+        logger.warning("transformers is not installed")
+
+
 def main() -> None:
     """
     Main entry point for the Lancet application.
     Reads configuration, ensures singleton instance, and runs the program.
     """
     setup_frozen_binary()
+    log_dependency_versions()
 
     res = read_config_file()
     if res.error:
