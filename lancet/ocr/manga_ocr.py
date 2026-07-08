@@ -37,7 +37,7 @@ def load_slow_tokenizer(
     pretrained_model_name_or_path: pathlib.Path | str, *, local_files_only: bool
 ) -> PreTrainedTokenizerBase:
     try:
-        tokenizer = BertJapaneseTokenizer.from_pretrained(  # type: ignore[return-value]
+        tokenizer: PreTrainedTokenizerBase = BertJapaneseTokenizer.from_pretrained(  # type: ignore[return-value]
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
         )
@@ -56,7 +56,7 @@ def load_tokenizer(
 ) -> PreTrainedTokenizerBase:
     """Load the tokenizer, trying AutoTokenizer first and falling back to BertJapaneseTokenizer on failure."""
     try:
-        tokenizer = AutoTokenizer.from_pretrained(  # type: ignore[return-value]
+        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(  # type: ignore[return-value]
             pretrained_model_name_or_path,
             local_files_only=local_files_only,
         )
