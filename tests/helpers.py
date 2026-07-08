@@ -21,6 +21,18 @@ class QtShortcut(typing.NamedTuple):
     expected_pynput: str
 
 
+class Counter:
+    """Callable that counts how many times it has been invoked."""
+
+    count: int
+
+    def __init__(self) -> None:
+        self.count = 0
+
+    def __call__(self) -> None:
+        self.count += 1
+
+
 def qt_shortcut_to_string(shortcut: QtShortcut) -> str:
     """Render a QtShortcut to its QKeySequence.toString() form, as the grab dialog does."""
     return QKeySequence(int(shortcut.modifiers.value) + shortcut.key).toString()

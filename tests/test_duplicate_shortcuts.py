@@ -8,7 +8,7 @@ import pytest
 from lancet.exceptions import DuplicateShortcutError
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import PyShortcutStr
-from tests.test_lancet_hotkey_tracks import Counter
+from tests.helpers import Counter
 
 
 class ShortcutPair(typing.NamedTuple):
