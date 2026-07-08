@@ -118,8 +118,10 @@ class MangaOcr(MangaOcrBase):
         try:
             self._load_from_pretrained(pretrained_model_name_or_path, local_files_only=True)
         except OSError as ex:
-            logger.error(f"{class_name(ex)}: {ex}")
-            logger.info(f"trying with local_files_only=False")
+            logger.warning(
+                f"Failed to load OCR model from local cache: {class_name(ex)}: {ex}. "
+                f"Retrying with downloads enabled."
+            )
             self._try_load_model_with_web_download_enabled(pretrained_model_name_or_path)
 
     def _try_load_model_with_web_download_enabled(self, pretrained_model_name_or_path: pathlib.Path | str) -> None:
