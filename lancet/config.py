@@ -91,6 +91,7 @@ class Config:
 
     @staticmethod
     def file_exists() -> bool:
+        """Return True if the config file exists."""
         return CFG_PATH.is_file()
 
     def save_to_file(self) -> None:
@@ -113,6 +114,7 @@ class Config:
 
 
 def try_backup_config_file() -> None:
+    """Move the invalid config file aside so a fresh default config can be written."""
     try:
         CFG_PATH.replace(CFG_PATH.with_suffix(".old"))  # unconditionally overwrites target
     except OSError as ex:
@@ -120,11 +122,14 @@ def try_backup_config_file() -> None:
 
 
 class ConfigFileReadResult(typing.NamedTuple):
+    """A config file read result, optionally carrying a recoverable error message."""
+
     cfg: Config
     error: str = ""
 
 
 def read_config_file() -> ConfigFileReadResult:
+    """Read the config file, backing up invalid files and returning defaults on recoverable errors."""
     try:
         return ConfigFileReadResult(Config.read_from_file())
     except ConfigReadError as ex:

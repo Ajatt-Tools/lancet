@@ -79,9 +79,11 @@ class OpenDialogs:
     _registry: DialogRegistry
 
     def __init__(self) -> None:
+        """Initialize the dialog registry."""
         self._registry = DialogRegistry()
 
     def is_locked(self) -> bool:
+        """Return True when at least one dialog is currently open."""
         return self._registry.is_locked()
 
     @contextmanager

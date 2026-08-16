@@ -9,11 +9,13 @@ from lancet.model_utils.common import round_to_stride
 
 
 def filter_dict[K, V](d: dict[K, V], keys: set[K]) -> dict[K, V]:
+    """Return a new dict containing only keys from the requested set, preserving original order."""
     # Preserve order of keys.
     return {key: value for key, value in d.items() if key in keys}
 
 
 def make_tab(widgets: dict[str, QWidget]) -> QWidget:
+    """Build a QWidget tab containing translated form rows for the provided widgets."""
     tab = QWidget()
     tab.setLayout(layout := QFormLayout())
     for key, widget in widgets.items():
@@ -22,7 +24,10 @@ def make_tab(widgets: dict[str, QWidget]) -> QWidget:
 
 
 class MainPreferencesWidget(QTabWidget):
+    """Tabbed preferences widget that edits and applies Config values."""
+
     def __init__(self, cfg: Config, parent: QWidget | None = None):
+        """Initialize preferences tabs from the provided config."""
         super().__init__(parent)
         self._cfg = cfg
         self._widgets = create_form_widgets(cfg)
@@ -30,6 +35,7 @@ class MainPreferencesWidget(QTabWidget):
 
     @property
     def widgets(self) -> FormWidgets:
+        """Return the constructed form widgets."""
         return self._widgets
 
     def _setup_tabs(self) -> None:
