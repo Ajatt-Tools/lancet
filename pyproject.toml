@@ -137,7 +137,7 @@ format-check = [
     "isort --check-only --diff {args:.}",
 ]
 format-fix = [
-    "bash scripts/format.sh", # run as: hatch fmt -f
+    "$(git rev-parse --show-toplevel)/scripts/format.sh", # run as: hatch fmt -f
 ]
 lint-check = "flake8 --max-line-length 120 {args:.}"
 lint-fix = "lint-check"
