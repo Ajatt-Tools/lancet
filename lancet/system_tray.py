@@ -122,11 +122,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._notify = NotifySend(self, duration_sec=self._cfg.notification_duration_sec)
         self._take = ZalaTakeScreenRegion(scr=ZalaScreenshot(app))
         self._history = OcrHistory(self._cfg.max_history_size)
-        self._loader = BackgroundModelLoader.new(
-            cfg=self._cfg,
-            notify=self._notify,
-            executor=self._executor,
-        )
+        self._loader = BackgroundModelLoader.new(cfg=self._cfg, notify=self._notify, executor=self._executor)
         self._ocr_workflow = OcrWorkflow(
             app=self._app,
             cfg=self._cfg,
