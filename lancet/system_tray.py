@@ -106,6 +106,7 @@ class LancetSystemTray(QSystemTrayIcon):
     _cfg: Config
     _open_dialogs: OpenDialogs
     _hotkeys: LancetShortcutManager
+    _parent: QWidget | None
 
     def __init__(self, app: QApplication, cfg: Config, parent: QWidget | None = None) -> None:
         """Set up the system tray icon, context menu, OCR model, and keyboard shortcuts."""
@@ -113,6 +114,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self.setIcon(QIcon(str(APP_LOGO_PATH)))
 
         # Setup members
+        self._parent = parent
         self._open_dialogs = OpenDialogs()
         self._executor = concurrent.futures.ThreadPoolExecutor()
         self._app = app
