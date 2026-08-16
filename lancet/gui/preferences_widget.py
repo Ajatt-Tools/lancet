@@ -26,7 +26,7 @@ def make_tab(widgets: dict[str, QWidget]) -> QWidget:
 class MainPreferencesWidget(QTabWidget):
     """Tabbed preferences widget that edits and applies Config values."""
 
-    def __init__(self, cfg: Config, parent: QWidget | None = None):
+    def __init__(self, cfg: Config, parent: QWidget | None = None) -> None:
         """Initialize preferences tabs from the provided config."""
         super().__init__(parent)
         self._cfg = cfg

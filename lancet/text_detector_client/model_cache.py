@@ -17,7 +17,7 @@ DOWNLOAD_URL = "https://github.com/zyddnys/manga-image-translator/releases/downl
 class ComicTextDetectorCache:
     """Manages the on-disk cache of the comic text detector model file."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Set the cache file path and ensure the cache directory exists."""
         self._file_path = CACHE_DIR_PATH / "comictextdetector.pt"
         self._file_path.parent.mkdir(parents=True, exist_ok=True)
