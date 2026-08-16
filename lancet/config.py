@@ -24,6 +24,17 @@ class OcrDestination(enum.Enum):
     clipboard = "clipboard"
 
 
+def normalize_copy_to(data: dict[str, typing.Any]) -> None:
+    """Convert copy_to from a serialized enum name, or drop invalid values to use the default."""
+    if "copy_to" not in data:
+        return
+    try:
+        data["copy_to"] = OcrDestination[data["copy_to"]]
+    except KeyError:
+        logger.warning(f"Cannot handle copy_to={data['copy_to']!r} in config. Falling back to default.")
+        data.pop("copy_to", None)
+
+
 @dataclasses.dataclass
 class Config:
     """Application configuration with defaults, loaded from and saved to a JSON file."""
@@ -72,13 +83,7 @@ class Config:
         except OSError as ex:
             # Permission denied, is a directory, I/O error, etc. Treat as a recoverable read failure.
             raise ConfigReadError(f"failed to open config file: {ex}") from ex
-        try:
-            data["copy_to"] = OcrDestination[data["copy_to"]]
-        except KeyError:
-            logger.warning(
-                f"Cannot handle copy_to='{data.get('copy_to', 'missing')!r}' value in config. Falling back to default."
-            )
-            data.pop("copy_to", None)
+        normalize_copy_to(data)
         try:
             return cls(**data)
         except TypeError as ex:
