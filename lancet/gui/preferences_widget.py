@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import QFormLayout, QTabWidget, QWidget
 
 from lancet.config import Config
-from lancet.gui.form_widgets import FormWidgets, create_form_widgets
+from lancet.gui.form_widgets import FormWidgets, FormWidgetsBuilder
 from lancet.gui.utils import ui_translate
 from lancet.model_utils.common import round_to_stride
 
@@ -30,7 +30,7 @@ class MainPreferencesWidget(QTabWidget):
         """Initialize preferences tabs from the provided config."""
         super().__init__(parent)
         self._cfg = cfg
-        self._widgets = create_form_widgets(cfg)
+        self._widgets = FormWidgetsBuilder(cfg).create_form_widgets()
         self._setup_tabs()
 
     @property
