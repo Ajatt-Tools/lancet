@@ -13,6 +13,8 @@ from lancet.exceptions import LancetHTTPError
 # Get from https://github.com/zyddnys/manga-image-translator/releases
 DOWNLOAD_URL = "https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/comictextdetector.pt"
 
+DOWNLOAD_CHUNK_SIZE: int = 1024
+
 
 class ComicTextDetectorCache:
     """Manages the on-disk cache of the comic text detector model file."""
@@ -36,7 +38,7 @@ class ComicTextDetectorCache:
             except HTTPError as ex:
                 raise LancetHTTPError(f"Failed to download {DOWNLOAD_URL}: {ex}") from ex
             with self._file_path.open("wb") as f:
-                for chunk in r.iter_content(1024):
+                for chunk in r.iter_content(DOWNLOAD_CHUNK_SIZE):
                     if chunk:
                         f.write(chunk)
             logger.info(f"Downloaded {DOWNLOAD_URL}")
