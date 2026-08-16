@@ -2,25 +2,26 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import functools
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
 
-HARDCODED_PATHS = (
-    "/usr/bin",
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    "/bin",
-    os.path.join(os.getenv("HOME", "/home/user"), ".local", "bin"),
+HARDCODED_PATHS: Sequence[pathlib.Path] = (
+    pathlib.Path("/usr/bin"),
+    pathlib.Path("/opt/homebrew/bin"),
+    pathlib.Path("/usr/local/bin"),
+    pathlib.Path("/bin"),
+    (pathlib.Path.home() / ".local" / "bin"),
 )
 
 
 def find_executable_hardcoded(name: str) -> str | None:
     """Search for an executable by name in a list of common installation directories."""
     for path_to_dir in HARDCODED_PATHS:
-        if os.path.isfile(path_to_exe := os.path.join(path_to_dir, name)):
-            return path_to_exe
+        if (path_to_exe := path_to_dir.joinpath(name)).is_file():
+            return str(path_to_exe.resolve())
     return None
 
 
