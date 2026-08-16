@@ -8,6 +8,8 @@ import subprocess
 import sys
 from collections.abc import Sequence
 
+from lancet.consts import IS_WIN
+
 HARDCODED_PATHS: Sequence[pathlib.Path] = (
     pathlib.Path("/usr/bin"),
     pathlib.Path("/opt/homebrew/bin"),
@@ -89,6 +91,11 @@ def make_clean_env() -> dict[str, str] | None:
         # Remove Qt plugin paths (these are always PyInstaller-specific)
         env = clean_ld_library_path(env, env_key="QT_PLUGIN_PATH")
         env = clean_ld_library_path(env, env_key="QT_QPA_PLATFORM_PLUGIN_PATH")
+
+        # On Windows, PyInstaller prepends its extraction directory to PATH for bundled DLL lookup.
+        # External Qt apps should not inherit that path, or they can load Lancet's bundled Qt DLLs/plugins.
+        if IS_WIN:
+            env = clean_ld_library_path(env, env_key="PATH")
 
         # Remove Python-specific variables (not needed for external programs)
         env.pop("PYTHONPATH", None)
