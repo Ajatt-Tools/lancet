@@ -17,10 +17,15 @@ HARDCODED_PATHS: Sequence[pathlib.Path] = (
 )
 
 
+def is_executable_file(path: pathlib.Path) -> bool:
+    """Return True if path points to an executable file."""
+    return path.is_file() and os.access(path, os.X_OK)
+
+
 def find_executable_hardcoded(name: str) -> str | None:
     """Search for an executable by name in a list of common installation directories."""
     for path_to_dir in HARDCODED_PATHS:
-        if (path_to_exe := path_to_dir.joinpath(name)).is_file():
+        if is_executable_file(path_to_exe := path_to_dir.joinpath(name)):
             return str(path_to_exe.resolve())
     return None
 
