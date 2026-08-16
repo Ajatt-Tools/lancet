@@ -66,7 +66,7 @@ class Config:
                 data: dict[str, typing.Any] = json.load(f)
         except FileNotFoundError:
             logger.info("config file does not exist, falling back to default.")
-            return cls()  # Mising config file is not an error.
+            return cls()  # Missing config file is not an error.
         except json.JSONDecodeError as ex:
             raise ConfigReadError(f"failed to decode json config file: {ex}") from ex
         except OSError as ex:
