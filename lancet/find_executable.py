@@ -48,6 +48,12 @@ def is_running_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def is_pyinstaller_path(path: str) -> bool:
+    """Return True if path looks like a PyInstaller temporary extraction directory."""
+    parts = path.replace("\\", "/").split("/")
+    return any(part.startswith("_MEI") for part in parts)
+
+
 def filter_pyinstaller_paths(path_str: str) -> list[str]:
     """
     PyInstaller prepends to the original LD_LIBRARY_PATH and QT_PLUGIN_PATH values:
@@ -55,7 +61,7 @@ def filter_pyinstaller_paths(path_str: str) -> list[str]:
     QT_PLUGIN_PATH=/tmp/_MEIz10LqR/PyQt6/Qt6/plugins
     Remove PyInstaller's temporary extraction paths from the passed env var while preserving the user's original paths.
     """
-    return [path for path in path_str.split(os.pathsep) if path.strip() and not path.startswith("/tmp/_MEI")]
+    return [path for path in path_str.split(os.pathsep) if path.strip() and not is_pyinstaller_path(path)]
 
 
 def clean_ld_library_path(env: dict[str, str], *, env_key: str = "LD_LIBRARY_PATH") -> dict[str, str]:
