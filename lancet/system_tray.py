@@ -123,15 +123,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._take = ZalaTakeScreenRegion(scr=ZalaScreenshot(app))
         self._history = OcrHistory(self._cfg.max_history_size)
         self._loader = BackgroundModelLoader.new(cfg=self._cfg, notify=self._notify, executor=self._executor)
-        self._ocr_workflow = OcrWorkflow(
-            app=self._app,
-            cfg=self._cfg,
-            loader=self._loader,
-            ocr_service=OcrService(loader=self._loader, cfg=self._cfg),
-            notify=self._notify,
-            history=self._history,
-            executor=self._executor,
-        )
+        self._ocr_workflow = self._build_ocr_workflow()
         self._hotkeys = LancetShortcutManager(self._build_shortcuts())
 
         # Menu
@@ -171,6 +163,18 @@ class LancetSystemTray(QSystemTrayIcon):
         # Set keyboard shortcuts
         self._hotkeys.start_listener()
         qconnect(self._hotkeys.signals.shortcut_activated, self.process_received_command)
+
+    def _build_ocr_workflow(self) -> OcrWorkflow:
+        """Construct the OCR workflow with all its dependencies."""
+        return OcrWorkflow(
+            app=self._app,
+            cfg=self._cfg,
+            loader=self._loader,
+            ocr_service=OcrService(loader=self._loader, cfg=self._cfg),
+            notify=self._notify,
+            history=self._history,
+            executor=self._executor,
+        )
 
     def _build_shortcuts(self) -> dict[PyShortcutStr, LancetAction]:
         """Parse keyboard shortcuts from config, log failures, and return valid hotkeys."""
