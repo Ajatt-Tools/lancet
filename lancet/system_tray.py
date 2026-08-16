@@ -125,36 +125,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._loader = BackgroundModelLoader.new(cfg=self._cfg, notify=self._notify, executor=self._executor)
         self._ocr_workflow = self._build_ocr_workflow()
         self._hotkeys = LancetShortcutManager(self._build_shortcuts())
-
-        # Menu
-        menu = QMenu(parent)
-        self.setContextMenu(menu)
-
-        # Menu Actions
-        menu.addAction(
-            QIcon(str(SCREENSHOT_ICON_PATH)),
-            format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
-            self.make_screenshot_area,
-        )
-        menu.addAction(
-            QIcon(str(OCR_ICON_PATH)),
-            format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
-            self.make_ocr_screenshot,
-        )
-        menu.addAction(
-            QIcon(str(OCR_ICON_PATH)),
-            format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
-            self.detect_and_make_ocr_screenshot,
-        )
-        menu.addSeparator()
-        menu.addAction(QIcon(str(PREFERENCES_ICON_PATH)), "Preferences…", self.open_preferences)
-        menu.addAction(QIcon(str(RESTART_ICON_PATH)), "Restart", self.restart)
-        menu.addAction(QIcon(str(APP_LOGO_PATH)), "About…", self.open_about)
-        menu.addAction(
-            QIcon(str(EXIT_ICON_PATH)),
-            "Exit",
-            self.quit,
-        )
+        self._insert_tray_menu_actions()
 
         # Init models in background
         self._loader.load_all()
@@ -175,6 +146,36 @@ class LancetSystemTray(QSystemTrayIcon):
             history=self._history,
             executor=self._executor,
         )
+
+    def _insert_tray_menu_actions(self) -> None:
+        """Build the tray icon's context menu with all action items."""
+        # Menu
+        menu = QMenu(self._parent)
+        self.setContextMenu(menu)
+
+        # Menu Actions
+        menu.addAction(
+            QIcon(str(SCREENSHOT_ICON_PATH)),
+            format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
+            self.make_screenshot_area,
+        )
+        menu.addAction(
+            QIcon(str(OCR_ICON_PATH)),
+            format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
+            self.make_ocr_screenshot,
+        )
+        menu.addAction(
+            QIcon(str(OCR_ICON_PATH)),
+            format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
+            self.detect_and_make_ocr_screenshot,
+        )
+        menu.addSeparator()
+
+        # Add preferences, restart, about, and exit actions to the menu.
+        menu.addAction(QIcon(str(PREFERENCES_ICON_PATH)), "Preferences…", self.open_preferences)
+        menu.addAction(QIcon(str(RESTART_ICON_PATH)), "Restart", self.restart)
+        menu.addAction(QIcon(str(APP_LOGO_PATH)), "About…", self.open_about)
+        menu.addAction(QIcon(str(EXIT_ICON_PATH)), "Exit", self.quit)
 
     def _build_shortcuts(self) -> dict[PyShortcutStr, LancetAction]:
         """Parse keyboard shortcuts from config, log failures, and return valid hotkeys."""
