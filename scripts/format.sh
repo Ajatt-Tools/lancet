@@ -8,7 +8,7 @@ ROOT=$(git rev-parse --show-toplevel)
 readonly ROOT
 cd -- "$ROOT" || exit 1
 
-readarray -t FILES <<<"$(find "$ROOT/lancet" -type f -iname '*.py')"
+readarray -t FILES <<<"$(find "$ROOT/tests" "$ROOT/lancet" -type f -iname '*.py')"
 readonly -a FILES
 
 for prog in pyupgrade isort black; do
