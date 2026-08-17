@@ -4,10 +4,11 @@ import typing
 from collections.abc import Sequence
 
 import pytest
+from pynput.keyboard import HotKey
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence
-from pynput.keyboard import HotKey
 
+from lancet.actions import LancetAction
 from lancet.config import Config
 from lancet.exceptions import KeyboardShortcutParseError
 from lancet.keyboard_shortcuts.listener import to_pynput_hotkey, to_pynput_shortcuts
@@ -15,7 +16,6 @@ from lancet.keyboard_shortcuts.types import (
     PyShortcutStr,
     QtShortcutStr,
 )
-from lancet.actions import LancetAction
 from tests.helpers import (
     QtShortcut,
     qt_shortcut_to_string,
@@ -249,7 +249,7 @@ CONVERSION_SCENARIOS: dict[str, ConversionScenario] = {
 class TestToPynputShortcuts:
     """Test batch conversion of shortcuts to pynput format."""
 
-    @pytest.mark.parametrize("scenario", CONVERSION_SCENARIOS.values())
+    @pytest.mark.parametrize("scenario", CONVERSION_SCENARIOS.values(), ids=CONVERSION_SCENARIOS.keys())
     def test_hotkey_count(self, scenario: ConversionScenario) -> None:
         """Test that the correct number of hotkeys are converted."""
         result = to_pynput_shortcuts(scenario.shortcuts)

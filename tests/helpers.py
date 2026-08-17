@@ -12,6 +12,12 @@ from PyQt6.QtGui import QKeySequence
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
 from lancet.keyboard_shortcuts.types import PyShortcutStr
 
+ALT: Key = Key.alt
+SHIFT: Key = Key.shift
+CTRL: Key = Key.ctrl
+KEY_O: KeyCode = KeyCode.from_char("o")
+KEY_P: KeyCode = KeyCode.from_char("p")
+
 
 class QtShortcut(typing.NamedTuple):
     """A Qt modifier+key combination paired with the expected pynput conversion."""

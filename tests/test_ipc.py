@@ -91,7 +91,7 @@ PARSE_SCENARIOS: dict[str, ParseScenario] = {
 class TestParseIpcRequest:
     """Test that parse_ipc_request validates JSON and LancetAction values."""
 
-    @pytest.mark.parametrize("scenario", PARSE_SCENARIOS.values(), ids=list(PARSE_SCENARIOS.keys()))
+    @pytest.mark.parametrize("scenario", PARSE_SCENARIOS.values(), ids=PARSE_SCENARIOS.keys())
     def test_parse_requests(self, scenario: ParseScenario) -> None:
         if scenario.expected_error is None:
             result = parse_ipc_request(scenario.body)
@@ -121,13 +121,13 @@ DECODE_RESPONSE_ERRORS: dict[str, str] = {
 class TestDecodeResponse:
     """Test that decode_response parses valid bodies and rejects invalid bodies."""
 
-    @pytest.mark.parametrize("response", ENCODE_RESPONSE_SCENARIOS.values(), ids=list(ENCODE_RESPONSE_SCENARIOS.keys()))
+    @pytest.mark.parametrize("response", ENCODE_RESPONSE_SCENARIOS.values(), ids=ENCODE_RESPONSE_SCENARIOS.keys())
     def test_encode_then_decode(self, response: IpcResponse) -> None:
         encoded = encode_response(response)
         decoded = decode_response(encoded.decode(IPC_ENCODING))
         assert decoded == response
 
-    @pytest.mark.parametrize("body", DECODE_RESPONSE_ERRORS.values(), ids=list(DECODE_RESPONSE_ERRORS.keys()))
+    @pytest.mark.parametrize("body", DECODE_RESPONSE_ERRORS.values(), ids=DECODE_RESPONSE_ERRORS.keys())
     def test_decode_error(self, body: str) -> None:
         with pytest.raises(LancetIpcParseError):
             decode_response(body)
@@ -159,7 +159,7 @@ SEND_SCENARIOS: dict[str, SendScenario] = {
 class TestSendIpcRequest:
     """Test that send_ipc_request sends an HTTP POST and returns a correctly parsed response."""
 
-    @pytest.mark.parametrize("scenario", SEND_SCENARIOS.values(), ids=list(SEND_SCENARIOS.keys()))
+    @pytest.mark.parametrize("scenario", SEND_SCENARIOS.values(), ids=SEND_SCENARIOS.keys())
     def test_send_ipc_request(self, ipc_server: IpcServer, scenario: SendScenario) -> None:
         """Send each command over a real HTTP port and verify the response and signal emission."""
         received_actions: list[LancetAction] = []
@@ -254,7 +254,7 @@ ERROR_SCENARIOS: dict[str, ErrorScenario] = {
 class TestIpcErrorResponses:
     """Test that malformed requests return structured error responses instead of crashing."""
 
-    @pytest.mark.parametrize("scenario", ERROR_SCENARIOS.values(), ids=list(ERROR_SCENARIOS.keys()))
+    @pytest.mark.parametrize("scenario", ERROR_SCENARIOS.values(), ids=ERROR_SCENARIOS.keys())
     def test_error_response(self, ipc_server: IpcServer, scenario: ErrorScenario) -> None:
         """Send a bad request over HTTP and verify the server returns a structured error."""
         port = ipc_server.server_address[1]

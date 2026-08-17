@@ -2,18 +2,22 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import typing
+from collections.abc import Sequence
 from unittest.mock import patch
 
 import pytest
 from transformers import PreTrainedTokenizerBase
 
+from lancet.ocr.error_messages import (
+    adjust_auto_tokenizer_error_message,
+    adjust_error_message,
+    adjust_slow_tokenizer_error_message,
+)
 from lancet.ocr.manga_ocr import (
     MangaOcr,
     load_tokenizer,
     tokenizer_is_fast_label,
 )
-from lancet.ocr.error_messages import adjust_auto_tokenizer_error_message, adjust_slow_tokenizer_error_message, \
-    adjust_error_message
 from lancet.ocr.manga_ocr_base import MangaOCRException, MangaOCRTokenizerLoadError
 
 
@@ -144,7 +148,7 @@ class AutoTokenizerErrorScenario(typing.NamedTuple):
     """A scenario for improving AutoTokenizer load errors."""
 
     error: Exception
-    expected_substrings: tuple[str, ...]
+    expected_substrings: Sequence[str]
 
 
 AUTO_TOKENIZER_ERROR_SCENARIOS: dict[str, AutoTokenizerErrorScenario] = {
@@ -176,7 +180,7 @@ class SlowTokenizerErrorScenario(typing.NamedTuple):
     """A scenario for improving BertJapaneseTokenizer fallback load errors."""
 
     error: Exception
-    expected_substrings: tuple[str, ...]
+    expected_substrings: Sequence[str]
 
 
 SLOW_TOKENIZER_ERROR_SCENARIOS: dict[str, SlowTokenizerErrorScenario] = {

@@ -14,7 +14,10 @@ from lancet.find_executable import (
     filter_pyinstaller_paths,
     find_executable,
     find_executable_hardcoded,
+    is_executable_file,
+    is_pyinstaller_path,
     make_clean_env,
+    resolve_executable_with_fallbacks,
 )
 
 
@@ -45,6 +48,13 @@ class TestFilterPyinstallerPaths:
     def test_filter_pyinstaller_paths(self, input_path: str, expected: Sequence[str]) -> None:
         """Test that PyInstaller paths are correctly filtered out."""
         assert filter_pyinstaller_paths(input_path) == expected
+
+    def test_filter_windows_paths(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Windows PATH-style separators are handled when os.pathsep is semicolon."""
+        monkeypatch.setattr("lancet.find_executable.os.pathsep", ";")
+        assert filter_pyinstaller_paths(r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx;C:\Qt\plugins") == [
+            r"C:\Qt\plugins"
+        ]
 
 
 class TestCleanLdLibraryPath:
@@ -81,6 +91,15 @@ class TestCleanLdLibraryPath:
         """Test that LD_LIBRARY_PATH is correctly cleaned in environment dictionary."""
         result = clean_ld_library_path(input_env.copy())
         assert result == expected_env
+
+    def test_clean_windows_path_variable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Windows PATH-style separators are preserved when cleaning PATH-like variables."""
+        monkeypatch.setattr("lancet.find_executable.os.pathsep", ";")
+        result = clean_ld_library_path(
+            {"QT_PLUGIN_PATH": r"C:\Temp\_MEIaaa;C:\Qt\plugins", "PATH": r"C:\Windows"},
+            env_key="QT_PLUGIN_PATH",
+        )
+        assert result == {"QT_PLUGIN_PATH": r"C:\Qt\plugins", "PATH": r"C:\Windows"}
 
 
 class MakeCleanEnvScenario(typing.NamedTuple):
@@ -162,7 +181,7 @@ class TestMakeCleanEnv:
         monkeypatch.delattr(sys, "frozen", raising=False)
         assert make_clean_env() is None
 
-    @pytest.mark.parametrize("scenario", FROZEN_SCENARIOS.values(), ids=list(FROZEN_SCENARIOS.keys()))
+    @pytest.mark.parametrize("scenario", FROZEN_SCENARIOS.values(), ids=FROZEN_SCENARIOS.keys())
     def test_make_clean_env_frozen(self, scenario: MakeCleanEnvScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """For each frozen-binary scenario, verify the cleaned env matches expectations."""
         monkeypatch.setattr(sys, "frozen", True, raising=False)
@@ -176,6 +195,36 @@ class TestMakeCleanEnv:
                 assert key not in result
             else:
                 assert result[key] == expected_value
+
+
+class TestIsPyinstallerPath:
+    """Test platform-independent PyInstaller extraction path detection."""
+
+    @pytest.mark.parametrize(
+        "path,expected",
+        [
+            ("/tmp/_MEIxxxxx", True),
+            ("/tmp/_MEIxxxxx/PyQt6/Qt6/plugins", True),
+            (r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx", True),
+            ("/usr/lib", False),
+            (r"C:\Qt\plugins", False),
+        ],
+    )
+    def test_detect(self, path: str, expected: bool) -> None:
+        """is_pyinstaller_path recognizes Linux and Windows _MEI paths."""
+        assert is_pyinstaller_path(path) is expected
+
+
+class TestIsExecutableFile:
+    """Test executable file detection."""
+
+    @pytest.mark.parametrize("mode,expected", [(0o755, True), (0o644, False)])
+    def test_file_mode(self, mode: int, expected: bool, tmp_path: pathlib.Path) -> None:
+        """Only executable regular files are accepted."""
+        file_path = tmp_path / "probe"
+        file_path.write_text("#!/bin/sh\n", encoding="utf-8")
+        file_path.chmod(mode)
+        assert is_executable_file(file_path) is expected
 
 
 @pytest.fixture(autouse=True)
@@ -212,7 +261,7 @@ def install_hardcoded_search_path(
     search_dirs = (tmp_path / "bin1", tmp_path / "bin2", tmp_path / "bin3")
     for path_str in search_dirs:
         path_str.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr("lancet.find_executable.HARDCODED_PATHS", tuple(str(s) for s in search_dirs))
+    monkeypatch.setattr("lancet.find_executable.HARDCODED_PATHS", tuple(search_dirs))
     if scenario.place_in is not None:
         make_executable_file(tmp_path / scenario.place_in, scenario.name)
 
@@ -278,7 +327,7 @@ def install_find_executable_dirs(
     hardcoded_dir.mkdir()
 
     monkeypatch.setattr(os, "environ", {"PATH": str(path_dir)})
-    monkeypatch.setattr("lancet.find_executable.HARDCODED_PATHS", (str(hardcoded_dir),))
+    monkeypatch.setattr("lancet.find_executable.HARDCODED_PATHS", (hardcoded_dir,))
 
     if scenario.on_path:
         make_executable_file(path_dir, name)
@@ -291,7 +340,7 @@ def install_find_executable_dirs(
 class TestFindExecutable:
     """find_executable prefers PATH (via shutil.which) and falls back to HARDCODED_PATHS."""
 
-    @pytest.mark.parametrize("scenario", FIND_SCENARIOS.values())
+    @pytest.mark.parametrize("scenario", FIND_SCENARIOS.values(), ids=FIND_SCENARIOS.keys())
     def test_lookup(
         self,
         scenario: FindExecutableScenario,
@@ -316,7 +365,7 @@ class TestFindExecutable:
         else:
             assert result_dir == hardcoded_dir
 
-    @pytest.mark.parametrize("scenario", FIND_HARDCODED_SCENARIOS.values())
+    @pytest.mark.parametrize("scenario", FIND_HARDCODED_SCENARIOS.values(), ids=FIND_HARDCODED_SCENARIOS.keys())
     def test_lookup_hardcoded(
         self,
         scenario: FindExecutableHardcodedScenario,
@@ -335,3 +384,52 @@ class TestFindExecutable:
             assert pathlib.Path(result).name == scenario.name
         else:
             assert result is None
+
+    @pytest.mark.parametrize("mode,expected_found", [(0o755, True), (0o644, False)])
+    def test_absolute_path(self, mode: int, expected_found: bool, tmp_path: pathlib.Path) -> None:
+        """Absolute paths resolve only when they point to executable files."""
+        executable = tmp_path / "custom-app"
+        executable.write_text("#!/bin/sh\n", encoding="utf-8")
+        executable.chmod(mode)
+        result = find_executable(str(executable))
+        if expected_found:
+            assert result == str(executable.resolve())
+        else:
+            assert result is None
+
+    def test_home_expanded_absolute_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        """A configured ~/ path is expanded before executable checks."""
+        bin_dir = tmp_path / "bin"
+        executable = make_executable_file(bin_dir, "goldendict")
+        monkeypatch.setenv("HOME", str(tmp_path))
+        assert find_executable("~/bin/goldendict") == str(executable.resolve())
+
+
+class ResolverScenario(typing.NamedTuple):
+    """A scenario for resolve_executable_with_fallbacks."""
+
+    configured: str
+    fallback_names: Sequence[str]
+    available_name: str | None
+    expected: str
+
+
+RESOLVER_SCENARIOS: dict[str, ResolverScenario] = {
+    "configured_resolved": ResolverScenario("custom", ("fallback",), "custom", "/usr/bin/custom"),
+    "configured_missing_fallback_resolved": ResolverScenario("missing", ("fallback",), "fallback", "/usr/bin/fallback"),
+    "empty_fallback_resolved": ResolverScenario("", ("fallback",), "fallback", "/usr/bin/fallback"),
+    "total_failure_empty": ResolverScenario("missing", ("fallback",), None, ""),
+}
+
+
+class TestResolveExecutableWithFallbacks:
+    """Test shared executable resolution semantics."""
+
+    @pytest.mark.parametrize("scenario", RESOLVER_SCENARIOS.values(), ids=RESOLVER_SCENARIOS.keys())
+    def test_resolve(self, scenario: ResolverScenario, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Configured executables are tried first, then fallback names; total failure is empty."""
+        monkeypatch.setattr(
+            "lancet.find_executable.find_executable",
+            lambda name: f"/usr/bin/{name}" if name == scenario.available_name else None,
+        )
+        assert resolve_executable_with_fallbacks(scenario.configured, scenario.fallback_names) == scenario.expected
