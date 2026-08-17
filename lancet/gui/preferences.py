@@ -3,20 +3,29 @@
 import dataclasses
 import pathlib
 import sys
+import typing
 
-from PyQt6.QtCore import pyqtSignal
+from loguru import logger
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QAbstractButton,
     QApplication,
     QDialogButtonBox,
-    QGridLayout,
+    QSplitter,
+    QVBoxLayout,
     QWidget,
 )
 from zala.utils import qconnect
 
 from lancet.config import Config
-from lancet.consts import APP_LOGO_PATH, APP_NAME, GEOMETRY_FILE_PATH
+from lancet.consts import (
+    APP_LOGO_PATH,
+    APP_NAME,
+    GEOMETRY_FILE_PATH,
+    PREFERENCES_SPLITTER_HISTORY_WIDTH,
+    PREFERENCES_SPLITTER_SETTINGS_WIDTH,
+)
 from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
 from lancet.gui.ocr_history_widget import OcrHistoryWidget
 from lancet.gui.preferences_widget import MainPreferencesWidget
@@ -30,6 +39,52 @@ class SettingsApplyResult:
     success: bool = False
     error: Exception | None = None
     ocr_history: list[str] = dataclasses.field(default_factory=list)
+
+
+class PreferencesDialogSplitter(QSplitter):
+    """Horizontal splitter separating the settings and OCR history panes, with persistent position."""
+
+    _splitter_state_file: pathlib.Path = GEOMETRY_FILE_PATH.with_suffix(".preferences.splitter")
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialize the splitter in horizontal orientation."""
+        super().__init__(parent)
+        self.setOrientation(Qt.Orientation.Horizontal)
+
+    def create_layout(self, tabs: MainPreferencesWidget, history_list: OcrHistoryWidget) -> typing.Self:
+        """Add the settings and history panes, configure resize behavior, and return self."""
+        # Two panes separated by a draggable splitter: settings on the left, history on the right.
+        self.addWidget(tabs)
+        self.addWidget(history_list)
+        self.setChildrenCollapsible(False)
+        # The settings pane keeps its width; the history pane absorbs extra space on resize.
+        self.setStretchFactor(0, 0)
+        self.setStretchFactor(1, 1)
+        self.setSizes([PREFERENCES_SPLITTER_SETTINGS_WIDTH, PREFERENCES_SPLITTER_HISTORY_WIDTH])
+        return self
+
+    def read_splitter_state(self) -> bytes | None:
+        """Return the saved splitter state bytes, or None if missing or empty."""
+        try:
+            state = self._splitter_state_file.read_bytes()
+        except OSError as e:
+            logger.warning(f"can't read splitter state: {e}")
+            return None
+        return state or None
+
+    def write_splitter_state(self) -> typing.Self:
+        """Write splitter state bytes to disk, logging instead of raising on failure."""
+        try:
+            self._splitter_state_file.write_bytes(self.saveState())
+        except OSError as e:
+            logger.error(f"can't save splitter state: {e}")
+        return self
+
+    def restore_splitter_state(self) -> typing.Self:
+        """Restore the splitter position from the previous session, if saved."""
+        if state := self.read_splitter_state():
+            self.restoreState(state)
+        return self
 
 
 class PreferencesDialog(SaveAndRestoreGeomDialog):
@@ -61,16 +116,24 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         # https://doc.qt.io/qt-6/qdialogbuttonbox.html#clicked
         qconnect(self._button_box.clicked, self._on_button_clicked)
 
-        # Two-column layout: settings on the left, history on the right
-        self.setLayout(columns_layout := QGridLayout())
-        columns_layout.addWidget(self._tabs, 1, 1)
-        columns_layout.addWidget(self.history_list, 1, 2)
-        columns_layout.addWidget(self._button_box, 3, 1, 1, 2)  # row, col, rowspan, colspan
+        # Two panes separated by a draggable splitter: settings on the left, history on the right.
+        self._splitter = PreferencesDialogSplitter().create_layout(self._tabs, self.history_list)
+
+        # Main layout: splitter on top, dialog buttons below.
+        self.setLayout(main_layout := QVBoxLayout())
+        main_layout.addWidget(self._splitter)
+        main_layout.addWidget(self._button_box)
 
         self._add_tooltips()
+        self._splitter.restore_splitter_state()
 
     def _add_tooltips(self) -> None:
         self._tabs.add_tooltips()
+
+    def _save_geometry(self) -> None:
+        """Save the dialog geometry and the splitter position to disk."""
+        super()._save_geometry()
+        self._splitter.write_splitter_state()
 
     def _on_button_clicked(self, button: QAbstractButton) -> None:
         """Route button clicks to the appropriate action based on the button's role."""

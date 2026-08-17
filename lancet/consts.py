@@ -26,6 +26,10 @@ CACHE_DIR_PATH: P = pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.h
 HISTORY_FILE_PATH: P = CACHE_DIR_PATH / "ocr_history.json"
 GEOMETRY_FILE_PATH: P = CACHE_DIR_PATH / "geometry"
 
+# Default pane widths (px) for the preferences dialog splitter: settings on the left, OCR history on the right.
+PREFERENCES_SPLITTER_SETTINGS_WIDTH: typing.Final[int] = 400
+PREFERENCES_SPLITTER_HISTORY_WIDTH: typing.Final[int] = 300
+
 IS_MAC: B = sys.platform.startswith("darwin")
 IS_WIN: B = sys.platform.startswith("win32")
 
