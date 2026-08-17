@@ -53,7 +53,7 @@ class CopySettingsFromWidgetsToConfig:
         self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
         self._cfg.show_help_bar = self._widgets.show_help_bar.isChecked()
         self._cfg.recover_missed_text = self._widgets.recover_missed_text.isChecked()
-        self._cfg.text_detection_resolution = round_to_stride(self._widgets.text_detection_resolution.value())
+        self._cfg.text_detection_resolution = self._widgets.text_detection_resolution.rounded_value()
         return self
 
     def _copy_shortcuts_to_cfg(self) -> typing.Self:

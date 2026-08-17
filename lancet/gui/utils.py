@@ -3,6 +3,8 @@
 
 from PyQt6.QtWidgets import QSpinBox, QWidget
 
+from lancet.model_utils.common import round_to_stride
+
 
 def ui_translate(key: str) -> str:
     """Convert a snake_case config key to a human-readable label."""
@@ -65,3 +67,6 @@ class DetectorInputSizeSpinBox(SecondsSpinBox):
     def __init__(self, initial_value: int = 1024, parent: QWidget | None = None) -> None:
         super().__init__(initial_value, parent)
         self.setSingleStep(64)
+
+    def rounded_value(self) -> int:
+        return round_to_stride(self.value())
