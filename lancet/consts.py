@@ -19,7 +19,8 @@ OCR_ICON_PATH: P = ICONS_DIR / "ocr.png"
 EXIT_ICON_PATH: P = ICONS_DIR / "exit.png"
 RESTART_ICON_PATH: P = ICONS_DIR / "restart.png"
 PREFERENCES_ICON_PATH: P = ICONS_DIR / "preferences.png"
-CFG_DIR_PATH: P = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")) / APP_NAME.lower()
+XDG_CONFIG_HOME = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config"))
+CFG_DIR_PATH: P = XDG_CONFIG_HOME / APP_NAME.lower()
 CFG_PATH: P = CFG_DIR_PATH / f"{APP_NAME.lower()}.json"
 
 CACHE_DIR_PATH: P = pathlib.Path(os.environ.get("XDG_CACHE_HOME", pathlib.Path.home() / ".cache")) / APP_NAME.lower()
