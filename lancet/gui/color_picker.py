@@ -16,9 +16,12 @@ def color_to_hex_argb(color: QColor) -> str:
 
 
 class ColorEditPicker(QWidget):
+    """A line edit paired with a color-pick button that emits a color_changed signal."""
+
     color_changed = pyqtSignal(str)
 
-    def __init__(self, initial_color: str, parent=None) -> None:
+    def __init__(self, initial_color: str, parent: QWidget | None = None) -> None:
+        """Create the edit and pick button, wiring the color_changed signal."""
         super().__init__(parent)
         # Create members
         self._edit = ColorEdit()
@@ -37,6 +40,7 @@ class ColorEditPicker(QWidget):
         qconnect(self._edit.textChanged, lambda text: q_emit(self.color_changed, text))
 
     def choose_color(self) -> None:
+        """Open a color dialog and update the edit with the selected color."""
         color = QColorDialog.getColor(
             initial=QColor.fromString(self._edit.text() or DEFAULT_COLOR),
             parent=self,

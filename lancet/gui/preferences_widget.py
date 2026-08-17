@@ -26,12 +26,15 @@ def make_tab(widgets: dict[str, QWidget]) -> QWidget:
 
 
 class CopySettingsFromWidgetsToConfig:
+    """Copy current values from all form widgets back into the Config object."""
+
     def __init__(self, cfg: Config, widgets: FormWidgets) -> None:
+        """Store references to the config and the form widgets to read from."""
         self._cfg = cfg
         self._widgets = widgets
 
     def copy_settings_to_cfg(self) -> typing.Self:
-        """Copy all current widget values into the backing Config object."""
+        """Copy all current widget values into the backing Config object, grouped by category."""
         return (
             self._copy_main_settings_to_cfg()
             ._copy_shortcuts_to_cfg()
@@ -76,10 +79,14 @@ class CopySettingsFromWidgetsToConfig:
 
 
 class FormWidgetsToolTips:
+    """Set tooltips on all form widgets, grouped by category."""
+
     def __init__(self, widgets: FormWidgets) -> None:
+        """Store a reference to the form widgets to apply tooltips to."""
         self._widgets = widgets
 
     def add_tooltips(self) -> typing.Self:
+        """Set tooltips on all widgets, grouped by category."""
         return self._add_main_tooltips()._add_shortcut_tooltips()._add_paths_tooltips()._add_overlay_tooltips()
 
     def _add_main_tooltips(self) -> typing.Self:
@@ -125,7 +132,10 @@ class FormWidgetsToolTips:
 
 
 class FormWidgetValues:
+    """Populate form widgets with values from a Config object."""
+
     def __init__(self, cfg: Config, widgets: FormWidgets) -> None:
+        """Store references to the config and the form widgets to populate."""
         self._cfg = cfg
         self._widgets = widgets
 
