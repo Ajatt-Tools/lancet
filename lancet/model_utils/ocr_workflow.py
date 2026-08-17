@@ -16,13 +16,18 @@ from zala.utils import ensure_cursor_restored
 
 from lancet.config import Config, OcrDestination
 from lancet.exceptions import PixmapConversionError
-from lancet.find_executable import find_executable, run_and_disown
+from lancet.find_executable import resolve_executable_with_fallbacks, run_and_disown
 from lancet.model_utils.base import ModelName
 from lancet.model_utils.model_loader import BackgroundModelLoader
 from lancet.model_utils.ocr_service import OcrService
 from lancet.notifications import NotifySend
 from lancet.ocr.thread_op import LancetThreadOp
 from lancet.ocr_history import OcrHistory
+
+
+def resolve_goldendict_path(path_override: str) -> str:
+    """Return the GoldenDict executable to launch: the override if set, else auto-detect."""
+    return resolve_executable_with_fallbacks(path_override, ("goldendict",)) or path_override.strip() or "goldendict"
 
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image:
@@ -117,8 +122,9 @@ class OcrWorkflow:
         """Send the OCR result to the configured destination (clipboard or GoldenDict)."""
         match self._cfg.copy_to:
             case OcrDestination.goldendict:
+                goldendict_path = resolve_goldendict_path(self._cfg.path_to_goldendict_executable)
                 try:
-                    run_and_disown([find_executable("goldendict") or "goldendict", text])
+                    run_and_disown([goldendict_path, text])
                 except FileNotFoundError:
                     self._notify.notify(
                         "Executable not found: 'goldendict'. Ensure it is installed and added to $PATH."

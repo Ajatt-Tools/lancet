@@ -43,6 +43,14 @@ def find_executable(name: str) -> str | None:
     return shutil.which(name) or find_executable_hardcoded(name)
 
 
+def resolve_executable_with_fallbacks(configured: str, fallback_names: Sequence[str]) -> str:
+    """Resolve configured executable or the first available fallback; return an empty string on total failure."""
+    for name in (configured.strip(), *fallback_names):
+        if name and (resolved := find_executable(name)):
+            return resolved
+    return ""
+
+
 def is_running_frozen() -> bool:
     """
     Frozen usually means running a binary created by pyinstaller.
