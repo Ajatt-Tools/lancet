@@ -59,6 +59,9 @@ class Config:
     ocr_page_shortcut: str = "Shift+Alt+O"
     screenshot_shortcut: str = ""  # unset
 
+    # GoldenDict
+    path_to_goldendict_executable: str = ""  # empty = call "goldendict"
+
     # Screenshot overlay colors (stored as hex ARGB strings, e.g. "#FF0000FF")
     border_thickness: int = 2
     border_color: str = "#7F0000FF"

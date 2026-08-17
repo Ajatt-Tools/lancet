@@ -35,6 +35,7 @@ class CopySettingsFromWidgetsToConfig:
         return (
             self._copy_main_settings_to_cfg()
             ._copy_shortcuts_to_cfg()
+            ._copy_paths_to_cfg()
             ._copy_overlay_settings_to_cfg()
         )
 
@@ -59,6 +60,11 @@ class CopySettingsFromWidgetsToConfig:
         self._cfg.screenshot_shortcut = self._widgets.screenshot_shortcut.current_shortcut()
         return self
 
+    def _copy_paths_to_cfg(self) -> typing.Self:
+        """Copy path settings into the config."""
+        self._cfg.path_to_goldendict_executable = self._widgets.goldendict_executable.get_file_path()
+        return self
+
     def _copy_overlay_settings_to_cfg(self) -> typing.Self:
         """Copy screenshot overlay color and sizing settings into the config."""
         self._cfg.border_thickness = self._widgets.border_thickness.value()
@@ -74,7 +80,7 @@ class FormWidgetsToolTips:
         self._widgets = widgets
 
     def add_tooltips(self) -> typing.Self:
-        return self._add_main_tooltips()._add_shortcut_tooltips()._add_overlay_tooltips()
+        return self._add_main_tooltips()._add_shortcut_tooltips()._add_paths_tooltips()._add_overlay_tooltips()
 
     def _add_main_tooltips(self) -> typing.Self:
         """Set tooltips on general OCR, model, and history widgets."""
@@ -101,6 +107,13 @@ class FormWidgetsToolTips:
         self._widgets.screenshot_shortcut.setToolTip("Keyboard shortcut to take a screenshot.")
         return self
 
+    def _add_paths_tooltips(self) -> typing.Self:
+        """Set tooltips on Path widgets."""
+        self._widgets.goldendict_executable.set_tooltip(
+            "GoldenDict binary used for OCR lookup.\n" "Leave empty to call: goldendict."
+        )
+        return self
+
     def _add_overlay_tooltips(self) -> typing.Self:
         """Set tooltips on screenshot overlay widgets."""
         self._widgets.border_thickness.setToolTip("Thickness of the selection border in pixels.")
@@ -121,6 +134,7 @@ class FormWidgetValues:
         return (
             self._set_main_widget_values()
             ._set_shortcut_widget_values()
+            ._set_path_widget_values()
             ._set_overlay_widget_values()
         )
 
@@ -143,6 +157,11 @@ class FormWidgetValues:
         self._widgets.ocr_shortcut.set_keyboard_shortcut(self._cfg.ocr_shortcut)
         self._widgets.ocr_page_shortcut.set_keyboard_shortcut(self._cfg.ocr_page_shortcut)
         self._widgets.screenshot_shortcut.set_keyboard_shortcut(self._cfg.screenshot_shortcut)
+        return self
+
+    def _set_path_widget_values(self) -> typing.Self:
+        """Populate Path widgets from config values."""
+        self._widgets.goldendict_executable.set_file_path(self._cfg.path_to_goldendict_executable)
         return self
 
     def _set_overlay_widget_values(self) -> typing.Self:
@@ -178,6 +197,7 @@ class MainPreferencesWidget(QTabWidget):
             "recover_missed_text",
             "text_detection_resolution",
             "bind_port",
+            "goldendict_executable",
         }
 
         self.addTab(make_tab(filter_dict(d, d.keys() - advanced)), "Main")

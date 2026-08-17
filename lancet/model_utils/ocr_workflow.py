@@ -124,11 +124,14 @@ class OcrWorkflow:
             case OcrDestination.goldendict:
                 goldendict_path = resolve_goldendict_path(self._cfg.path_to_goldendict_executable)
                 try:
-                    run_and_disown([goldendict_path, text])
-                except FileNotFoundError:
-                    self._notify.notify(
-                        "Executable not found: 'goldendict'. Ensure it is installed and added to $PATH."
-                    )
+                    run_and_disown((goldendict_path, text))
+                except FileNotFoundError as ex:
+                    logger.warning(f"Failed to launch GoldenDict: {ex}")
+                    self._notify.notify(f"Executable not found: {goldendict_path!r}. Check Preferences or PATH.")
+                    return
+                except OSError as ex:
+                    logger.warning(f"Failed to launch GoldenDict: {ex}")
+                    self._notify.notify(f"Failed to launch GoldenDict: {ex}")
                     return
             case OcrDestination.clipboard:
                 clipboard = self._app.clipboard()

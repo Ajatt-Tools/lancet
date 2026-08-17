@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QCheckBox
 from lancet.config import Config
 from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
+from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.ocr_model_list import ModelListEditor
 from lancet.gui.utils import (
@@ -36,6 +37,9 @@ class FormWidgets(SimpleNamespace):
     ocr_page_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
 
+    # GoldenDict
+    goldendict_executable: LancetFilePicker
+
     # Screenshot overlay colors
     border_thickness: BorderThicknessSpinBox
     border_color: ColorEditPicker
@@ -60,6 +64,7 @@ class FormWidgetsBuilder:
         return (
             self.create_ocr_widgets()
             .create_shortcut_widgets()
+            .create_file_picker_widgets()
             .create_overlay_widgets()
             .get_form()
         )
@@ -101,6 +106,14 @@ class FormWidgetsBuilder:
         self._widgets.ocr_page_shortcut = ShortCutGrabButton(initial_value=self._cfg.ocr_page_shortcut)
         # Screenshot shortcut
         self._widgets.screenshot_shortcut = ShortCutGrabButton(initial_value=self._cfg.screenshot_shortcut)
+        return self
+
+    def create_file_picker_widgets(self) -> typing.Self:
+        """Create file picker widgets."""
+        self._widgets.goldendict_executable = LancetFilePicker()
+        self._widgets.goldendict_executable.set_file_path(self._cfg.path_to_goldendict_executable)
+        self._widgets.goldendict_executable.set_placeholder("goldendict")
+        self._widgets.goldendict_executable.set_dialog_title("Select GoldenDict executable")
         return self
 
     def create_overlay_widgets(self) -> typing.Self:
