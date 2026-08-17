@@ -154,8 +154,12 @@ class LancetSystemTray(QSystemTrayIcon):
         # Menu
         menu = QMenu(self._parent)
         self.setContextMenu(menu)
+        self._add_feature_menu_actions(menu)
+        menu.addSeparator()
+        self._add_system_menu_actions(menu)
 
-        # Menu Actions
+    def _add_feature_menu_actions(self, menu: QMenu) -> None:
+        """Add the screenshot, OCR actions to the menu."""
         menu.addAction(
             QIcon(str(SCREENSHOT_ICON_PATH)),
             format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
@@ -171,9 +175,9 @@ class LancetSystemTray(QSystemTrayIcon):
             format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
             self.detect_and_make_ocr_screenshot,
         )
-        menu.addSeparator()
 
-        # Add preferences, restart, about, and exit actions to the menu.
+    def _add_system_menu_actions(self, menu: QMenu) -> None:
+        """Add the preferences/restart/about/exit actions to the menu."""
         menu.addAction(QIcon(str(PREFERENCES_ICON_PATH)), "Preferences…", self.open_preferences)
         menu.addAction(QIcon(str(RESTART_ICON_PATH)), "Restart", self.restart)
         menu.addAction(QIcon(str(APP_LOGO_PATH)), "About…", self.open_about)
