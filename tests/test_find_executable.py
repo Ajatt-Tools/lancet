@@ -21,6 +21,12 @@ from lancet.find_executable import (
 )
 
 
+@pytest.fixture()
+def windows_pathsep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch os.pathsep to semicolon to simulate Windows PATH-style separators."""
+    monkeypatch.setattr("lancet.find_executable.os.pathsep", ";")
+
+
 class TestFilterPyinstallerPaths:
     """Test filtering of PyInstaller paths from LD_LIBRARY_PATH."""
 
@@ -49,9 +55,8 @@ class TestFilterPyinstallerPaths:
         """Test that PyInstaller paths are correctly filtered out."""
         assert filter_pyinstaller_paths(input_path) == expected
 
-    def test_filter_windows_paths(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_filter_windows_paths(self, windows_pathsep: None) -> None:
         """Windows PATH-style separators are handled when os.pathsep is semicolon."""
-        monkeypatch.setattr("lancet.find_executable.os.pathsep", ";")
         assert filter_pyinstaller_paths(r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx;C:\Qt\plugins") == [
             r"C:\Qt\plugins"
         ]
@@ -92,9 +97,8 @@ class TestCleanLdLibraryPath:
         result = clean_ld_library_path(input_env.copy())
         assert result == expected_env
 
-    def test_clean_windows_path_variable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_clean_windows_path_variable(self, windows_pathsep: None) -> None:
         """Windows PATH-style separators are preserved when cleaning PATH-like variables."""
-        monkeypatch.setattr("lancet.find_executable.os.pathsep", ";")
         result = clean_ld_library_path(
             {"QT_PLUGIN_PATH": r"C:\Temp\_MEIaaa;C:\Qt\plugins", "PATH": r"C:\Windows"},
             env_key="QT_PLUGIN_PATH",
