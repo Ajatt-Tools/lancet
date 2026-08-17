@@ -35,9 +35,11 @@ def find_executable_hardcoded(name: str) -> str | None:
 @functools.cache
 def find_executable(name: str) -> str | None:
     """
-    If possible, use the executable installed in the system.
-    Otherwise, try fallback paths.
+    Resolve name to an executable path: absolute/~ path, then PATH, then hardcoded dirs.
     """
+    path = pathlib.Path(name).expanduser()
+    if path.is_absolute() and is_executable_file(path):
+        return str(path.resolve())
     return shutil.which(name) or find_executable_hardcoded(name)
 
 
