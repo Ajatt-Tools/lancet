@@ -7,7 +7,15 @@ from PyQt6.QtWidgets import QFormLayout, QTabWidget, QWidget
 from lancet.config import Config
 from lancet.gui.form_widgets import FormWidgets, FormWidgetsBuilder
 from lancet.gui.utils import ui_translate
-from lancet.model_utils.common import round_to_stride
+from lancet.gui.widgets_to_config_dict import (
+    get_from_widget,
+    set_cfg_value,
+    set_from_cfg,
+)
+
+# Keys that cannot be handled by the generic loop because one widget maps to
+# multiple config fields, or the widget key does not match a config field.
+SPECIAL_KEYS: typing.Final[frozenset[str]] = frozenset({"huggingface_model"})
 
 
 def filter_dict[K, V](d: dict[K, V], keys: set[K]) -> dict[K, V]:
@@ -16,12 +24,23 @@ def filter_dict[K, V](d: dict[K, V], keys: set[K]) -> dict[K, V]:
     return {key: value for key, value in d.items() if key in keys}
 
 
+def label_replace(cfg_key: str) -> str:
+    """Map a config key to a prettier key used for generating UI labels."""
+    match cfg_key:
+        case "notification_duration_sec":
+            return "notification_duration"
+        case "path_to_goldendict_executable":
+            return "goldendict_executable"
+        case _:
+            return cfg_key
+
+
 def make_tab(widgets: dict[str, QWidget]) -> QWidget:
     """Build a QWidget tab containing translated form rows for the provided widgets."""
     tab = QWidget()
     tab.setLayout(layout := QFormLayout())
     for key, widget in widgets.items():
-        layout.addRow(ui_translate(key), widget)
+        layout.addRow(ui_translate(label_replace(key)), widget)
     return tab
 
 
@@ -34,47 +53,13 @@ class CopySettingsFromWidgetsToConfig:
         self._widgets = widgets
 
     def copy_settings_to_cfg(self) -> typing.Self:
-        """Copy all current widget values into the backing Config object, grouped by category."""
-        return (
-            self._copy_main_settings_to_cfg()
-            ._copy_shortcuts_to_cfg()
-            ._copy_paths_to_cfg()
-            ._copy_overlay_settings_to_cfg()
-        )
-
-    def _copy_main_settings_to_cfg(self) -> typing.Self:
-        """Copy general OCR and history settings into the config."""
-        self._cfg.copy_to = self._widgets.copy_to.currentData()
-        self._cfg.notification_duration_sec = self._widgets.notification_duration.value()
-        self._cfg.max_history_size = self._widgets.max_history_size.value()
-        self._cfg.bind_port = self._widgets.bind_port.value()
+        """Copy all current widget values into the backing Config object."""
+        widget_dict = self._widgets.__dict__
+        for key in frozenset(widget_dict).difference(SPECIAL_KEYS):
+            set_cfg_value(self._cfg, key, get_from_widget(widget_dict[key]))
+        # Special case: huggingface_model maps to two config fields.
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
-        self._cfg.force_cpu = self._widgets.force_cpu.isChecked()
-        self._cfg.show_help_bar = self._widgets.show_help_bar.isChecked()
-        self._cfg.recover_missed_text = self._widgets.recover_missed_text.isChecked()
-        self._cfg.text_detection_resolution = self._widgets.text_detection_resolution.rounded_value()
-        return self
-
-    def _copy_shortcuts_to_cfg(self) -> typing.Self:
-        """Copy keyboard shortcut settings into the config."""
-        self._cfg.ocr_shortcut = self._widgets.ocr_shortcut.current_shortcut()
-        self._cfg.ocr_page_shortcut = self._widgets.ocr_page_shortcut.current_shortcut()
-        self._cfg.screenshot_shortcut = self._widgets.screenshot_shortcut.current_shortcut()
-        return self
-
-    def _copy_paths_to_cfg(self) -> typing.Self:
-        """Copy path settings into the config."""
-        self._cfg.path_to_goldendict_executable = self._widgets.goldendict_executable.get_file_path()
-        return self
-
-    def _copy_overlay_settings_to_cfg(self) -> typing.Self:
-        """Copy screenshot overlay color and sizing settings into the config."""
-        self._cfg.border_thickness = self._widgets.border_thickness.value()
-        self._cfg.border_color = self._widgets.border_color.color_hex()
-        self._cfg.fill_color = self._widgets.fill_color.color_hex()
-        self._cfg.outline_color = self._widgets.outline_color.color_hex()
-        self._cfg.fill_brush_color = self._widgets.fill_brush_color.color_hex()
         return self
 
 
@@ -92,7 +77,7 @@ class FormWidgetsToolTips:
     def _add_main_tooltips(self) -> typing.Self:
         """Set tooltips on general OCR, model, and history widgets."""
         self._widgets.copy_to.setToolTip("Destination for recognized text.")
-        self._widgets.notification_duration.setToolTip("Duration in seconds to show notifications.")
+        self._widgets.notification_duration_sec.setToolTip("Duration in seconds to show notifications.")
         self._widgets.huggingface_model.setToolTip("Huggingface model to use for OCR.")
         self._widgets.force_cpu.setToolTip("Recognize text on images using CPU instead of CUDA.")
         self._widgets.show_help_bar.setToolTip("Show the help bar in the main window.")
@@ -116,7 +101,7 @@ class FormWidgetsToolTips:
 
     def _add_paths_tooltips(self) -> typing.Self:
         """Set tooltips on Path widgets."""
-        self._widgets.goldendict_executable.set_tooltip(
+        self._widgets.path_to_goldendict_executable.set_tooltip(
             "GoldenDict binary used for OCR lookup.\n" "Leave empty to call: goldendict."
         )
         return self
@@ -141,46 +126,12 @@ class FormWidgetValues:
 
     def set_widget_values(self) -> typing.Self:
         """Populate all widgets with values from the config object."""
-        return (
-            self._set_main_widget_values()
-            ._set_shortcut_widget_values()
-            ._set_path_widget_values()
-            ._set_overlay_widget_values()
-        )
-
-    def _set_main_widget_values(self) -> typing.Self:
-        """Populate general OCR and history widgets from config values."""
-        self._widgets.copy_to.set_current(self._cfg.copy_to)
-        self._widgets.notification_duration.setValue(self._cfg.notification_duration_sec)
-        self._widgets.max_history_size.setValue(self._cfg.max_history_size)
-        self._widgets.bind_port.setValue(self._cfg.bind_port)
-        self._widgets.huggingface_model.set_current(self._cfg.huggingface_model_name)
+        widget_dict = self._widgets.__dict__
+        for key in frozenset(widget_dict).difference(SPECIAL_KEYS):
+            set_from_cfg(widget_dict[key], getattr(self._cfg, key))
+        # Special case: huggingface_model maps to two config fields.
         self._widgets.huggingface_model.set_items(self._cfg.huggingface_models)
-        self._widgets.force_cpu.setChecked(self._cfg.force_cpu)
-        self._widgets.recover_missed_text.setChecked(self._cfg.recover_missed_text)
-        self._widgets.text_detection_resolution.setValue(self._cfg.text_detection_resolution)
-        self._widgets.show_help_bar.setChecked(self._cfg.show_help_bar)
-        return self
-
-    def _set_shortcut_widget_values(self) -> typing.Self:
-        """Populate keyboard shortcut widgets from config values."""
-        self._widgets.ocr_shortcut.set_keyboard_shortcut(self._cfg.ocr_shortcut)
-        self._widgets.ocr_page_shortcut.set_keyboard_shortcut(self._cfg.ocr_page_shortcut)
-        self._widgets.screenshot_shortcut.set_keyboard_shortcut(self._cfg.screenshot_shortcut)
-        return self
-
-    def _set_path_widget_values(self) -> typing.Self:
-        """Populate Path widgets from config values."""
-        self._widgets.goldendict_executable.set_file_path(self._cfg.path_to_goldendict_executable)
-        return self
-
-    def _set_overlay_widget_values(self) -> typing.Self:
-        """Populate screenshot overlay widgets from config values."""
-        self._widgets.border_thickness.setValue(self._cfg.border_thickness)
-        self._widgets.border_color.set_color(self._cfg.border_color)
-        self._widgets.fill_color.set_color(self._cfg.fill_color)
-        self._widgets.outline_color.set_color(self._cfg.outline_color)
-        self._widgets.fill_brush_color.set_color(self._cfg.fill_brush_color)
+        self._widgets.huggingface_model.set_current(self._cfg.huggingface_model_name)
         return self
 
 
@@ -207,7 +158,7 @@ class MainPreferencesWidget(QTabWidget):
             "recover_missed_text",
             "text_detection_resolution",
             "bind_port",
-            "goldendict_executable",
+            "path_to_goldendict_executable",
         }
 
         self.addTab(make_tab(filter_dict(d, d.keys() - advanced)), "Main")

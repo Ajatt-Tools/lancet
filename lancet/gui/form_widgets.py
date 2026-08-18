@@ -24,7 +24,7 @@ class FormWidgets(SimpleNamespace):
     """Container holding all form widgets used in the preferences dialog."""
 
     copy_to: EnumSelectCombo
-    notification_duration: SecondsSpinBox
+    notification_duration_sec: SecondsSpinBox
     huggingface_model: ModelListEditor
     force_cpu: QCheckBox
     recover_missed_text: QCheckBox
@@ -38,7 +38,7 @@ class FormWidgets(SimpleNamespace):
     screenshot_shortcut: ShortCutGrabButton
 
     # GoldenDict
-    goldendict_executable: LancetFilePicker
+    path_to_goldendict_executable: LancetFilePicker
 
     # Screenshot overlay colors
     border_thickness: BorderThicknessSpinBox
@@ -78,7 +78,7 @@ class FormWidgetsBuilder:
         # OCR destination
         self._widgets.copy_to = EnumSelectCombo(initial_value=self._cfg.copy_to)
         # Notification duration
-        self._widgets.notification_duration = SecondsSpinBox(initial_value=self._cfg.notification_duration_sec)
+        self._widgets.notification_duration_sec = SecondsSpinBox(initial_value=self._cfg.notification_duration_sec)
         # huggingface model name and items
         self._widgets.huggingface_model = ModelListEditor()
         self._widgets.huggingface_model.set_items(self._cfg.huggingface_models)
@@ -110,10 +110,10 @@ class FormWidgetsBuilder:
 
     def create_file_picker_widgets(self) -> typing.Self:
         """Create file picker widgets."""
-        self._widgets.goldendict_executable = LancetFilePicker()
-        self._widgets.goldendict_executable.set_file_path(self._cfg.path_to_goldendict_executable)
-        self._widgets.goldendict_executable.set_placeholder("goldendict")
-        self._widgets.goldendict_executable.set_dialog_title("Select GoldenDict executable")
+        self._widgets.path_to_goldendict_executable = LancetFilePicker()
+        self._widgets.path_to_goldendict_executable.set_file_path(self._cfg.path_to_goldendict_executable)
+        self._widgets.path_to_goldendict_executable.set_placeholder("goldendict")
+        self._widgets.path_to_goldendict_executable.set_dialog_title("Select GoldenDict executable")
         return self
 
     def create_overlay_widgets(self) -> typing.Self:
