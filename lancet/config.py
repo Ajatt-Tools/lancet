@@ -26,12 +26,16 @@ class OcrDestination(enum.Enum):
 
 def normalize_copy_to(data: dict[str, typing.Any]) -> None:
     """Convert copy_to from a serialized enum name, or drop invalid values to use the default."""
-    if "copy_to" not in data:
+    try:
+        copy_to = data["copy_to"]
+    except KeyError:
         return
     try:
-        data["copy_to"] = OcrDestination[data["copy_to"]]
-    except KeyError:
-        logger.warning(f"Cannot handle copy_to={data['copy_to']!r} in config. Falling back to default.")
+        data["copy_to"] = OcrDestination[copy_to]
+    except (KeyError, TypeError):
+        # "invalid", 42 or None → KeyError
+        # [] or {} → TypeError
+        logger.warning(f"Cannot handle copy_to={copy_to!r} in config. Falling back to default.")
         data.pop("copy_to", None)
 
 
