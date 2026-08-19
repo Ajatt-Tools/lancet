@@ -43,9 +43,10 @@ def find_executable(name: str) -> str | None:
     return shutil.which(name) or find_executable_hardcoded(name)
 
 
-def resolve_executable_with_fallbacks(configured: str, fallback_names: Sequence[str]) -> str:
-    """Resolve configured executable or the first available fallback; return an empty string on total failure."""
-    for name in (configured.strip(), *fallback_names):
+def resolve_executable_with_fallbacks(*fallback_names: str) -> str:
+    """Return the first resolvable executable name, or an empty string."""
+    for executable_name in fallback_names:
+        name = executable_name.strip()
         if name and (resolved := find_executable(name)):
             return resolved
     return ""

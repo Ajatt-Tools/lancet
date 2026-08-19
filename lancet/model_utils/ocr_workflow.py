@@ -27,7 +27,9 @@ from lancet.ocr_history import OcrHistory
 
 def resolve_goldendict_path(path_override: str) -> str:
     """Return the GoldenDict executable to launch: the override if set, else auto-detect."""
-    return resolve_executable_with_fallbacks(path_override, ("goldendict",)) or path_override.strip() or "goldendict"
+    if configured_path := path_override.strip():
+        return resolve_executable_with_fallbacks(configured_path) or configured_path
+    return resolve_executable_with_fallbacks("goldendict") or "goldendict"
 
 
 def pixmap_to_pillow_image(pixmap: QPixmap) -> Image.Image:
