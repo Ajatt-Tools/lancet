@@ -81,7 +81,7 @@ class Config:
         """Read the config from the JSON file, returning defaults if the file does not exist."""
         try:
             with open(CFG_PATH, encoding="utf-8") as f:
-                data: dict[str, typing.Any] = json.load(f)
+                data: object = json.load(f)
         except FileNotFoundError:
             logger.info("config file does not exist, falling back to default.")
             return cls()  # Missing config file is not an error.
@@ -90,6 +90,8 @@ class Config:
         except OSError as ex:
             # Permission denied, is a directory, I/O error, etc. Treat as a recoverable read failure.
             raise ConfigReadError(f"failed to open config file: {ex}") from ex
+        if not isinstance(data, dict):
+            raise ConfigReadError("failed to parse config file: top-level JSON value must be an object")
         normalize_copy_to(data)
         try:
             return cls(**data)
