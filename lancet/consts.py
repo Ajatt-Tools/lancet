@@ -42,6 +42,7 @@ OCR_JOIN_STR: S = " "
 
 
 def self_check() -> None:
+    """Raise FileNotFoundError when a packaged application resource is missing."""
     for file in (
         DESKTOP_FILE,
         APP_LOGO_PATH,

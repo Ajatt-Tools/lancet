@@ -50,7 +50,7 @@ class BorderThicknessSpinBox(SecondsSpinBox):
 
 
 class BindPortSpinBox(SecondsSpinBox):
-    """A spin box for selecting the screenshot overlay border thickness in pixels."""
+    """A spin box for selecting the single-instance server bind port."""
 
     _min: int = 1025
     _max: int = 32767
@@ -65,8 +65,10 @@ class DetectorInputSizeSpinBox(SecondsSpinBox):
     _suffix: str = "px"
 
     def __init__(self, initial_value: int = 1024, parent: QWidget | None = None) -> None:
+        """Initialize the detector input size spin box with 64-pixel increments."""
         super().__init__(initial_value, parent)
         self.setSingleStep(64)
 
     def rounded_value(self) -> int:
+        """Return the current value rounded to the detector's required stride."""
         return round_to_stride(self.value())
