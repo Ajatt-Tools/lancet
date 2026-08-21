@@ -41,6 +41,7 @@ class LancetIpcClient:
     """HTTP client for sending commands to the running Lancet daemon."""
 
     def __init__(self, cfg: Config) -> None:
+        """Initialize the client with the daemon connection configuration."""
         self._cfg = cfg
 
     def send_ipc_request(self, request: IpcRequest) -> IpcResponse:
