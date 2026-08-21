@@ -5,12 +5,12 @@ import pathlib
 from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QWidget
 from zala.utils import qconnect
 
-from lancet.find_executable import HARDCODED_PATHS
+from lancet.find_executable import default_hardcoded_paths
 
 
 def best_bin_directory() -> str:
     """Return the first existing hardcoded bin directory, or the user's home directory as a fallback."""
-    for bin_path in HARDCODED_PATHS:
+    for bin_path in default_hardcoded_paths():
         if bin_path.is_dir():
             return str(bin_path.resolve())
     return str(pathlib.Path.home())

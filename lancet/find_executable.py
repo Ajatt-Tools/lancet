@@ -10,13 +10,17 @@ from collections.abc import Sequence
 
 from lancet.consts import IS_WIN
 
-HARDCODED_PATHS: Sequence[pathlib.Path] = (
-    pathlib.Path("/usr/bin"),
-    pathlib.Path("/opt/homebrew/bin"),
-    pathlib.Path("/usr/local/bin"),
-    pathlib.Path("/bin"),
-    (pathlib.Path.home() / ".local" / "bin"),
-)
+
+@functools.cache
+def default_hardcoded_paths() -> Sequence[pathlib.Path]:
+    """Return common executable directories."""
+    return (
+        pathlib.Path("/usr/bin"),
+        pathlib.Path("/opt/homebrew/bin"),
+        pathlib.Path("/usr/local/bin"),
+        pathlib.Path("/bin"),
+        pathlib.Path.home() / ".local" / "bin",
+    )
 
 
 def windows_executable_suffixes() -> Sequence[str]:
@@ -37,7 +41,7 @@ def is_executable_file(path: pathlib.Path) -> bool:
 
 def find_executable_hardcoded(name: str) -> str | None:
     """Search for an executable by name in a list of common installation directories."""
-    for path_to_dir in HARDCODED_PATHS:
+    for path_to_dir in default_hardcoded_paths():
         if is_executable_file(path_to_exe := path_to_dir.joinpath(name)):
             return str(path_to_exe.resolve())
     return None
