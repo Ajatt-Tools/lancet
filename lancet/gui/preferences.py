@@ -75,7 +75,7 @@ class PreferencesDialogSplitter(QSplitter):
     def write_splitter_state(self) -> typing.Self:
         """Write splitter state bytes to disk, logging instead of raising on failure."""
         try:
-            self._splitter_state_file.write_bytes(self.saveState())
+            self._splitter_state_file.write_bytes(self.saveState().data())
         except OSError as e:
             logger.error(f"can't save splitter state: {e}")
         return self
