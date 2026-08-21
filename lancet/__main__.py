@@ -30,9 +30,10 @@ from lancet.system_tray import LancetSystemTray
 class CLI:
     """Send a command to the running Lancet daemon and print the response."""
 
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, cfg: Config, client: LancetIpcClient | None = None) -> None:
+        """Initialize the CLI with cfg and an optional IPC client for dependency injection."""
         self._cfg = cfg
-        self._client = LancetIpcClient(cfg)
+        self._client = client or LancetIpcClient(cfg)
 
     def screenshot(self) -> None:
         """Tell the running Lancet to open the screenshot area selector."""
