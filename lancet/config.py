@@ -5,6 +5,7 @@ import enum
 import json
 import typing
 
+from beartype.roar import BeartypeCallHintParamViolation
 from loguru import logger
 
 from lancet.actions import LancetAction
@@ -95,7 +96,7 @@ class Config:
         normalize_copy_to(data)
         try:
             return cls(**data)
-        except TypeError as ex:
+        except (TypeError, BeartypeCallHintParamViolation) as ex:
             raise ConfigReadError(f"failed to parse config file: {ex}") from ex
 
     @staticmethod
