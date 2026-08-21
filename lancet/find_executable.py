@@ -23,7 +23,7 @@ def windows_executable_suffixes() -> Sequence[str]:
     if IS_WIN:
         path_extensions = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
         return tuple(suffix.lower() for suffix in path_extensions if suffix)
-    return ()
+    raise RuntimeError("not running Windows")
 
 
 def is_executable_file(path: pathlib.Path) -> bool:
