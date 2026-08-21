@@ -19,9 +19,20 @@ HARDCODED_PATHS: Sequence[pathlib.Path] = (
 )
 
 
+def windows_executable_suffixes() -> Sequence[str]:
+    if IS_WIN:
+        path_extensions = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
+        return tuple(suffix.lower() for suffix in path_extensions if suffix)
+    return ()
+
+
 def is_executable_file(path: pathlib.Path) -> bool:
     """Return True if path points to an executable file."""
-    return path.is_file() and os.access(path, os.X_OK)
+    if not path.is_file():
+        return False
+    if IS_WIN:
+        return path.suffix.lower() in windows_executable_suffixes()
+    return os.access(path, os.X_OK)
 
 
 def find_executable_hardcoded(name: str) -> str | None:
