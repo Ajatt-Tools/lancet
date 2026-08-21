@@ -5,9 +5,9 @@ import pathlib
 import sys
 import typing
 
-P = typing.Final[pathlib.Path]
-S = typing.Final[str]
-B = typing.Final[bool]
+type P = pathlib.Path
+type S = str
+type B = bool
 
 APP_NAME: S = "Lancet"
 THIS_DIR: P = pathlib.Path(__file__).resolve().parent
