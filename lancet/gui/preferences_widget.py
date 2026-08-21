@@ -16,6 +16,15 @@ from lancet.gui.widgets_to_config_dict import (
 # Keys that cannot be handled by the generic loop because one widget maps to
 # multiple config fields, or the widget key does not match a config field.
 SPECIAL_KEYS: typing.Final[frozenset[str]] = frozenset({"huggingface_model"})
+ADVANCED_KEYS: typing.Final[frozenset[str]] = frozenset(
+    {
+        "huggingface_model",
+        "recover_missed_text",
+        "text_detection_resolution",
+        "bind_port",
+        "path_to_goldendict_executable",
+    }
+)
 
 
 def filter_dict[K, V](d: dict[K, V], keys: set[K]) -> dict[K, V]:
@@ -153,16 +162,8 @@ class MainPreferencesWidget(QTabWidget):
     def _setup_tabs(self) -> None:
         """Build a form layout with labeled rows for each settings widget."""
         d = self._widgets.__dict__
-        advanced = {
-            "huggingface_model",
-            "recover_missed_text",
-            "text_detection_resolution",
-            "bind_port",
-            "path_to_goldendict_executable",
-        }
-
-        self.addTab(make_tab(filter_dict(d, d.keys() - advanced)), "Main")
-        self.addTab(make_tab(filter_dict(d, advanced)), "Advanced")
+        self.addTab(make_tab(filter_dict(d, d.keys() - ADVANCED_KEYS)), "Main")
+        self.addTab(make_tab(filter_dict(d, ADVANCED_KEYS)), "Advanced")
 
     def copy_settings_to_cfg(self) -> None:
         """Copy all current widget values into the backing Config object."""
