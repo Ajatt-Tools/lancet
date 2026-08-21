@@ -128,6 +128,7 @@ class PreferencesDialog(SaveAndRestoreGeomDialog):
         self._splitter.restore_splitter_state()
 
     def _add_tooltips(self) -> None:
+        """Add explanatory tooltips to all preference widgets."""
         self._tabs.add_tooltips()
 
     def _save_geometry(self) -> None:
