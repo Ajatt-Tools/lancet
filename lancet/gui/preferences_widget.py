@@ -1,6 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import typing
+from collections.abc import Iterable, Set
 
 from PyQt6.QtWidgets import QFormLayout, QTabWidget, QWidget
 
@@ -27,7 +28,7 @@ ADVANCED_KEYS: typing.Final[frozenset[str]] = frozenset(
 )
 
 
-def filter_dict[K, V](d: dict[K, V], keys: set[K]) -> dict[K, V]:
+def filter_dict[K, V](d: dict[K, V], keys: Set[K]) -> dict[K, V]:
     """Return a new dict containing only keys from the requested set, preserving original order."""
     # Preserve order of keys.
     return {key: value for key, value in d.items() if key in keys}
