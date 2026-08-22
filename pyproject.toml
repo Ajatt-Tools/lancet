@@ -133,13 +133,13 @@ dependencies = ["black", "flake8", "isort", "pyupgrade"]
 
 [tool.hatch.envs.hatch-static-analysis.scripts]
 format-check = [
-    "black --check --diff {args:.}",
-    "isort --check-only --diff {args:.}",
+    "black --check --diff lancet tests",
+    "isort --check-only --diff lancet tests",
 ]
 format-fix = [
-    "$(git rev-parse --show-toplevel)/scripts/format.sh", # run as: hatch fmt -f
+    "bash \"$(git rev-parse --show-toplevel)/scripts/format.sh\"", # run as: hatch fmt -f
 ]
-lint-check = "flake8 --max-line-length 120 {args:.}"
+lint-check = "flake8 --max-line-length 120 --extend-ignore E203 lancet tests"
 lint-fix = "lint-check"
 
 [tool.pytest.ini_options]
