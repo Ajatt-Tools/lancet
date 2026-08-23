@@ -11,8 +11,12 @@ cd -- "$ROOT" || exit 1
 readarray -t FILES <<<"$(find "$ROOT/tests" "$ROOT/lancet" -type f -iname '*.py')"
 readonly -a FILES
 
+is_installed() {
+	[[ -x $(command -v "$1") ]]
+}
+
 for prog in pyupgrade isort black; do
-	if ! [[ -x $(command -v "$prog") ]]; then
+	if ! is_installed "$prog"; then
 		echo "command not found: $prog"
 		exit 1
 	fi
