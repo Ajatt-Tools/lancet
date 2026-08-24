@@ -40,7 +40,7 @@ def adjust_slow_tokenizer_error_message(ex: Exception, model_name: pathlib.Path 
 
 
 def adjust_error_message(ex: OSError, model_name: pathlib.Path | str) -> OSError:
-    """Return a copy of ex with a more helpful message when the error is a known OSError from HuggingFace transformers."""
+    """Return a copy of ex with a helpful message for known HuggingFace transformers errors."""
     error_msg = str(ex).lower()
     # The "Unable to load vocabulary" error often means PyInstaller didn't bundle
     # fugashi/unidic_lite data files, not that the vocabulary file is corrupted.

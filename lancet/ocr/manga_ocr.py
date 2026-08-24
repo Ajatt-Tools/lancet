@@ -197,7 +197,7 @@ def post_process(text: str) -> str:
 
 def main() -> None:
     """Create a MangaOcr instance for testing purposes."""
-    mocr = MangaOcr()
+    _ = MangaOcr()
 
 
 if __name__ == "__main__":

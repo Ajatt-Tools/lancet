@@ -287,4 +287,5 @@ class LancetSystemTray(QSystemTrayIcon):
             self._notify.notify(f"Failed to save selection to {output_path}")
 
     def notify_user(self, msg: str) -> None:
+        """Show a desktop notification containing msg."""
         self._notify.notify(msg)

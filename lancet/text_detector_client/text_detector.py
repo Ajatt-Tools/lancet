@@ -96,7 +96,7 @@ class ComicTextDetector(ComicTextDetectorBase):
         except Exception as ex:
             raise ComicTextDetectorException(f"{class_name(ex)}: {ex}") from ex
         logger.info(f"TextDetector uses {self._detector.device.upper()}")
-        logger.info(f"TextDetector ready")
+        logger.info("TextDetector ready")
 
     @property
     def force_cpu(self) -> bool:

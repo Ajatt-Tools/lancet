@@ -132,7 +132,8 @@ class BackgroundModelLoader:
         )
         if reload_needed:
             logger.info(
-                f"OCR config changed, reloading model: {self._cfg.huggingface_model_name}, force_cpu={self._cfg.force_cpu}"
+                f"OCR config changed, reloading model: {self._cfg.huggingface_model_name}, "
+                f"force_cpu={self._cfg.force_cpu}"
             )
             self.reload_model_by_name(ModelName.manga_ocr)
 
