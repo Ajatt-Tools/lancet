@@ -34,6 +34,12 @@ def filter_dict[K, V](d: dict[K, V], keys: Set[K]) -> dict[K, V]:
     return {key: value for key, value in d.items() if key in keys}
 
 
+def iter_widgets(widgets: FormWidgets) -> Iterable[tuple[str, QWidget]]:
+    """Return widget keys that directly map to one Config field each."""
+    for key in frozenset(widgets.__dict__).difference(SPECIAL_KEYS):
+        yield key, widgets.__dict__[key]
+
+
 def label_replace(cfg_key: str) -> str:
     """Map a config key to a prettier key used for generating UI labels."""
     match cfg_key:
@@ -64,9 +70,8 @@ class CopySettingsFromWidgetsToConfig:
 
     def copy_settings_to_cfg(self) -> typing.Self:
         """Copy all current widget values into the backing Config object."""
-        widget_dict = self._widgets.__dict__
-        for key in frozenset(widget_dict).difference(SPECIAL_KEYS):
-            set_cfg_value(self._cfg, key, get_from_widget(widget_dict[key]))
+        for cfg_key, widget in iter_widgets(self._widgets):
+            set_cfg_value(self._cfg, cfg_key, get_from_widget(widget))
         # Special case: huggingface_model maps to two config fields.
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
@@ -136,9 +141,8 @@ class FormWidgetValues:
 
     def set_widget_values(self) -> typing.Self:
         """Populate all widgets with values from the config object."""
-        widget_dict = self._widgets.__dict__
-        for key in frozenset(widget_dict).difference(SPECIAL_KEYS):
-            set_from_cfg(widget_dict[key], getattr(self._cfg, key))
+        for cfg_key, widget in iter_widgets(self._widgets):
+            set_from_cfg(widget, getattr(self._cfg, cfg_key))
         # Special case: huggingface_model maps to two config fields.
         self._widgets.huggingface_model.set_items(self._cfg.huggingface_models)
         self._widgets.huggingface_model.set_current(self._cfg.huggingface_model_name)
