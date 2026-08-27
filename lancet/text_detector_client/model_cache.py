@@ -7,7 +7,6 @@ import zipfile
 
 import requests
 from loguru import logger
-from requests import HTTPError
 
 from lancet.consts import CACHE_DIR_PATH
 from lancet.exceptions import LancetHTTPError
@@ -17,11 +16,19 @@ DOWNLOAD_URL = "https://github.com/zyddnys/manga-image-translator/releases/downl
 
 DOWNLOAD_CHUNK_SIZE: int = 1024
 DOWNLOAD_TIMEOUT_SEC: int = 60
+EXPECTED_CHECKPOINT_SIZE_BYTES: int = 79_948_869
 
 
 def is_valid_checkpoint(file_path: pathlib.Path) -> bool:
-    """Return True if the checkpoint file exists and is a valid zip archive (torch checkpoints are zips)."""
-    return file_path.is_file() and zipfile.is_zipfile(file_path)
+    """Return True if the checkpoint is a regular ZIP file with the pinned asset size."""
+    try:
+        return (
+            file_path.is_file()
+            and file_path.stat().st_size == EXPECTED_CHECKPOINT_SIZE_BYTES
+            and zipfile.is_zipfile(file_path)
+        )
+    except OSError:
+        return False
 
 
 def content_length(response: requests.Response) -> int:
@@ -33,10 +40,29 @@ def content_length(response: requests.Response) -> int:
 
 
 def raise_if_incomplete(partial_path: pathlib.Path, expected_size: int) -> None:
-    """Raise LancetHTTPError if the downloaded partial file's size differs from the expected size."""
+    """Raise LancetHTTPError when a partial file differs from HTTP or pinned checkpoint sizes."""
     actual_size = partial_path.stat().st_size
     if expected_size and actual_size != expected_size:
         raise LancetHTTPError(f"Incomplete download: got {actual_size} of {expected_size} bytes")
+    if actual_size != EXPECTED_CHECKPOINT_SIZE_BYTES:
+        raise LancetHTTPError(
+            f"Unexpected checkpoint size: got {actual_size} of {EXPECTED_CHECKPOINT_SIZE_BYTES} bytes"
+        )
+
+
+def download_comic_text_detector_pt(destination_path: pathlib.Path) -> None:
+    """Stream the model to partial_path, verifying its HTTP and pinned release sizes."""
+    logger.info(f"Downloading {DOWNLOAD_URL}")
+    try:
+        with requests.get(DOWNLOAD_URL, stream=True, verify=True, timeout=DOWNLOAD_TIMEOUT_SEC) as r:
+            r.raise_for_status()
+            with destination_path.open("wb") as f:
+                for chunk in r.iter_content(DOWNLOAD_CHUNK_SIZE):
+                    if chunk:
+                        f.write(chunk)
+            raise_if_incomplete(destination_path, content_length(r))
+    except requests.RequestException as ex:
+        raise LancetHTTPError(f"Failed to download {DOWNLOAD_URL}: {ex}") from ex
 
 
 class ComicTextDetectorCache:
@@ -62,7 +88,7 @@ class ComicTextDetectorCache:
         # Clean up a stale partial from a prior crash before starting a new download.
         partial_path.unlink(missing_ok=True)
         try:
-            self._download_to(partial_path)
+            download_comic_text_detector_pt(partial_path)
             if not is_valid_checkpoint(partial_path):
                 raise LancetHTTPError(f"Downloaded file is not a valid checkpoint: {DOWNLOAD_URL}")
             os.replace(partial_path, self._file_path)
@@ -70,22 +96,9 @@ class ComicTextDetectorCache:
             partial_path.unlink(missing_ok=True)
         logger.info(f"Downloaded {DOWNLOAD_URL}")
 
-    def _download_to(self, partial_path: pathlib.Path) -> None:
-        """Stream the model to partial_path, verifying the size against Content-Length."""
-        logger.info(f"Downloading {DOWNLOAD_URL}")
-        with requests.get(DOWNLOAD_URL, stream=True, verify=True, timeout=DOWNLOAD_TIMEOUT_SEC) as r:
-            try:
-                r.raise_for_status()
-            except HTTPError as ex:
-                raise LancetHTTPError(f"Failed to download {DOWNLOAD_URL}: {ex}") from ex
-            with partial_path.open("wb") as f:
-                for chunk in r.iter_content(DOWNLOAD_CHUNK_SIZE):
-                    if chunk:
-                        f.write(chunk)
-            raise_if_incomplete(partial_path, content_length(r))
-
 
 def main() -> None:
+    """Download the text detector checkpoint if needed and print its cached path."""
     cache = ComicTextDetectorCache()
     print(f"path: {cache.comic_text_detector_path()}")
 
