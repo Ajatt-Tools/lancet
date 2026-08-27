@@ -39,11 +39,20 @@ def is_executable_file(path: pathlib.Path) -> bool:
     return os.access(path, os.X_OK)
 
 
+def executable_file_candidates(path_to_dir: pathlib.Path, name: str) -> Sequence[pathlib.Path]:
+    """Return possible executable paths for name inside path_to_dir on the current platform."""
+    path = path_to_dir / name
+    if not IS_WIN or path.suffix:
+        return (path,)
+    return tuple(path.with_suffix(suffix) for suffix in windows_executable_suffixes())
+
+
 def find_executable_hardcoded(name: str) -> str | None:
     """Search for an executable by name in a list of common installation directories."""
     for path_to_dir in default_hardcoded_paths():
-        if is_executable_file(path_to_exe := path_to_dir.joinpath(name)):
-            return str(path_to_exe.resolve())
+        for path_to_exe in executable_file_candidates(path_to_dir, name):
+            if is_executable_file(path_to_exe):
+                return str(path_to_exe.resolve())
     return None
 
 
