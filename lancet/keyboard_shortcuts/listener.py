@@ -1,46 +1,21 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import functools
-import typing
 from collections.abc import Callable, Sequence
 
 from loguru import logger
-from pynput.keyboard import Key
 from PyQt6.QtCore import QObject, pyqtSignal
 from zala.utils import q_emit
 
 from lancet.actions import LancetAction
 from lancet.exceptions import KeyboardShortcutParseError
+from lancet.keyboard_shortcuts.consts import PYNPUT_KEY_NAMES, KEY_ALIASES, PYNPUT_MODIFIER_NAMES
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import (
     PyShortcutStr,
     QtShortcutStr,
     ShortcutConversionResult,
     ShortcutParseFailure,
-)
-
-# Canonical pynput special-key names, derived from the pynput.keyboard.Key enum.
-# This ensures we stay in sync with whatever pynput version is installed.
-PYNPUT_KEY_NAMES: typing.Final[frozenset[str]] = frozenset(key.name for key in Key)
-
-# Aliases: maps user/Qt spellings to canonical pynput names.
-# Includes modifier mappings (Qt's "Meta" is Win/Super/Cmd, pynput calls all of them "cmd")
-# and common abbreviations that Qt and users produce (e.g. "Del" instead of "Delete").
-KEY_ALIASES: typing.Final[dict[str, str]] = {
-    "control": "ctrl",
-    "meta": "cmd",
-    "super": "cmd",
-    "win": "cmd",
-    "del": "delete",
-    "escape": "esc",
-    "return": "enter",
-    "pgup": "page_up",
-    "pgdown": "page_down",
-}
-
-# All pynput modifier names (canonical). Used to detect trigger keys.
-PYNPUT_MODIFIERS: typing.Final[frozenset[str]] = frozenset(
-    key.name for key in Key if key.name.startswith(("ctrl", "alt", "shift", "cmd"))
 )
 
 
@@ -70,7 +45,7 @@ def to_pynput_hotkey(shortcut: QtShortcutStr) -> PyShortcutStr:
     if not converted:
         raise KeyboardShortcutParseError(f"empty shortcut: {shortcut!r}")
     # A token is a trigger key if its pynput name is not a modifier.
-    has_trigger = any(tok.strip("<>") not in PYNPUT_MODIFIERS for tok in converted)
+    has_trigger = any(tok.strip("<>") not in PYNPUT_MODIFIER_NAMES for tok in converted)
     if not has_trigger:
         raise KeyboardShortcutParseError(f"shortcut has no trigger key: {shortcut!r}")
     return PyShortcutStr("+".join(converted))
