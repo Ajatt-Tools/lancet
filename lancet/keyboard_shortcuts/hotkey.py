@@ -1,7 +1,7 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-from collections.abc import Callable, Collection, Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence, Set
 
 from pynput.keyboard import Key, KeyCode
 
@@ -15,6 +15,7 @@ class SiblingAwareHotKey:
     """
 
     _keys: frozenset[KeyCode | Key]
+    _configured_modifiers: frozenset[KeyCode | Key]
     _state: set[KeyCode | Key]
     _on_activate: Callable[[], None]
     _activation_latched: bool
@@ -23,6 +24,7 @@ class SiblingAwareHotKey:
     def __init__(self, keys: Iterable[KeyCode | Key], on_activate: Callable[[], None]) -> None:
         """Initialize a hotkey with its key combination and activation callback."""
         self._keys = frozenset(keys)
+        self._configured_modifiers = self._keys.intersection(PYNPUT_MODIFIERS)
         self._state = set()
         self._on_activate = on_activate
         self._activation_latched = False
@@ -58,12 +60,14 @@ class SiblingAwareHotKey:
         if self.tracks(key):
             self._state.add(key)
 
-    def try_activate(self) -> None:
+    def try_activate(self, pressed_modifiers: Set[KeyCode | Key]) -> None:
         """
         Phase 2: fire the callback if fully held, not already latched,
-        and no more-specific sibling is simultaneously satisfied.
+        its modifier set matches exactly, and no more-specific sibling is simultaneously satisfied.
         """
         if not self.is_satisfied() or self._activation_latched:
+            return
+        if pressed_modifiers != self._configured_modifiers:
             return
         if any(sibling.is_satisfied() for sibling in self._more_specific_siblings):
             return

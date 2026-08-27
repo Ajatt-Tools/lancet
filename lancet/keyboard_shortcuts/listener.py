@@ -9,7 +9,11 @@ from zala.utils import q_emit
 
 from lancet.actions import LancetAction
 from lancet.exceptions import KeyboardShortcutParseError
-from lancet.keyboard_shortcuts.consts import PYNPUT_KEY_NAMES, KEY_ALIASES, PYNPUT_MODIFIER_NAMES
+from lancet.keyboard_shortcuts.consts import (
+    KEY_ALIASES,
+    PYNPUT_KEY_NAMES,
+    PYNPUT_MODIFIER_NAMES,
+)
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import (
     PyShortcutStr,

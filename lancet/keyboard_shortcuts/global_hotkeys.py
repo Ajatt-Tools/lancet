@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from pynput.keyboard import HotKey, Key, KeyCode, Listener
 
 from lancet.exceptions import DuplicateShortcutError
+from lancet.keyboard_shortcuts.consts import PYNPUT_MODIFIERS
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
 from lancet.keyboard_shortcuts.types import ParsedEntry, PyShortcutStr
 
@@ -60,12 +61,14 @@ class LancetHotKeyListener(Listener):
     """
 
     _hotkeys: Sequence[SiblingAwareHotKey]
+    _pressed_modifiers: set[KeyCode | Key]
 
     def __init__(self, hotkeys: dict[PyShortcutStr, Callable[[], None]]) -> None:
         """Build sibling-aware hotkeys."""
         # Assign self._hotkeys before super().__init__ as a defensive measure
         # because the parent's _wrap() introspects self._on_press at construction time.
         self._hotkeys = prepare_hotkeys(hotkeys)
+        self._pressed_modifiers = set()
         super().__init__(on_press=self._on_press, on_release=self._on_release)  # type: ignore[arg-type]
 
     def _on_press(self, key: Key | KeyCode | None, injected: bool) -> None:
@@ -73,15 +76,18 @@ class LancetHotKeyListener(Listener):
         if injected or key is None:
             return
         canonical = self.canonical(key)
+        if canonical in PYNPUT_MODIFIERS:
+            self._pressed_modifiers.add(canonical)
         for hotkey in self._hotkeys:
             hotkey.update_state(canonical)
         for hotkey in self._hotkeys:
-            hotkey.try_activate()
+            hotkey.try_activate(self._pressed_modifiers)
 
     def _on_release(self, key: Key | KeyCode | None, injected: bool) -> None:
         """Forward releases to every hotkey so per-combo activation latches reset."""
         if injected or key is None:
             return
         canonical = self.canonical(key)
+        self._pressed_modifiers.discard(canonical)
         for hotkey in self._hotkeys:
             hotkey.release(canonical)
