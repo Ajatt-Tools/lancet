@@ -22,6 +22,11 @@ from lancet.gui.utils import DetectorInputSizeSpinBox
 type CfgValueTypes = bool | str | int | float | enum.Enum
 
 
+def is_bool_for_int(old_value: CfgValueTypes, new_value: CfgValueTypes) -> bool:
+    """Return True when a bool would be assigned to a non-bool integer field."""
+    return isinstance(old_value, int) and not isinstance(old_value, bool) and isinstance(new_value, bool)
+
+
 def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
     """Set a widget's value from a configuration value based on the widget type."""
     match widget:
@@ -82,6 +87,6 @@ def set_cfg_value(cfg: Config, cfg_key: str, new_value: CfgValueTypes) -> None:
     if not hasattr(cfg, cfg_key):
         raise AttributeError(f"config has no attribute '{cfg_key}'")
     old_value = getattr(cfg, cfg_key)
-    if not isinstance(new_value, type(old_value)):
+    if not isinstance(new_value, type(old_value)) or is_bool_for_int(old_value, new_value):
         raise TypeError(f"types differ in widget and config: {type(old_value)} != {type(new_value)}")
     setattr(cfg, cfg_key, new_value)
