@@ -35,9 +35,10 @@ def filter_dict[K, V](d: dict[K, V], keys: Set[K]) -> dict[K, V]:
 
 
 def iter_widgets(widgets: FormWidgets) -> Iterable[tuple[str, QWidget]]:
-    """Return widget keys that directly map to one Config field each."""
-    for key in frozenset(widgets.__dict__).difference(SPECIAL_KEYS):
-        yield key, widgets.__dict__[key]
+    """Yield widgets that directly map to one Config field, preserving form order."""
+    for key, widget in widgets.__dict__.items():
+        if key not in SPECIAL_KEYS:
+            yield key, widget
 
 
 def label_replace(cfg_key: str) -> str:
