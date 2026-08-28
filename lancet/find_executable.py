@@ -1,8 +1,10 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import functools
+import ntpath
 import os
 import pathlib
+import posixpath
 import shutil
 import subprocess
 import sys
@@ -13,7 +15,7 @@ from lancet.consts import IS_WIN
 
 @functools.cache
 def default_hardcoded_paths() -> Sequence[pathlib.Path]:
-    """Return common executable directories."""
+    """Return common executable directories used after PATH lookup fails."""
     return (
         pathlib.Path("/usr/bin"),
         pathlib.Path("/opt/homebrew/bin"),
@@ -24,6 +26,7 @@ def default_hardcoded_paths() -> Sequence[pathlib.Path]:
 
 
 def windows_executable_suffixes() -> Sequence[str]:
+    """Return executable suffixes from PATHEXT when running on Windows."""
     if IS_WIN:
         path_extensions = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
         return tuple(suffix.lower() for suffix in path_extensions if suffix)
@@ -83,10 +86,30 @@ def is_running_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def normalize_env_path(path: str) -> str:
+    """Normalize an environment path for platform-appropriate comparison."""
+    if IS_WIN:
+        return ntpath.normcase(ntpath.normpath(path))
+    return posixpath.normpath(path)
+
+
+def common_env_path(paths: Sequence[str]) -> str:
+    """Return the longest common subpath using the active platform's path rules."""
+    if IS_WIN:
+        return ntpath.commonpath(paths)
+    return posixpath.commonpath(paths)
+
+
 def is_pyinstaller_path(path: str) -> bool:
-    """Return True if path looks like a PyInstaller temporary extraction directory."""
-    parts = path.replace("\\", "/").split("/")
-    return any(part.startswith("_MEI") for part in parts)
+    """Return True if path is the active PyInstaller extraction directory or one of its descendants."""
+    if not (extraction_dir := getattr(sys, "_MEIPASS", "")):
+        return False
+    normalized_path = normalize_env_path(path)
+    normalized_root = normalize_env_path(str(extraction_dir))
+    try:
+        return common_env_path((normalized_path, normalized_root)) == normalized_root
+    except ValueError:
+        return False
 
 
 def filter_pyinstaller_paths(path_str: str) -> list[str]:
