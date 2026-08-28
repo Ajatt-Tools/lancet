@@ -28,6 +28,15 @@ from lancet.text_detector_client.text_detector_base import (
 )
 
 
+def text_detector_load_error_message(model_path: pathlib.Path, error: Exception) -> str:
+    """Return an actionable detector-load error that preserves the validated cache."""
+    return (
+        f"{class_name(error)}: {error}. "
+        f"If the problem persists, remove the cached checkpoint at {str(model_path)!r} "
+        f"and restart Lancet to download it again."
+    )
+
+
 def read_image_from_path(imgpath: pathlib.Path, read_type: int = cv2.IMREAD_COLOR) -> np.ndarray:
     """cv2.imread, but works with Unicode paths. Raises on failure."""
     result = cv2.imdecode(np.fromfile(imgpath, dtype=np.uint8), read_type)
@@ -84,17 +93,18 @@ class ComicTextDetector(ComicTextDetectorBase):
         self._max_ratio_hor = max_ratio_hor
         self._anchor_window = anchor_window
         cache = ComicTextDetectorCache()
-        logger.info(f"Loading TextDetector model from {cache.comic_text_detector_path()}")
+        model_path = cache.comic_text_detector_path()
+        logger.info(f"Loading TextDetector model from {model_path}")
 
         try:
             self._detector = TextDetector(
-                model_path=cache.comic_text_detector_path(),
+                model_path=model_path,
                 input_size=self._detector_input_size,
                 device=get_device(force_cpu=self._force_cpu).name.lower(),
                 act="leaky",
             )
         except Exception as ex:
-            raise ComicTextDetectorException(f"{class_name(ex)}: {ex}") from ex
+            raise ComicTextDetectorException(text_detector_load_error_message(model_path, ex)) from ex
         logger.info(f"TextDetector uses {self._detector.device.upper()}")
         logger.info("TextDetector ready")
 
