@@ -7,7 +7,7 @@ from zala.utils import q_emit, qconnect
 
 from lancet.gui.line_edit import ColorEdit
 
-DEFAULT_COLOR = "black"
+DEFAULT_COLOR = "#FF000000"
 
 
 def color_to_hex_argb(color: QColor) -> str:
