@@ -51,7 +51,7 @@ def raise_if_incomplete(partial_path: pathlib.Path, expected_size: int) -> None:
 
 
 def download_comic_text_detector_pt(destination_path: pathlib.Path) -> None:
-    """Stream the model to partial_path, verifying its HTTP and pinned release sizes."""
+    """Stream the model to destination_path, verifying its HTTP and pinned release sizes."""
     logger.info(f"Downloading {DOWNLOAD_URL}")
     try:
         with requests.get(DOWNLOAD_URL, stream=True, verify=True, timeout=DOWNLOAD_TIMEOUT_SEC) as r:

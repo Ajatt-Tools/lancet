@@ -159,7 +159,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._add_system_menu_actions(menu)
 
     def _add_feature_menu_actions(self, menu: QMenu) -> None:
-        """Add the screenshot, OCR actions to the menu."""
+        """Add screenshot and OCR actions to the menu."""
         menu.addAction(
             QIcon(str(SCREENSHOT_ICON_PATH)),
             format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
