@@ -9,9 +9,9 @@ import io
 import json
 import socket
 import typing
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from http import HTTPStatus
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -162,17 +162,44 @@ class TestSendIpcRequest:
     @pytest.mark.parametrize("scenario", SEND_SCENARIOS.values(), ids=SEND_SCENARIOS.keys())
     def test_send_ipc_request(self, ipc_server: IpcServer, scenario: SendScenario) -> None:
         """Send each command over a real HTTP port and verify the response and signal emission."""
-        received_actions: list[LancetAction] = []
-
-        def mock_q_emit(_signal: object, action: LancetAction) -> None:
-            received_actions.append(action)
-
         client = LancetIpcClient(Config(bind_port=ipc_server.server_address[1]))
-        with patch("lancet.ipc.server.q_emit", mock_q_emit):
+        with patch("lancet.ipc.server.q_emit") as emit:
             response = client.send_ipc_request(IpcRequest(action=scenario.action))
         assert response.status == IpcStatus.ok
         assert response.message == scenario.expected_message
-        assert received_actions == [scenario.action]
+        assert emit.call_args.args[1] == scenario.action
+
+
+class AskScenario(typing.NamedTuple):
+    """A convenience-client method invocation and its expected IPC action."""
+
+    method_name: str
+    args: Sequence[object]
+    action: LancetAction
+
+
+ASK_SCENARIOS: dict[str, AskScenario] = {
+    "screenshot": AskScenario(method_name="ask_screenshot", args=(), action=LancetAction.screenshot),
+    "ocr": AskScenario(method_name="ask_ocr", args=(False,), action=LancetAction.ocr),
+    "detect_and_ocr": AskScenario(method_name="ask_ocr", args=(True,), action=LancetAction.detect_and_ocr),
+}
+
+
+class TestAskCommands:
+    """Test IPC convenience methods construct the expected request action."""
+
+    @pytest.mark.parametrize("scenario", ASK_SCENARIOS.values(), ids=ASK_SCENARIOS.keys())
+    def test_ask(self, scenario: AskScenario, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Each convenience method forwards its corresponding LancetAction to the shared sender."""
+        client = LancetIpcClient(Config())
+        response = IpcResponse(status=IpcStatus.ok, message="accepted")
+        send = Mock(return_value=response)
+        monkeypatch.setattr(client, "_send_and_handle_error", send)
+
+        result = getattr(client, scenario.method_name)(*scenario.args)
+
+        assert result == response
+        assert send.call_args.args == (IpcRequest(action=scenario.action),)
 
 
 def raw_post(port: int, path: str, body: bytes) -> http.client.HTTPResponse:

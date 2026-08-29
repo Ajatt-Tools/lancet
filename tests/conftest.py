@@ -20,4 +20,10 @@ def qapp(qt_offscreen_platform: None) -> QApplication:
     A program name must be present in argv because Qt aborts
     when QApplication is created with an empty argument list.
     """
-    return QApplication.instance() or QApplication(["pytest"])
+    match instance := QApplication.instance():
+        case None:
+            return QApplication(["pytest"])
+        case QApplication():
+            return instance
+        case _:
+            raise RuntimeError("A QCoreApplication already exists; widget tests require QApplication")

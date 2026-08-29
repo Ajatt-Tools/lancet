@@ -11,12 +11,14 @@ import pytest
 
 from lancet.find_executable import (
     clean_ld_library_path,
+    executable_file_candidates,
     filter_pyinstaller_paths,
     find_executable,
     find_executable_hardcoded,
     is_executable_file,
     is_pyinstaller_path,
     make_clean_env,
+    normalize_env_path,
     resolve_executable_with_fallbacks,
 )
 
@@ -43,20 +45,27 @@ class TestFilterPyinstallerPaths:
             ("/usr/lib:/tmp/_MEIxxxxx:/opt/lib", ["/usr/lib", "/opt/lib"]),
             # PyInstaller path at end
             ("/usr/lib:/opt/lib:/tmp/_MEIxxxxx", ["/usr/lib", "/opt/lib"]),
-            # Multiple PyInstaller paths
-            ("/tmp/_MEIaaa:/usr/lib:/tmp/_MEIbbb:/opt/lib", ["/usr/lib", "/opt/lib"]),
+            # Repeated PyInstaller paths
+            ("/tmp/_MEIxxxxx:/usr/lib:/tmp/_MEIxxxxx/lib:/opt/lib", ["/usr/lib", "/opt/lib"]),
+            # A similarly named user path must be preserved
+            ("/opt/_MEI-tools/lib:/usr/lib", ["/opt/_MEI-tools/lib", "/usr/lib"]),
             # Empty string
             ("", []),
             # Single path (no colons)
             ("/usr/lib", ["/usr/lib"]),
         ],
     )
-    def test_filter_pyinstaller_paths(self, input_path: str, expected: Sequence[str]) -> None:
+    def test_filter_pyinstaller_paths(
+        self, input_path: str, expected: Sequence[str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that PyInstaller paths are correctly filtered out."""
+        monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
         assert filter_pyinstaller_paths(input_path) == expected
 
-    def test_filter_windows_paths(self, windows_pathsep: None) -> None:
+    def test_filter_windows_paths(self, windows_pathsep: None, monkeypatch: pytest.MonkeyPatch) -> None:
         """Windows PATH-style separators are handled when os.pathsep is semicolon."""
+        monkeypatch.setattr(sys, "_MEIPASS", r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx", raising=False)
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
         assert filter_pyinstaller_paths(r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx;C:\Qt\plugins") == [
             r"C:\Qt\plugins"
         ]
@@ -87,18 +96,23 @@ class TestCleanLdLibraryPath:
             ),
             # LD_LIBRARY_PATH with multiple PyInstaller paths
             (
-                {"LD_LIBRARY_PATH": "/tmp/_MEIaaa:/usr/lib:/tmp/_MEIbbb", "PATH": "/usr/bin"},
+                {"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/usr/lib:/tmp/_MEIxxxxx/lib", "PATH": "/usr/bin"},
                 {"LD_LIBRARY_PATH": "/usr/lib", "PATH": "/usr/bin"},
             ),
         ],
     )
-    def test_clean_ld_library_path(self, input_env: dict[str, str], expected_env: dict[str, str]) -> None:
+    def test_clean_ld_library_path(
+        self, input_env: dict[str, str], expected_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that LD_LIBRARY_PATH is correctly cleaned in environment dictionary."""
+        monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
         result = clean_ld_library_path(input_env.copy())
         assert result == expected_env
 
-    def test_clean_windows_path_variable(self, windows_pathsep: None) -> None:
+    def test_clean_windows_path_variable(self, windows_pathsep: None, monkeypatch: pytest.MonkeyPatch) -> None:
         """Windows PATH-style separators are preserved when cleaning PATH-like variables."""
+        monkeypatch.setattr(sys, "_MEIPASS", r"C:\Temp\_MEIaaa", raising=False)
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
         result = clean_ld_library_path(
             {"QT_PLUGIN_PATH": r"C:\Temp\_MEIaaa;C:\Qt\plugins", "PATH": r"C:\Windows"},
             env_key="QT_PLUGIN_PATH",
@@ -189,6 +203,7 @@ class TestMakeCleanEnv:
     def test_make_clean_env_frozen(self, scenario: MakeCleanEnvScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """For each frozen-binary scenario, verify the cleaned env matches expectations."""
         monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
         monkeypatch.setattr(os, "environ", dict(scenario.input_env))
 
         result = make_clean_env()
@@ -209,14 +224,60 @@ class TestIsPyinstallerPath:
         [
             ("/tmp/_MEIxxxxx", True),
             ("/tmp/_MEIxxxxx/PyQt6/Qt6/plugins", True),
-            (r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx", True),
+            ("/tmp//_MEIxxxxx/./PyQt6", True),
+            ("/tmp/_MEIxxxxx/../other", False),
+            ("/tmp/_MEIxxxxx-other", False),
+            ("tmp/_MEIxxxxx", False),
+            ("/opt/_MEI-tools/lib", False),
             ("/usr/lib", False),
-            (r"C:\Qt\plugins", False),
         ],
     )
-    def test_detect(self, path: str, expected: bool) -> None:
-        """is_pyinstaller_path recognizes Linux and Windows _MEI paths."""
+    def test_detect(self, path: str, expected: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+        """is_pyinstaller_path recognizes only the active extraction root and descendants."""
+        monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
         assert is_pyinstaller_path(path) is expected
+
+    @pytest.mark.parametrize(
+        "path,expected",
+        [
+            (r"c:\temp\_meixxxxx", True),
+            (r"C:\TEMP\_MEIXXXXX\PyQt6", True),
+            (r"C:\Temp\_MEIxxxxx\plugins\..\platforms", True),
+            (r"C:\Temp\_MEIxxxxx-other", False),
+            (r"C:\Temp\_MEI-tools", False),
+            (r"D:\Temp\_MEIxxxxx", False),
+        ],
+    )
+    def test_detect_windows_case_insensitive(self, path: str, expected: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Windows extraction-root matching is case-insensitive."""
+        monkeypatch.setattr(sys, "_MEIPASS", r"C:\Temp\_MEIxxxxx", raising=False)
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
+        assert is_pyinstaller_path(path) is expected
+
+    @pytest.mark.parametrize("path", ["/tmp/_MEIxxxxx"])
+    def test_without_extraction_dir(self, path: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        """No path is classified as PyInstaller-owned when _MEIPASS is unavailable."""
+        monkeypatch.delattr(sys, "_MEIPASS", raising=False)
+        assert is_pyinstaller_path(path) is False
+
+
+class TestNormalizeEnvPath:
+    """Test platform-specific environment path normalization."""
+
+    @pytest.mark.parametrize(
+        "is_windows,path,expected",
+        [
+            (False, "/tmp/example/", "/tmp/example"),
+            (False, "/tmp/example/./plugins/../lib", "/tmp/example/lib"),
+            (False, r"/tmp/example\name/", r"/tmp/example\name"),
+            (True, "C:\\Temp\\Example\\", r"c:\temp\example"),
+            (True, r"C:\Temp\Example\.\plugins\..\lib", r"c:\temp\example\lib"),
+        ],
+    )
+    def test_normalize(self, is_windows: bool, path: str, expected: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Separators, trailing slashes, and Windows case are normalized."""
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", is_windows)
+        assert normalize_env_path(path) == expected
 
 
 class TestIsExecutableFile:
@@ -228,6 +289,16 @@ class TestIsExecutableFile:
         file_path = tmp_path / "probe"
         file_path.write_text("#!/bin/sh\n", encoding="utf-8")
         file_path.chmod(mode)
+        assert is_executable_file(file_path) is expected
+
+    @pytest.mark.parametrize("suffix,expected", [(".exe", True), (".txt", False)])
+    def test_windows_file_type(
+        self, suffix: str, expected: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        """Windows executable detection uses the filename suffix instead of POSIX mode bits."""
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
+        file_path = tmp_path / f"probe{suffix}"
+        file_path.write_text("contents", encoding="utf-8")
         assert is_executable_file(file_path) is expected
 
 
@@ -261,17 +332,17 @@ def install_hardcoded_search_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: pathlib.Path,
 ) -> None:
-    """Replace HARDCODED_PATHS with three tmp dirs and (if requested) materialise the named file."""
+    """Replace default_hardcoded_paths() with three tmp dirs and optionally create the named file."""
     search_dirs = (tmp_path / "bin1", tmp_path / "bin2", tmp_path / "bin3")
     for path_str in search_dirs:
         path_str.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr("lancet.find_executable.HARDCODED_PATHS", tuple(search_dirs))
+    monkeypatch.setattr("lancet.find_executable.default_hardcoded_paths", lambda: search_dirs)
     if scenario.place_in is not None:
         make_executable_file(tmp_path / scenario.place_in, scenario.name)
 
 
 class FindExecutableScenario(typing.NamedTuple):
-    """A scenario describing how find_executable falls back from PATH to HARDCODED_PATHS."""
+    """A scenario describing how find_executable falls back from PATH to default hardcoded paths."""
 
     on_path: bool  # True if the executable should be created in a directory on PATH.
     on_hardcoded: bool  # True if the executable should be created in a hardcoded directory.
@@ -324,14 +395,14 @@ def install_find_executable_dirs(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: pathlib.Path,
 ) -> tuple[pathlib.Path, pathlib.Path]:
-    """Wire PATH and HARDCODED_PATHS to two empty dirs, optionally materializing the file in each."""
+    """Wire PATH and default hardcoded paths to empty dirs, optionally creating the file in each."""
     path_dir = tmp_path / "path_dir"
     hardcoded_dir = tmp_path / "hardcoded_dir"
     path_dir.mkdir()
     hardcoded_dir.mkdir()
 
     monkeypatch.setattr(os, "environ", {"PATH": str(path_dir)})
-    monkeypatch.setattr("lancet.find_executable.HARDCODED_PATHS", (hardcoded_dir,))
+    monkeypatch.setattr("lancet.find_executable.default_hardcoded_paths", lambda: (hardcoded_dir,))
 
     if scenario.on_path:
         make_executable_file(path_dir, name)
@@ -342,7 +413,7 @@ def install_find_executable_dirs(
 
 
 class TestFindExecutable:
-    """find_executable prefers PATH (via shutil.which) and falls back to HARDCODED_PATHS."""
+    """find_executable prefers PATH (via shutil.which) and falls back to default hardcoded paths."""
 
     @pytest.mark.parametrize("scenario", FIND_SCENARIOS.values(), ids=FIND_SCENARIOS.keys())
     def test_lookup(
@@ -377,7 +448,7 @@ class TestFindExecutable:
         tmp_path: pathlib.Path,
     ) -> None:
         """
-        find_executable_hardcoded scans HARDCODED_PATHS in order, returning the first hit.
+        find_executable_hardcoded scans default hardcoded paths in order, returning the first hit.
         Each scenario verifies whether the name is resolved from the patched search dirs.
         """
         install_hardcoded_search_path(scenario, monkeypatch, tmp_path)
@@ -408,21 +479,69 @@ class TestFindExecutable:
         monkeypatch.setenv("HOME", str(tmp_path))
         assert find_executable("~/bin/goldendict") == str(executable.resolve())
 
+    def test_windows_hardcoded_lookup_adds_exe_suffix(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        """A Windows hardcoded lookup resolves a bare browser name to its .exe file."""
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
+        monkeypatch.setattr("lancet.find_executable.default_hardcoded_paths", lambda: (tmp_path,))
+        executable = tmp_path / "firefox.exe"
+        executable.write_text("contents", encoding="utf-8")
+
+        assert find_executable_hardcoded("firefox") == str(executable.resolve())
+
+
+class ExecutableCandidatesScenario(typing.NamedTuple):
+    """A platform/name combination and its expected executable candidate filenames."""
+
+    is_windows: bool
+    name: str
+    suffixes: Sequence[str]
+    expected_names: Sequence[str]
+
+
+EXECUTABLE_CANDIDATE_SCENARIOS: dict[str, ExecutableCandidatesScenario] = {
+    "non_windows_keeps_bare_name": ExecutableCandidatesScenario(False, "firefox", (), ("firefox",)),
+    "windows_bare_name_uses_suffix_order": ExecutableCandidatesScenario(
+        True, "firefox", (".cmd", ".exe"), ("firefox.cmd", "firefox.exe")
+    ),
+    "windows_explicit_suffix_is_preserved": ExecutableCandidatesScenario(
+        True, "firefox.exe", (".cmd", ".exe"), ("firefox.exe",)
+    ),
+}
+
+
+class TestExecutableFileCandidates:
+    """Test platform-specific executable candidate generation."""
+
+    @pytest.mark.parametrize(
+        "scenario", EXECUTABLE_CANDIDATE_SCENARIOS.values(), ids=EXECUTABLE_CANDIDATE_SCENARIOS.keys()
+    )
+    def test_candidates(
+        self, scenario: ExecutableCandidatesScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        """Candidate generation preserves explicit names and Windows suffix order."""
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", scenario.is_windows)
+        monkeypatch.setattr("lancet.find_executable.windows_executable_suffixes", lambda: scenario.suffixes)
+
+        candidates = executable_file_candidates(tmp_path, scenario.name)
+
+        assert tuple(candidate.name for candidate in candidates) == scenario.expected_names
+
 
 class ResolverScenario(typing.NamedTuple):
     """A scenario for resolve_executable_with_fallbacks."""
 
-    configured: str
-    fallback_names: Sequence[str]
+    executable_names: Sequence[str]
     available_name: str | None
     expected: str
 
 
 RESOLVER_SCENARIOS: dict[str, ResolverScenario] = {
-    "configured_resolved": ResolverScenario("custom", ("fallback",), "custom", "/usr/bin/custom"),
-    "configured_missing_fallback_resolved": ResolverScenario("missing", ("fallback",), "fallback", "/usr/bin/fallback"),
-    "empty_fallback_resolved": ResolverScenario("", ("fallback",), "fallback", "/usr/bin/fallback"),
-    "total_failure_empty": ResolverScenario("missing", ("fallback",), None, ""),
+    "first_name_resolved": ResolverScenario(("custom", "fallback"), "custom", "/usr/bin/custom"),
+    "later_name_resolved": ResolverScenario(("missing", "fallback"), "fallback", "/usr/bin/fallback"),
+    "empty_name_skipped": ResolverScenario(("", "fallback"), "fallback", "/usr/bin/fallback"),
+    "total_failure_empty": ResolverScenario(("missing", "fallback"), None, ""),
 }
 
 
@@ -431,9 +550,9 @@ class TestResolveExecutableWithFallbacks:
 
     @pytest.mark.parametrize("scenario", RESOLVER_SCENARIOS.values(), ids=RESOLVER_SCENARIOS.keys())
     def test_resolve(self, scenario: ResolverScenario, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Configured executables are tried first, then fallback names; total failure is empty."""
+        """Executable names are tried in order; an empty result signals total failure."""
         monkeypatch.setattr(
             "lancet.find_executable.find_executable",
             lambda name: f"/usr/bin/{name}" if name == scenario.available_name else None,
         )
-        assert resolve_executable_with_fallbacks(scenario.configured, scenario.fallback_names) == scenario.expected
+        assert resolve_executable_with_fallbacks(*scenario.executable_names) == scenario.expected

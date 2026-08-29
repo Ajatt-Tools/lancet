@@ -9,6 +9,7 @@ from pynput.keyboard import HotKey, Key, KeyCode
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence
 
+from lancet.keyboard_shortcuts.consts import PYNPUT_MODIFIERS
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
 from lancet.keyboard_shortcuts.types import PyShortcutStr
 
@@ -56,18 +57,25 @@ def wire_siblings(hotkeys: Iterable[SiblingAwareHotKey]) -> None:
         hotkey.set_siblings(hotkeys)
 
 
-def feed_press(hotkeys: Iterable[SiblingAwareHotKey], key: Key | KeyCode) -> None:
+def feed_press(
+    hotkeys: Iterable[SiblingAwareHotKey], key: Key | KeyCode, pressed_modifiers: set[Key | KeyCode]
+) -> None:
     """
     Feed a key press event to all hotkeys using the two-phase protocol used by class LancetHotKeyListener.
     """
     hotkeys = list(hotkeys)
+    if key in PYNPUT_MODIFIERS:
+        pressed_modifiers.add(key)
     for hotkey in hotkeys:
         hotkey.update_state(key)
     for hotkey in hotkeys:
-        hotkey.try_activate()
+        hotkey.try_activate(pressed_modifiers)
 
 
-def feed_release(hotkeys: Iterable[SiblingAwareHotKey], key: Key | KeyCode) -> None:
+def feed_release(
+    hotkeys: Iterable[SiblingAwareHotKey], key: Key | KeyCode, pressed_modifiers: set[Key | KeyCode]
+) -> None:
     """Feed a key release event to all hotkeys."""
+    pressed_modifiers.discard(key)
     for hotkey in hotkeys:
         hotkey.release(key)

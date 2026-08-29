@@ -16,12 +16,43 @@ from lancet.text_detector_client.text_detector import (
     crop_box_region,
     pil_image_to_bgr_array,
     read_image_from_path,
+    text_detector_load_error_message,
 )
 from lancet.text_detector_client.text_detector_base import (
     ComicTextDetectorException,
     Rect,
     clamp,
 )
+
+
+class LoadErrorScenario(typing.NamedTuple):
+    """A detector-load exception and its expected rendered prefix."""
+
+    error: Exception
+    expected_prefix: str
+
+
+LOAD_ERROR_SCENARIOS: dict[str, LoadErrorScenario] = {
+    "runtime_error": LoadErrorScenario(RuntimeError("load failed"), "RuntimeError: load failed."),
+    "os_error": LoadErrorScenario(OSError("device unavailable"), "OSError: device unavailable."),
+}
+
+
+class TestTextDetectorLoadErrorMessage:
+    """Test actionable detector-load reporting without automatic cache deletion."""
+
+    @pytest.mark.parametrize("scenario", LOAD_ERROR_SCENARIOS.values(), ids=LOAD_ERROR_SCENARIOS.keys())
+    def test_message_preserves_cache(self, scenario: LoadErrorScenario, tmp_path: pathlib.Path) -> None:
+        """The message identifies the failure and reset steps while leaving the cache untouched."""
+        model_path = tmp_path / "comictextdetector.pt"
+        model_path.write_bytes(b"validated checkpoint")
+        expected = (
+            f"{scenario.expected_prefix} If the problem persists, remove the cached checkpoint at {str(model_path)!r} "
+            "and restart Lancet to download it again."
+        )
+
+        assert text_detector_load_error_message(model_path, scenario.error) == expected
+        assert model_path.read_bytes() == b"validated checkpoint"
 
 
 class PilToBgrScenario(typing.NamedTuple):
@@ -61,7 +92,7 @@ class TestPilImageToBgrArray:
 
 
 def make_solid_bgr_array(height: int, width: int, bgr: tuple[int, int, int]) -> np.ndarray:
-    """Build an HxWx3 BGR uint8 numpy array filled with a single colour."""
+    """Build an HxWx3 BGR uint8 numpy array filled with a single color."""
     arr = np.zeros((height, width, 3), dtype=np.uint8)
     arr[:, :] = bgr
     return arr
@@ -122,7 +153,7 @@ class TestCropBoxRegion:
 
 
 def write_png(path: pathlib.Path, height: int, width: int, bgr: tuple[int, int, int]) -> None:
-    """Write a small solid-colour PNG at path using cv2 (round-trip-compatible with read_image_from_path)."""
+    """Write a small solid-color PNG at path using cv2 (round-trip-compatible with read_image_from_path)."""
     img = make_solid_bgr_array(height, width, bgr)
     encoded_ok, buffer = cv2.imencode(".png", img)
     assert encoded_ok, "failed to encode test PNG"
@@ -153,7 +184,7 @@ class TestReadImageFromPath:
         assert "Failed to read image" in str(excinfo.value)
 
     def test_missing_file_raises_file_not_found(self, tmp_path: pathlib.Path) -> None:
-        """A nonexistent path raises FileNotFoundError (np.fromfile's behaviour, not the function's contract)."""
+        """A nonexistent path raises FileNotFoundError (np.fromfile's behavior, not the function's contract)."""
         missing = tmp_path / "does_not_exist.png"
         with pytest.raises(FileNotFoundError):
             read_image_from_path(missing)

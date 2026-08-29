@@ -1,19 +1,28 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import typing
+
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
 from tests.helpers import ALT, KEY_O, KEY_P, Counter
 
 
-def make_satisfied_alt_o_hotkey() -> tuple[SiblingAwareHotKey, "Counter"]:
+class HotkeyAndCounter(typing.NamedTuple):
+    """A latched hotkey paired with the callback counter it invokes."""
+
+    hotkey: SiblingAwareHotKey
+    counter: Counter
+
+
+def make_satisfied_alt_o_hotkey() -> HotkeyAndCounter:
     """Build an <alt>+o SiblingAwareHotKey and drive it to the activated/latched state."""
     counter = Counter()
     hotkey = SiblingAwareHotKey({ALT, KEY_O}, counter)
     hotkey.update_state(ALT)
     hotkey.update_state(KEY_O)
-    hotkey.try_activate()
+    hotkey.try_activate({ALT})
     assert counter.count == 1  # sanity: hotkey activated and latched
-    return hotkey, counter
+    return HotkeyAndCounter(hotkey=hotkey, counter=counter)
 
 
 class TestLancetHotKeyReleaseGuard:
@@ -41,7 +50,7 @@ class TestLancetHotKeyReleaseGuard:
         # Re-press KEY_O to drive the combo back to the satisfied state. Latch is reset, so the
         # callback must fire again.
         hotkey.update_state(KEY_O)
-        hotkey.try_activate()
+        hotkey.try_activate({ALT})
         assert counter.count == 2
 
     def test_release_of_key_not_in_keys_is_noop(self) -> None:
@@ -53,5 +62,5 @@ class TestLancetHotKeyReleaseGuard:
 
         # OS auto-repeat of KEY_O while still latched and combo satisfied: must not re-fire.
         hotkey.update_state(KEY_O)
-        hotkey.try_activate()
+        hotkey.try_activate({ALT})
         assert counter.count == 1

@@ -3,7 +3,7 @@
 
 import typing
 from collections.abc import Sequence
-from unittest.mock import patch
+from unittest.mock import create_autospec, patch
 
 import pytest
 from transformers import PreTrainedTokenizerBase
@@ -105,42 +105,39 @@ class TestTryLoadModelWithWebDownload:
     """Tests that _try_load_model_with_web_download_enabled raises improved error messages."""
 
     def test_raises_improved_error_for_unsupported_format(self) -> None:
-        mocr = object.__new__(MangaOcr)
-        with patch.object(mocr, "_load_from_pretrained", side_effect=OSError("Can't load image processor")):
-            with pytest.raises(OSError) as excinfo:
-                mocr._try_load_model_with_web_download_enabled("tflite/model")
-            assert "not a compatible HuggingFace transformers model" in str(excinfo.value)
+        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
+        mocr._load_from_pretrained.side_effect = OSError("Can't load image processor")
+        with pytest.raises(OSError) as excinfo:
+            MangaOcr._try_load_model_with_web_download_enabled(mocr, "tflite/model")
+        assert "not a compatible HuggingFace transformers model" in str(excinfo.value)
 
     def test_raises_improved_error_for_vocabulary(self) -> None:
-        mocr = object.__new__(MangaOcr)
-        with patch.object(mocr, "_load_from_pretrained", side_effect=OSError("Unable to load vocabulary")):
-            with pytest.raises(OSError) as excinfo:
-                mocr._try_load_model_with_web_download_enabled("good/model")
-            assert "fugashi/unidic_lite" in str(excinfo.value)
+        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
+        mocr._load_from_pretrained.side_effect = OSError("Unable to load vocabulary")
+        with pytest.raises(OSError) as excinfo:
+            MangaOcr._try_load_model_with_web_download_enabled(mocr, "good/model")
+        assert "fugashi/unidic_lite" in str(excinfo.value)
 
     def test_passes_through_unrecognized_error(self) -> None:
-        mocr = object.__new__(MangaOcr)
+        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
         original = OSError("Something weird happened")
-        with patch.object(mocr, "_load_from_pretrained", side_effect=original):
-            with pytest.raises(OSError) as excinfo:
-                mocr._try_load_model_with_web_download_enabled("good/model")
-            assert str(excinfo.value) == str(original)
+        mocr._load_from_pretrained.side_effect = original
+        with pytest.raises(OSError) as excinfo:
+            MangaOcr._try_load_model_with_web_download_enabled(mocr, "good/model")
+        assert str(excinfo.value) == str(original)
 
 
 class TestLoadModelRetry:
     """_load_model warns on a local cache miss and then retries with downloads enabled."""
 
     def test_local_cache_failure_warns_then_retries_with_downloads(self) -> None:
-        mocr = object.__new__(MangaOcr)
-        with (
-            patch.object(mocr, "_load_from_pretrained", side_effect=OSError("cache miss")) as mock_load,
-            patch.object(mocr, "_try_load_model_with_web_download_enabled") as mock_retry,
-            patch("lancet.ocr.manga_ocr.logger.warning") as mock_warning,
-        ):
-            mocr._load_model("model/name")
+        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
+        with (patch("lancet.ocr.manga_ocr.logger.warning") as mock_warning,):
+            mocr._load_from_pretrained.side_effect = OSError("cache miss")
+            MangaOcr._load_model(mocr, "model/name")
 
-            assert mock_load.call_count == 1
-            mock_retry.assert_called_once_with("model/name")
+            assert mocr._load_from_pretrained.call_count == 1
+            mocr._try_load_model_with_web_download_enabled.assert_called_once_with("model/name")
             assert "Failed to load OCR model from local cache" in str(mock_warning.call_args.args[0])
 
 

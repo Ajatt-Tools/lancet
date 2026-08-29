@@ -61,13 +61,21 @@ LISTENER_INTEGRATION_SCENARIOS: dict[str, ListenerIntegrationScenario] = {
         events=(lpress(ALT), lpress(KEY_O), lrelease(KEY_O, injected=True), lpress(KEY_O)),
         expected_counts=(1,),
     ),
-    "single_shortcut_fires_with_incidentally_held_modifier_via_listener": ListenerIntegrationScenario(
-        # Listener-level companion of the OverlapScenario with the same name. With only
-        # <alt>+o registered, an incidentally-held SHIFT must not block activation — the
-        # listener's two-phase per-event protocol must not reject the combo just because
-        # an unrelated modifier was pressed first.
+    "single_shortcut_blocks_incidentally_held_modifier_via_listener": ListenerIntegrationScenario(
+        # Exact modifier matching rejects <alt>+o while an unrelated SHIFT is held,
+        # even when no more-specific sibling is registered.
         shortcuts=(PyShortcutStr("<alt>+o"),),
         events=(lpress(SHIFT), lpress(ALT), lpress(KEY_O)),
+        expected_counts=(0,),
+    ),
+    "released_extra_modifier_allows_activation": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"),),
+        events=(lpress(SHIFT), lrelease(SHIFT), lpress(ALT), lpress(KEY_O)),
+        expected_counts=(1,),
+    ),
+    "modifier_autorepeat_is_idempotent": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<shift>+<alt>+o"),),
+        events=(lpress(SHIFT), lpress(SHIFT), lpress(ALT), lpress(KEY_O)),
         expected_counts=(1,),
     ),
 }

@@ -171,11 +171,11 @@ GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
         expected_failure_count=1,
         expected_actions=frozenset({LancetAction.ocr}),
     ),
-    "all_four_distinct_valid": GetPynputShortcutsScenario(
+    "all_three_distinct_valid": GetPynputShortcutsScenario(
         ocr_shortcut="Alt+O",
         ocr_page_shortcut="Shift+Alt+O",
         screenshot_shortcut="Ctrl+Shift+S",
-        expected_hotkey_count=4,
+        expected_hotkey_count=3,
         expected_failure_count=0,
         expected_actions=frozenset(LancetAction),
     ),
