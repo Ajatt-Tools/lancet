@@ -28,17 +28,24 @@ ADVANCED_KEYS: typing.Final[frozenset[str]] = frozenset(
 )
 
 
+class FormWidgetEntry(typing.NamedTuple):
+    """A Config field name and its corresponding preferences widget."""
+
+    cfg_key: str
+    widget: QWidget
+
+
 def filter_dict[K, V](d: dict[K, V], keys: Set[K]) -> dict[K, V]:
     """Return a new dict containing only keys from the requested set, preserving original order."""
     # Preserve order of keys.
     return {key: value for key, value in d.items() if key in keys}
 
 
-def iter_widgets(widgets: FormWidgets) -> Iterable[tuple[str, QWidget]]:
+def iter_widgets(widgets: FormWidgets) -> Iterable[FormWidgetEntry]:
     """Yield widgets that directly map to one Config field, preserving form order."""
     for key, widget in widgets.__dict__.items():
         if key not in SPECIAL_KEYS:
-            yield key, widget
+            yield FormWidgetEntry(cfg_key=key, widget=widget)
 
 
 def label_replace(cfg_key: str) -> str:
