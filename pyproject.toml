@@ -121,7 +121,8 @@ randomize = true
 
 [[tool.hatch.envs.hatch-test.matrix]]
 # https://hatch.pypa.io/latest/tutorials/testing/overview/#testing-projects
-python = ["3.13", ]
+# Pin the test environment to the same Python minor version as CI and release builds.
+python = ["3.14", ]
 
 [tool.hatch.envs.dev]
 features = ["dev"]
