@@ -62,10 +62,10 @@ class Config:
     # Shortcuts
     ocr_shortcut: str = "Alt+O"
     ocr_page_shortcut: str = "Shift+Alt+O"
-    screenshot_shortcut: str = ""  # unset
+    screenshot_shortcut: str = ""  # Empty disables the shortcut.
 
     # GoldenDict
-    path_to_goldendict_executable: str = ""  # empty = call "goldendict"
+    path_to_goldendict_executable: str = ""  # Empty enables automatic GoldenDict lookup.
 
     # Screenshot overlay colors (stored as hex ARGB strings, e.g. "#FF0000FF")
     border_thickness: int = 2
