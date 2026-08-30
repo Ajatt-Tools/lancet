@@ -3,6 +3,10 @@
 
 import typing
 
+import pytest
+from pynput.keyboard import Key as PynputKey
+from pynput.keyboard import KeyCode
+
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
 from tests.helpers import ALT, KEY_O, KEY_P, Counter
 
@@ -25,42 +29,43 @@ def make_satisfied_alt_o_hotkey() -> HotkeyAndCounter:
     return HotkeyAndCounter(hotkey=hotkey, counter=counter)
 
 
+class ReleaseGuardScenario(typing.NamedTuple):
+    """A released key, optional held-state divergence, and expected activation count."""
+
+    released_key: PynputKey | KeyCode
+    discard_trigger_before_release: bool
+    expected_count: int
+
+
+RELEASE_GUARD_SCENARIOS: dict[str, ReleaseGuardScenario] = {
+    "tracked_unheld_key_resets_latch": ReleaseGuardScenario(KEY_O, True, 2),
+    "untracked_key_preserves_latch": ReleaseGuardScenario(KEY_P, False, 1),
+}
+
+
 class TestLancetHotKeyReleaseGuard:
     """
     The release() guard checks membership in self._keys (via tracks()), not self._state.
 
     This means a "stray" release for a key that belongs to the shortcut but is no longer
-    tracked as held still resets the activation latch. The two tests below verify the two
+    tracked as held still resets the activation latch. The two scenarios below verify the two
     halves of that contract:
 
       - Stray release of an in-_keys key resets the latch (decisive divergence test).
       - Release of a key not in _keys is a no-op (must not reset the latch).
     """
 
-    def test_release_of_in_keys_unheld_key_resets_latch(self) -> None:
-        """A stray release for an in-_keys key that is not currently tracked still resets the latch."""
+    @pytest.mark.parametrize("scenario", RELEASE_GUARD_SCENARIOS.values(), ids=RELEASE_GUARD_SCENARIOS.keys())
+    def test_release_guard(self, scenario: ReleaseGuardScenario) -> None:
+        """Tracked releases reset the latch while untracked releases leave it unchanged."""
         hotkey, counter = make_satisfied_alt_o_hotkey()
 
-        # Model a stray release: directly clear KEY_O from _state without going through release(),
-        # then call release(KEY_O). Under the new guard (membership in _keys), the latch must be
-        # reset; under the old guard (membership in _state), it would not have been.
-        hotkey._state.discard(KEY_O)
-        hotkey.release(KEY_O)
-
-        # Re-press KEY_O to drive the combo back to the satisfied state. Latch is reset, so the
-        # callback must fire again.
+        if scenario.discard_trigger_before_release:
+            # Create the decisive divergence: KEY_O belongs to the shortcut but is absent from held state.
+            hotkey._state.discard(KEY_O)
+        hotkey.release(scenario.released_key)
+        # Re-pressing KEY_O either activates after a tracked release or models auto-repeat
+        # while the latch remains set after an unrelated release.
         hotkey.update_state(KEY_O)
         hotkey.try_activate({ALT})
-        assert counter.count == 2
-
-    def test_release_of_key_not_in_keys_is_noop(self) -> None:
-        """Releasing a key that is not part of the shortcut must NOT reset the latch."""
-        hotkey, counter = make_satisfied_alt_o_hotkey()
-
-        # KEY_P is not in the shortcut's key set; releasing it must not affect the latch.
-        hotkey.release(KEY_P)
-
-        # OS auto-repeat of KEY_O while still latched and combo satisfied: must not re-fire.
-        hotkey.update_state(KEY_O)
-        hotkey.try_activate({ALT})
-        assert counter.count == 1
+        assert counter.count == scenario.expected_count
