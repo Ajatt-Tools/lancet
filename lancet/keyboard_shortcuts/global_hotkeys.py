@@ -80,8 +80,11 @@ class LancetHotKeyListener(Listener):
             self._pressed_modifiers.add(canonical)
         for hotkey in self._hotkeys:
             hotkey.update_state(canonical)
+        # All states must be current for sibling suppression, but only this key's
+        # hotkeys may activate; otherwise an unrelated press can fire a stale combo.
         for hotkey in self._hotkeys:
-            hotkey.try_activate(self._pressed_modifiers)
+            if hotkey.tracks(canonical):
+                hotkey.try_activate(self._pressed_modifiers)
 
     def _on_release(self, key: Key | KeyCode | None, injected: bool) -> None:
         """Forward releases to every hotkey so per-combo activation latches reset."""

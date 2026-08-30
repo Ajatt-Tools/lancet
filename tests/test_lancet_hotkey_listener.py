@@ -9,7 +9,7 @@ from pynput.keyboard import KeyCode
 
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import PyShortcutStr
-from tests.helpers import ALT, KEY_O, SHIFT, Counter
+from tests.helpers import ALT, KEY_O, KEY_P, SHIFT, Counter
 
 
 class ListenerEvent(typing.NamedTuple):
@@ -72,6 +72,16 @@ LISTENER_INTEGRATION_SCENARIOS: dict[str, ListenerIntegrationScenario] = {
         shortcuts=(PyShortcutStr("<alt>+o"),),
         events=(lpress(SHIFT), lrelease(SHIFT), lpress(ALT), lpress(KEY_O)),
         expected_counts=(1,),
+    ),
+    "unrelated_key_does_not_activate_satisfied_shortcut": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"),),
+        events=(lpress(SHIFT), lpress(ALT), lpress(KEY_O), lrelease(SHIFT), lpress(KEY_P)),
+        expected_counts=(0,),
+    ),
+    "unrelated_key_does_not_activate_less_specific_sibling": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"), PyShortcutStr("<shift>+<alt>+o")),
+        events=(lpress(SHIFT), lpress(ALT), lpress(KEY_O), lrelease(SHIFT), lpress(KEY_P)),
+        expected_counts=(0, 1),
     ),
     "modifier_autorepeat_is_idempotent": ListenerIntegrationScenario(
         shortcuts=(PyShortcutStr("<shift>+<alt>+o"),),
