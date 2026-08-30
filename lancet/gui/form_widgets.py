@@ -79,7 +79,7 @@ class FormWidgetsBuilder:
         self._widgets.copy_to = EnumSelectCombo(initial_value=self._cfg.copy_to)
         # Notification duration
         self._widgets.notification_duration_sec = SecondsSpinBox(initial_value=self._cfg.notification_duration_sec)
-        # huggingface model name and items
+        # Hugging Face model name and available options.
         self._widgets.huggingface_model = ModelListEditor()
         self._widgets.huggingface_model.set_items(self._cfg.huggingface_models)
         self._widgets.huggingface_model.set_current(self._cfg.huggingface_model_name)
