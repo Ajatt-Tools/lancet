@@ -1,8 +1,6 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""
-Tests for read_config_file recovery behavior.
-"""
+"""Tests for config recovery, CLI commands, and application startup dispatch."""
 
 import builtins
 import functools
@@ -11,14 +9,16 @@ import json
 import pathlib
 import typing
 from collections.abc import Callable, Sequence
-from unittest.mock import Mock, create_autospec
+from unittest.mock import MagicMock, Mock, call, create_autospec
 
 import pytest
 
+import lancet.__main__ as lancet_main
 from lancet.cli import CLI, log_dependency_versions
 from lancet.config import Config, ConfigFileReadResult, OcrDestination, read_config_file
-from lancet.exceptions import ConfigReadError
+from lancet.exceptions import ConfigReadError, PortAlreadyInUseError
 from lancet.ipc.client import LancetIpcClient
+from lancet.ipc.server import IpcServer
 from lancet.ipc.types import IpcResponse, IpcStatus
 
 OpenFn = Callable[..., typing.IO[str]]
@@ -41,37 +41,53 @@ class ReadRecoveryScenario(typing.NamedTuple):
     """A scenario for read_config_file recovery from a malformed/unreadable config."""
 
     file_content: str | None  # None means "do not create the file"
-    expect_error_substring: str  # Empty means no error expected.
+    expected_error_prefix: str  # Empty means no error expected.
+    expected_copy_to: OcrDestination
+    expect_backup: bool
 
 
 RECOVERY_SCENARIOS: dict[str, ReadRecoveryScenario] = {
     "happy_path_returns_config": ReadRecoveryScenario(
         file_content=json.dumps({"copy_to": "clipboard"}),
-        expect_error_substring="",
+        expected_error_prefix="",
+        expected_copy_to=OcrDestination.clipboard,
+        expect_backup=False,
     ),
     "missing_file_returns_defaults": ReadRecoveryScenario(
         file_content=None,
-        expect_error_substring="",
+        expected_error_prefix="",
+        expected_copy_to=OcrDestination.goldendict,
+        expect_backup=False,
     ),
     "malformed_json_returns_defaults_with_error": ReadRecoveryScenario(
         file_content="{not valid json",
-        expect_error_substring="failed to decode json config file",
+        expected_error_prefix="failed to decode json config file",
+        expected_copy_to=OcrDestination.goldendict,
+        expect_backup=True,
     ),
     "unknown_field_returns_defaults_with_error": ReadRecoveryScenario(
         file_content=json.dumps({"unknown_field": "value"}),
-        expect_error_substring="failed to parse config file",
+        expected_error_prefix="failed to parse config file",
+        expected_copy_to=OcrDestination.goldendict,
+        expect_backup=True,
     ),
     "non_object_json_returns_defaults_with_error": ReadRecoveryScenario(
         file_content="[]",
-        expect_error_substring="top-level JSON value must be an object",
+        expected_error_prefix="failed to parse config file: top-level JSON value must be an object",
+        expected_copy_to=OcrDestination.goldendict,
+        expect_backup=True,
     ),
     "unhashable_copy_to_uses_default": ReadRecoveryScenario(
         file_content=json.dumps({"copy_to": []}),
-        expect_error_substring="",
+        expected_error_prefix="",
+        expected_copy_to=OcrDestination.goldendict,
+        expect_backup=False,
     ),
     "wrong_goldendict_path_type_returns_defaults_with_error": ReadRecoveryScenario(
         file_content=json.dumps({"path_to_goldendict_executable": {}}),
-        expect_error_substring="failed to parse config file",
+        expected_error_prefix="failed to parse config file",
+        expected_copy_to=OcrDestination.goldendict,
+        expect_backup=True,
     ),
 }
 
@@ -88,46 +104,24 @@ class TestReadConfigFileRecovery:
     """Verify read_config_file's recovery contract for each malformed-file scenario."""
 
     @pytest.mark.parametrize("scenario", RECOVERY_SCENARIOS.values(), ids=RECOVERY_SCENARIOS.keys())
-    def test_returns_config_file_read_result(
+    def test_recovery(
         self, scenario: ReadRecoveryScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
     ) -> None:
-        """For every scenario, read_config_file must return a ConfigFileReadResult, never raise."""
+        """Return a Config result with the expected value, error, and backup behavior."""
         cfg_path = write_scenario_config(scenario, tmp_path)
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
 
         result = read_config_file()
         assert isinstance(result, ConfigFileReadResult)
         assert isinstance(result.cfg, Config)
-
-    @pytest.mark.parametrize("scenario", RECOVERY_SCENARIOS.values(), ids=RECOVERY_SCENARIOS.keys())
-    def test_error_substring_matches(
-        self, scenario: ReadRecoveryScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-    ) -> None:
-        """The error string carried by ConfigFileReadResult matches the failure mode."""
-        cfg_path = write_scenario_config(scenario, tmp_path)
-        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
-
-        result = read_config_file()
-        if scenario.expect_error_substring:
-            assert scenario.expect_error_substring in result.error
+        assert result.cfg.copy_to == scenario.expected_copy_to
+        if scenario.expected_error_prefix:
+            assert result.error.startswith(scenario.expected_error_prefix)
         else:
             assert result.error == ""
-
-
-class TestReadConfigFileBackupOnError:
-    """When the existing config is malformed, the file must be renamed aside."""
-
-    def test_malformed_json_renames_to_old(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-        """A corrupt config is moved to .old to make room for a fresh default config."""
-        cfg_path = tmp_path / "lancet.json"
-        cfg_path.write_text("{not valid json", encoding="utf-8")
-        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
-
-        result = read_config_file()
-        assert not cfg_path.is_file()
-        assert (tmp_path / "lancet.old").is_file()
-        # Defaults are returned regardless.
-        assert result.cfg.copy_to == OcrDestination.goldendict
+        assert cfg_path.with_suffix(".old").is_file() == scenario.expect_backup
+        if scenario.expect_backup:
+            assert cfg_path.is_file() is False
 
 
 class OSErrorScenario(typing.NamedTuple):
@@ -231,6 +225,7 @@ class TestLogDependencyVersions:
     def test_logs_transformers_version(
         self, scenario: DependencyVersionScenario, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Log the installed version or a warning when transformers is absent."""
         version = Mock()
         if isinstance(scenario.version_side_effect, Exception):
             version.side_effect = scenario.version_side_effect
@@ -272,7 +267,7 @@ class TestCliCommands:
         getattr(client, scenario.client_method_name).return_value = response
         cli = CLI(Config(), client)
         info = Mock()
-        monkeypatch.setattr("lancet.__main__.logger.info", info)
+        monkeypatch.setattr("lancet.cli.logger.info", info)
 
         getattr(cli, scenario.method_name)(*scenario.args)
 
@@ -281,3 +276,155 @@ class TestCliCommands:
         else:
             assert getattr(client, scenario.client_method_name).call_args.args == scenario.args
         assert info.call_args.args == ("ok: accepted",)
+
+
+class MainDispatchScenario(typing.NamedTuple):
+    """Expected entry-point dispatch for one command-line argument list."""
+
+    args: Sequence[str]
+    uses_cli: bool
+    config_exists: bool = True
+    port_in_use: bool = False
+    config_error: str = ""
+
+
+MAIN_DISPATCH_SCENARIOS: dict[str, MainDispatchScenario] = {
+    "no_arguments_starts_gui": MainDispatchScenario((), False),
+    "cli_saves_missing_config": MainDispatchScenario(("ocr",), True, False),
+    "occupied_port_skips_gui": MainDispatchScenario((), False, True, True),
+    "config_error_logs_and_starts_gui": MainDispatchScenario((), False, True, False, "invalid config"),
+}
+
+
+class MainDispatchHarness(typing.NamedTuple):
+    """Mocks used to verify one main-entry-point dispatch."""
+
+    cfg: Config
+    result: ConfigFileReadResult
+    cli: CLI
+    cli_type: Mock
+    fire: Mock
+    entered_ipc: IpcServer
+    ipc_context: MagicMock
+    ipc_type: Mock
+    run_program: Mock
+    warning: Mock
+    save_config: Mock
+    setup_frozen: Mock
+    log_versions: Mock
+    read_config: Mock
+    error_log: Mock
+
+
+class MainConfigHarness(typing.NamedTuple):
+    """Config state and persistence mock for one main dispatch."""
+
+    cfg: Config
+    result: ConfigFileReadResult
+    save_config: Mock
+
+
+class MainIpcHarness(typing.NamedTuple):
+    """IPC context mocks for one main dispatch."""
+
+    entered: IpcServer
+    context: MagicMock
+    ipc_type: Mock
+    run_program: Mock
+
+
+def make_main_config_harness(scenario: MainDispatchScenario) -> MainConfigHarness:
+    """Create Config state for one dispatch scenario."""
+    cfg = create_autospec(Config, instance=True)
+    cfg.file_exists.return_value = scenario.config_exists
+    return MainConfigHarness(cfg, ConfigFileReadResult(cfg, error=scenario.config_error), Mock())
+
+
+def make_main_ipc_harness(scenario: MainDispatchScenario) -> MainIpcHarness:
+    """Create IPC context state for one dispatch scenario."""
+    entered_ipc = create_autospec(IpcServer, instance=True)
+    ipc_context = MagicMock()
+    ipc_context.__enter__.return_value = entered_ipc
+    if scenario.port_in_use:
+        ipc_context.__enter__.side_effect = PortAlreadyInUseError("port occupied")
+    ipc_type, run_program = Mock(return_value=ipc_context), Mock()
+    return MainIpcHarness(entered_ipc, ipc_context, ipc_type, run_program)
+
+
+def assemble_main_dispatch_harness(
+    config: MainConfigHarness, ipc: MainIpcHarness, cli: CLI, cli_type: Mock, fire: Mock
+) -> MainDispatchHarness:
+    """Assemble grouped collaborators into the assertion harness."""
+    return MainDispatchHarness(
+        config.cfg,
+        config.result,
+        cli,
+        cli_type,
+        fire,
+        ipc.entered,
+        ipc.context,
+        ipc.ipc_type,
+        ipc.run_program,
+        Mock(),
+        config.save_config,
+        Mock(),
+        Mock(),
+        Mock(return_value=config.result),
+        Mock(),
+    )
+
+
+def make_main_dispatch_harness(scenario: MainDispatchScenario) -> MainDispatchHarness:
+    """Construct entry-point collaborators without installing patches."""
+    config = make_main_config_harness(scenario)
+    ipc = make_main_ipc_harness(scenario)
+    cli = create_autospec(CLI, instance=True)
+    return assemble_main_dispatch_harness(config, ipc, cli, Mock(return_value=cli), Mock())
+
+
+def install_main_dispatch_patches(
+    harness: MainDispatchHarness, scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Install one harness as the entry point's collaborators."""
+    monkeypatch.setattr(lancet_main.sys, "argv", ["lancet", *scenario.args])
+    monkeypatch.setattr(lancet_main, "setup_frozen_binary", harness.setup_frozen)
+    monkeypatch.setattr(lancet_main, "log_dependency_versions", harness.log_versions)
+    monkeypatch.setattr(harness.cfg, "save_to_file", harness.save_config)
+    monkeypatch.setattr(lancet_main, "read_config_file", harness.read_config)
+    monkeypatch.setattr(lancet_main, "CLI", harness.cli_type)
+    monkeypatch.setattr(lancet_main.fire, "Fire", harness.fire)
+    monkeypatch.setattr(lancet_main, "IpcServer", harness.ipc_type)
+    monkeypatch.setattr(lancet_main, "run_program", harness.run_program)
+    monkeypatch.setattr(lancet_main.logger, "warning", harness.warning)
+    monkeypatch.setattr(lancet_main.logger, "error", harness.error_log)
+
+
+def install_main_dispatch(scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch) -> MainDispatchHarness:
+    """Construct and install entry-point collaborators."""
+    harness = make_main_dispatch_harness(scenario)
+    install_main_dispatch_patches(harness, scenario, monkeypatch)
+    return harness
+
+
+class TestMainDispatch:
+    """Test selection between CLI and GUI entry points."""
+
+    @pytest.mark.parametrize("scenario", MAIN_DISPATCH_SCENARIOS.values(), ids=MAIN_DISPATCH_SCENARIOS.keys())
+    def test_dispatches_by_arguments(self, scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Arguments invoke Fire; an empty argument list enters the IPC-backed GUI."""
+        harness = install_main_dispatch(scenario, monkeypatch)
+        lancet_main.main()
+        harness.setup_frozen.assert_called_once_with()
+        harness.log_versions.assert_called_once_with()
+        harness.read_config.assert_called_once_with()
+        assert harness.cli_type.call_args_list == ([call(harness.cfg)] if scenario.uses_cli else [])
+        assert harness.fire.call_args_list == ([call(harness.cli)] if scenario.uses_cli else [])
+        assert harness.save_config.call_count == int(not scenario.config_exists)
+        assert harness.ipc_type.call_args_list == ([] if scenario.uses_cli else [call(harness.cfg)])
+        expected_run = (
+            [call(harness.result, harness.entered_ipc)] if not (scenario.uses_cli or scenario.port_in_use) else []
+        )
+        assert harness.run_program.call_args_list == expected_run
+        assert harness.ipc_context.__exit__.call_count == int(not (scenario.uses_cli or scenario.port_in_use))
+        assert harness.warning.call_args_list == ([call("port occupied")] if scenario.port_in_use else [])
+        assert harness.error_log.call_args_list == ([call(scenario.config_error)] if scenario.config_error else [])
