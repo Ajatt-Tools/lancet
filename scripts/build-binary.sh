@@ -46,6 +46,8 @@ main() {
 	cd -- "$(git rev-parse --show-toplevel)" || exit 1
 
 	local os sep
+	# detect_os is defined above; ShellCheck 0.11 misorders this call through main.
+	# shellcheck disable=SC2218
 	os=$(detect_os)
 	sep=$(python -c 'import os; print(os.pathsep)')
 	local -r os sep

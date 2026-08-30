@@ -15,6 +15,8 @@ echo "Creating .venv..."
 python -m venv .venv
 
 echo "Activating .venv..."
+# The activation script is generated at runtime and is unavailable to static analysis.
+# shellcheck disable=SC1091
 source .venv/bin/activate
 
 echo "Installing build dependencies..."

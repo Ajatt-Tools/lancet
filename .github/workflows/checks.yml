@@ -1,0 +1,38 @@
+name: Checks
+
+on:
+  # Branch pushes run directly; release tags invoke these checks through workflow_call.
+  push:
+    branches:
+      - "**"
+  pull_request:
+  # Allow to gate release builds on these checks.
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-tests:
+    name: Test Python package and scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository revision
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install Hatch
+        run: python -m pip install hatch
+
+      - name: Run tests
+        run: hatch test
+
+      - name: Check shell scripts
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: scripts
