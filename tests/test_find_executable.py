@@ -60,9 +60,13 @@ class TestFilterPyinstallerPaths:
     ) -> None:
         """Test that PyInstaller paths are correctly filtered out."""
         monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
-        assert filter_pyinstaller_paths(input_path) == expected
+        assert filter_pyinstaller_paths(input_path) == list(expected)
 
-    def test_filter_windows_paths(self, windows_pathsep: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_filter_windows_paths(
+        self,
+        windows_pathsep: None,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Windows PATH-style separators are handled when os.pathsep is semicolon."""
         monkeypatch.setattr(sys, "_MEIPASS", r"C:\Users\user\AppData\Local\Temp\_MEIxxxxx", raising=False)
         monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
@@ -111,13 +115,14 @@ class TestCleanLdLibraryPath:
 
     def test_clean_windows_path_variable(self, windows_pathsep: None, monkeypatch: pytest.MonkeyPatch) -> None:
         """Windows PATH-style separators are preserved when cleaning PATH-like variables."""
+        env_key = "QT_PLUGIN_PATH"
         monkeypatch.setattr(sys, "_MEIPASS", r"C:\Temp\_MEIaaa", raising=False)
         monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
         result = clean_ld_library_path(
-            {"QT_PLUGIN_PATH": r"C:\Temp\_MEIaaa;C:\Qt\plugins", "PATH": r"C:\Windows"},
-            env_key="QT_PLUGIN_PATH",
+            {env_key: r"C:\Temp\_MEIaaa;C:\Qt\plugins", "PATH": r"C:\Windows"},
+            env_key=env_key,
         )
-        assert result == {"QT_PLUGIN_PATH": r"C:\Qt\plugins", "PATH": r"C:\Windows"}
+        assert result == {env_key: r"C:\Qt\plugins", "PATH": r"C:\Windows"}
 
 
 class MakeCleanEnvScenario(typing.NamedTuple):
@@ -474,21 +479,23 @@ class TestFindExecutable:
 
     def test_home_expanded_absolute_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
         """A configured ~/ path is expanded before executable checks."""
-        bin_dir = tmp_path / "bin"
-        executable = make_executable_file(bin_dir, "goldendict")
+        relative_path = "bin/goldendict"
+        executable_path = tmp_path / relative_path
+        executable = make_executable_file(executable_path.parent, executable_path.name)
         monkeypatch.setenv("HOME", str(tmp_path))
-        assert find_executable("~/bin/goldendict") == str(executable.resolve())
+        assert find_executable(f"~/{relative_path}") == str(executable.resolve())
 
     def test_windows_hardcoded_lookup_adds_exe_suffix(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
     ) -> None:
         """A Windows hardcoded lookup resolves a bare browser name to its .exe file."""
+        name = "firefox"
         monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
         monkeypatch.setattr("lancet.find_executable.default_hardcoded_paths", lambda: (tmp_path,))
-        executable = tmp_path / "firefox.exe"
+        executable = tmp_path / f"{name}.exe"
         executable.write_text("contents", encoding="utf-8")
 
-        assert find_executable_hardcoded("firefox") == str(executable.resolve())
+        assert find_executable_hardcoded(name) == str(executable.resolve())
 
 
 class ExecutableCandidatesScenario(typing.NamedTuple):
