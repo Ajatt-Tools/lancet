@@ -124,16 +124,7 @@ class OcrWorkflow:
         """Send the OCR result to the configured destination (clipboard or GoldenDict)."""
         match self._cfg.copy_to:
             case OcrDestination.goldendict:
-                goldendict_path = resolve_goldendict_path(self._cfg.path_to_goldendict_executable)
-                try:
-                    run_and_disown((goldendict_path, text))
-                except FileNotFoundError as ex:
-                    logger.warning(f"Failed to launch GoldenDict: {ex}")
-                    self._notify.notify(f"Executable not found: {goldendict_path!r}. Check Preferences or PATH.")
-                    return
-                except OSError as ex:
-                    logger.warning(f"Failed to launch GoldenDict: {ex}")
-                    self._notify.notify(f"Failed to launch GoldenDict: {ex}")
+                if not self._copy_to_goldendict(text):
                     return
             case OcrDestination.clipboard:
                 clipboard = self._app.clipboard()
@@ -143,6 +134,21 @@ class OcrWorkflow:
                     return
                 clipboard.setText(text)
         self._notify.notify(f"{action_name} result copied: {text}")
+
+    def _copy_to_goldendict(self, text: str) -> bool:
+        """Launch GoldenDict with text and return whether delivery succeeded."""
+        goldendict_path = resolve_goldendict_path(self._cfg.path_to_goldendict_executable)
+        try:
+            run_and_disown((goldendict_path, text))
+        except FileNotFoundError as ex:
+            logger.warning(f"Failed to launch GoldenDict: {ex}")
+            self._notify.notify(f"Executable not found: {goldendict_path!r}. Check Preferences or PATH.")
+            return False
+        except OSError as ex:
+            logger.warning(f"Failed to launch GoldenDict: {ex}")
+            self._notify.notify(f"Failed to launch GoldenDict: {ex}")
+            return False
+        return True
 
     def _submit_ocr_task(self, *, op: Callable[[], str], action_name: str = "OCR") -> None:
         """Submit an OCR task to the background thread with shared success/failure callbacks."""
