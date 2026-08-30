@@ -6,7 +6,7 @@ from pynput.keyboard import HotKey, Key, KeyCode, Listener
 
 from lancet.exceptions import DuplicateShortcutError
 from lancet.keyboard_shortcuts.consts import PYNPUT_MODIFIERS
-from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
+from lancet.keyboard_shortcuts.hotkey import HotKeyStateUpdate, SiblingAwareHotKey
 from lancet.keyboard_shortcuts.types import ParsedEntry, PyShortcutStr
 
 
@@ -75,33 +75,38 @@ class LancetHotKeyListener(Listener):
         """Return the canonical modifiers represented by the pressed physical keys."""
         return frozenset(self.canonical(key) for key in self._pressed_modifiers)
 
-    def _try_activate_tracking_hotkeys(self, key: KeyCode | Key, pressed_modifiers: frozenset[KeyCode | Key]) -> None:
-        """Try to activate only hotkeys that contain the current pressed key."""
-        # All states must be current for sibling suppression, but only this key's
-        # hotkeys may activate; otherwise an unrelated press can fire a stale combo.
-        for hotkey in self._hotkeys:
-            if hotkey.tracks(key):
-                hotkey.try_activate(pressed_modifiers)
+    def _try_activate_hotkeys(
+        self,
+        hotkeys: Sequence[SiblingAwareHotKey],
+        pressed_modifiers: frozenset[KeyCode | Key],
+    ) -> None:
+        """Try to activate hotkeys whose held state changed on the current press."""
+        for hotkey in hotkeys:
+            hotkey.try_activate(pressed_modifiers)
 
     def _on_press(self, key: Key | KeyCode | None, injected: bool) -> None:
-        """Update every hotkey's state, then ask each to activate if eligible."""
+        """Track a real key press and activate only hotkeys with a fresh state transition."""
         if injected or key is None:
             return
         canonical = self.canonical(key)
         if canonical in PYNPUT_MODIFIERS:
             # Keep physical variants distinct so releasing one side does not erase the other.
             self._pressed_modifiers.add(key)
-        for hotkey in self._hotkeys:
-            hotkey.update_state(canonical)
-        self._try_activate_tracking_hotkeys(canonical, self._canonical_pressed_modifiers())
+        # Update every state for sibling suppression, but only fresh transitions
+        # may activate; auto-repeat must not revive a previously blocked chord.
+        transitioned = tuple(
+            hotkey for hotkey in self._hotkeys if hotkey.update_state(canonical) is HotKeyStateUpdate.changed
+        )
+        self._try_activate_hotkeys(transitioned, self._canonical_pressed_modifiers())
 
     def _on_release(self, key: Key | KeyCode | None, injected: bool) -> None:
-        """Forward releases to every hotkey so per-combo activation latches reset."""
+        """Release a real key, preserving canonical modifiers until their final physical variant is released."""
         if injected or key is None:
             return
         canonical = self.canonical(key)
         self._pressed_modifiers.discard(key)
-        # Forward a canonical release only after its final physical variant is released.
+        # Left and right modifier keys share one canonical state. Do not release it
+        # while another physical variant remains held.
         if canonical in self._canonical_pressed_modifiers():
             return
         for hotkey in self._hotkeys:

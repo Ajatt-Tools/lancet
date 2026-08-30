@@ -120,6 +120,21 @@ LISTENER_INTEGRATION_SCENARIOS: dict[str, ListenerIntegrationScenario] = {
         events=(lpress(SHIFT), lpress(SHIFT), lpress(ALT), lpress(KEY_O)),
         expected_counts=(1,),
     ),
+    "blocked_chord_stays_blocked_on_trigger_autorepeat": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"),),
+        events=(lpress(SHIFT), lpress(ALT), lpress(KEY_O), lrelease(SHIFT), lpress(KEY_O)),
+        expected_counts=(0,),
+    ),
+    "less_specific_sibling_stays_blocked_on_trigger_autorepeat": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"), PyShortcutStr("<shift>+<alt>+o")),
+        events=(lpress(SHIFT), lpress(ALT), lpress(KEY_O), lrelease(SHIFT), lpress(KEY_O)),
+        expected_counts=(0, 1),
+    ),
+    "trigger_release_allows_normal_reactivation": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"),),
+        events=(lpress(ALT), lpress(KEY_O), lrelease(KEY_O), lpress(KEY_O)),
+        expected_counts=(2,),
+    ),
 }
 
 

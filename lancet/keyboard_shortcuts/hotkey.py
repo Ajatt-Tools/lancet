@@ -1,12 +1,20 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import enum
 from collections.abc import Callable, Iterable, Sequence, Set
 
 from pynput.keyboard import Key, KeyCode
 
 from lancet.exceptions import KeyboardShortcutParseError
 from lancet.keyboard_shortcuts.consts import PYNPUT_MODIFIERS
+
+
+class HotKeyStateUpdate(enum.Enum):
+    """Outcome of applying one key press to a hotkey's held state."""
+
+    unchanged = enum.auto()
+    changed = enum.auto()
 
 
 class SiblingAwareHotKey:
@@ -50,15 +58,18 @@ class SiblingAwareHotKey:
             shortcut for shortcut in siblings if shortcut is not self and shortcut._keys > self._keys
         )
 
-    def update_state(self, key: KeyCode | Key) -> None:
+    def update_state(self, key: KeyCode | Key) -> HotKeyStateUpdate:
         """
-        Phase 1: record a key press without activating.
+        Phase 1: record a key press and report whether the held state changed.
 
         The listener calls this on every registered hotkey first,
         so all states reflect the current key event before any activation decision.
         """
-        if self.tracks(key):
-            self._state.add(key)
+        # Untracked keys and auto-repeated presses leave this hotkey's state unchanged.
+        if not self.tracks(key) or key in self._state:
+            return HotKeyStateUpdate.unchanged
+        self._state.add(key)
+        return HotKeyStateUpdate.changed
 
     def try_activate(self, pressed_modifiers: Set[KeyCode | Key]) -> None:
         """
