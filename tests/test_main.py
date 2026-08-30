@@ -237,8 +237,8 @@ class TestLogDependencyVersions:
         else:
             version.return_value = scenario.version_side_effect
         message = Mock()
-        monkeypatch.setattr("lancet.__main__.importlib.metadata.version", version)
-        monkeypatch.setattr(f"lancet.__main__.logger.{scenario.expected_logger}", message)
+        monkeypatch.setattr("lancet.cli.importlib.metadata.version", version)
+        monkeypatch.setattr(f"lancet.cli.logger.{scenario.expected_logger}", message)
 
         log_dependency_versions()
 
