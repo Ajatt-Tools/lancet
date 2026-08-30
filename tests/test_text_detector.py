@@ -1,18 +1,26 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""
-Tests for the pure helpers in lancet.text_detector_client.text_detector.
-"""
+"""Tests for text-detector helpers, construction, and speech-bubble integration."""
 
+import errno
 import pathlib
+import re
 import typing
+from collections.abc import Sequence
+from unittest.mock import create_autospec, patch
 
 import cv2
 import numpy as np
 import pytest
 from PIL import Image
 
+from comic_text_detector.inference import TextDetector
+from comic_text_detector.utils.textblock import TextBlock
+from lancet.model_utils.device import TorchDevice
+from lancet.text_detector_client.model_cache import ComicTextDetectorCache
 from lancet.text_detector_client.text_detector import (
+    ComicTextDetector,
+    DetectResult,
     crop_box_region,
     pil_image_to_bgr_array,
     read_image_from_path,
@@ -23,6 +31,9 @@ from lancet.text_detector_client.text_detector_base import (
     Rect,
     clamp,
 )
+
+EMPTY_PIL_IMAGE_RE = re.compile("cannot convert an empty PIL image")
+EMPTY_CROP_RE = re.compile("crop region is empty")
 
 
 class LoadErrorScenario(typing.NamedTuple):
@@ -55,18 +66,176 @@ class TestTextDetectorLoadErrorMessage:
         assert model_path.read_bytes() == b"validated checkpoint"
 
 
-class PilToBgrScenario(typing.NamedTuple):
-    """A scenario describing a single-pixel RGB image and the expected BGR triplet."""
+class DetectorConstructorScenario(typing.NamedTuple):
+    """Constructor settings and selected inference device."""
 
+    force_cpu: bool
+    detector_input_size: int
+    device: TorchDevice
+
+
+DETECTOR_CONSTRUCTOR_SCENARIOS: dict[str, DetectorConstructorScenario] = {
+    "forced_cpu": DetectorConstructorScenario(True, 768, TorchDevice.cpu),
+    "automatic_cuda": DetectorConstructorScenario(False, 1024, TorchDevice.cuda),
+}
+
+
+class TestComicTextDetectorConstructor:
+    """Test model-path, resolution, and device forwarding during construction."""
+
+    @pytest.mark.parametrize(
+        "scenario", DETECTOR_CONSTRUCTOR_SCENARIOS.values(), ids=DETECTOR_CONSTRUCTOR_SCENARIOS.keys()
+    )
+    def test_builds_backend_once(self, scenario: DetectorConstructorScenario, tmp_path: pathlib.Path) -> None:
+        """Load the cached checkpoint once and pass normalized settings to TextDetector."""
+        model_path = tmp_path / "comictextdetector.pt"
+        cache = create_autospec(ComicTextDetectorCache, instance=True)
+        cache.comic_text_detector_path.return_value = model_path
+        backend = create_autospec(TextDetector, instance=True)
+        backend.device = scenario.device.name
+
+        with (
+            patch(
+                "lancet.text_detector_client.text_detector.ComicTextDetectorCache",
+                autospec=True,
+                return_value=cache,
+            ) as cache_class,
+            patch(
+                "lancet.text_detector_client.text_detector.TextDetector", autospec=True, return_value=backend
+            ) as detector_class,
+            patch(
+                "lancet.text_detector_client.text_detector.get_device",
+                autospec=True,
+                return_value=scenario.device,
+            ) as get_device,
+        ):
+            detector = ComicTextDetector(
+                force_cpu=scenario.force_cpu,
+                detector_input_size=scenario.detector_input_size,
+            )
+
+        assert detector.force_cpu is scenario.force_cpu
+        assert detector.detector_input_size == scenario.detector_input_size
+        cache_class.assert_called_once_with()
+        cache.comic_text_detector_path.assert_called_once_with()
+        get_device.assert_called_once_with(force_cpu=scenario.force_cpu)
+        detector_class.assert_called_once_with(
+            model_path=model_path,
+            input_size=scenario.detector_input_size,
+            device=scenario.device.name.lower(),
+            act="leaky",
+        )
+
+
+DETECTOR_CONSTRUCTOR_ERROR_SCENARIOS: dict[str, Exception] = {
+    "runtime_error": RuntimeError("invalid checkpoint"),
+    "os_error": OSError("device unavailable"),
+}
+
+
+class TestComicTextDetectorConstructorErrors:
+    """Test actionable error normalization without deleting the checkpoint."""
+
+    @pytest.mark.parametrize(
+        "error",
+        DETECTOR_CONSTRUCTOR_ERROR_SCENARIOS.values(),
+        ids=DETECTOR_CONSTRUCTOR_ERROR_SCENARIOS.keys(),
+    )
+    def test_wraps_backend_failure_and_preserves_cache(self, error: Exception, tmp_path: pathlib.Path) -> None:
+        """Wrap the original failure, retain its cause, and preserve the validated file."""
+        model_path = tmp_path / "comictextdetector.pt"
+        model_path.write_bytes(b"validated checkpoint")
+        cache = create_autospec(ComicTextDetectorCache, instance=True)
+        cache.comic_text_detector_path.return_value = model_path
+
+        with (
+            patch(
+                "lancet.text_detector_client.text_detector.ComicTextDetectorCache",
+                autospec=True,
+                return_value=cache,
+            ),
+            patch("lancet.text_detector_client.text_detector.TextDetector", autospec=True, side_effect=error),
+            patch(
+                "lancet.text_detector_client.text_detector.get_device",
+                autospec=True,
+                return_value=TorchDevice.cpu,
+            ),
+            pytest.raises(ComicTextDetectorException) as exc_info,
+        ):
+            ComicTextDetector(force_cpu=True, detector_input_size=512)
+
+        assert str(exc_info.value) == text_detector_load_error_message(model_path, error)
+        assert exc_info.value.__cause__ is error
+        assert model_path.read_bytes() == b"validated checkpoint"
+        cache.comic_text_detector_path.assert_called_once_with()
+
+
+def make_detector_with_mocked_backend() -> ComicTextDetector:
+    """Construct a detector while replacing checkpoint and inference dependencies."""
+    cache = create_autospec(ComicTextDetectorCache, instance=True)
+    cache.comic_text_detector_path.return_value = pathlib.Path("comictextdetector.pt")
+    backend = create_autospec(TextDetector, instance=True)
+    backend.device = TorchDevice.cpu.name
+    with (
+        patch("lancet.text_detector_client.text_detector.ComicTextDetectorCache", return_value=cache),
+        patch("lancet.text_detector_client.text_detector.TextDetector", return_value=backend),
+        patch("lancet.text_detector_client.text_detector.get_device", return_value=TorchDevice.cpu),
+    ):
+        return ComicTextDetector(force_cpu=True)
+
+
+class SpeechBubbleClampScenario(typing.NamedTuple):
+    """A detector rectangle and its expected clamped speech-bubble box."""
+
+    xyxy: Sequence[int]
+    expected_box: Rect | None
+
+
+SPEECH_BUBBLE_CLAMP_SCENARIOS: dict[str, SpeechBubbleClampScenario] = {
+    "partially_outside_is_clamped": SpeechBubbleClampScenario((-2, -1, 4, 5), Rect(0, 0, 4, 5)),
+    "fully_outside_is_skipped": SpeechBubbleClampScenario((12, 1, 14, 3), None),
+}
+
+
+class TestSpeechBubbleClampingIntegration:
+    """Test detector rectangles are clamped before speech-bubble crops are created."""
+
+    @pytest.mark.parametrize(
+        "scenario", SPEECH_BUBBLE_CLAMP_SCENARIOS.values(), ids=SPEECH_BUBBLE_CLAMP_SCENARIOS.keys()
+    )
+    def test_clamped_blocks(self, scenario: SpeechBubbleClampScenario) -> None:
+        """Partial boxes produce bounded crops while zero-area boxes are omitted."""
+        detector = make_detector_with_mocked_backend()
+        mask = np.zeros((8, 10), dtype=np.uint8)
+        detected = DetectResult(mask=mask, mask_refined=mask, blk_list=[TextBlock(list(scenario.xyxy), font_size=12)])
+        with patch.object(detector, "_detect_text", return_value=detected):
+            result = detector.get_speech_bubbles(Image.new("RGB", (10, 8)))
+
+        assert [block.box for block in result.blocks] == (
+            [] if scenario.expected_box is None else [scenario.expected_box]
+        )
+        if scenario.expected_box is not None:
+            assert result.blocks[0].box_image.size == (
+                scenario.expected_box.x2 - scenario.expected_box.x1,
+                scenario.expected_box.y2 - scenario.expected_box.y1,
+            )
+
+
+class PilToBgrScenario(typing.NamedTuple):
+    """An RGB image size/color and expected BGR triplet."""
+
+    width: int
+    height: int
     rgb: tuple[int, int, int]
     expected_bgr: tuple[int, int, int]
 
 
 PIL_TO_BGR_SCENARIOS: dict[str, PilToBgrScenario] = {
-    "red_pixel": PilToBgrScenario(rgb=(255, 0, 0), expected_bgr=(0, 0, 255)),
-    "green_pixel": PilToBgrScenario(rgb=(0, 255, 0), expected_bgr=(0, 255, 0)),
-    "blue_pixel": PilToBgrScenario(rgb=(0, 0, 255), expected_bgr=(255, 0, 0)),
-    "grey_pixel": PilToBgrScenario(rgb=(128, 128, 128), expected_bgr=(128, 128, 128)),
+    "red_pixel": PilToBgrScenario(1, 1, (255, 0, 0), (0, 0, 255)),
+    "green_pixel": PilToBgrScenario(1, 1, (0, 255, 0), (0, 255, 0)),
+    "blue_pixel": PilToBgrScenario(1, 1, (0, 0, 255), (255, 0, 0)),
+    "grey_pixel": PilToBgrScenario(1, 1, (128, 128, 128), (128, 128, 128)),
+    "larger_image": PilToBgrScenario(4, 6, (10, 20, 30), (30, 20, 10)),
 }
 
 
@@ -75,20 +244,14 @@ class TestPilImageToBgrArray:
 
     @pytest.mark.parametrize("scenario", PIL_TO_BGR_SCENARIOS.values(), ids=PIL_TO_BGR_SCENARIOS.keys())
     def test_pixel_channel_order(self, scenario: PilToBgrScenario) -> None:
-        """A 1x1 RGB image converts to a 1x1x3 BGR array with channel order swapped."""
-        image = Image.new("RGB", (1, 1), color=scenario.rgb)
+        """RGB images preserve dimensions and swap pixel channels to BGR."""
+        image = Image.new("RGB", (scenario.width, scenario.height), color=scenario.rgb)
 
         result = pil_image_to_bgr_array(image)
 
-        assert result.shape == (1, 1, 3)
+        assert result.shape == (scenario.height, scenario.width, 3)
         assert result.dtype == np.uint8
         assert tuple(int(v) for v in result[0, 0]) == scenario.expected_bgr
-
-    def test_larger_image_shape_preserved(self) -> None:
-        """A 4x6 RGB image converts to a (6, 4, 3) BGR array (PIL is W,H; numpy is H,W)."""
-        image = Image.new("RGB", (4, 6), color=(10, 20, 30))
-        result = pil_image_to_bgr_array(image)
-        assert result.shape == (6, 4, 3)
 
 
 def make_solid_bgr_array(height: int, width: int, bgr: tuple[int, int, int]) -> np.ndarray:
@@ -160,34 +323,67 @@ def write_png(path: pathlib.Path, height: int, width: int, bgr: tuple[int, int, 
     buffer.tofile(str(path))
 
 
+class ReadImageScenario(typing.NamedTuple):
+    """An image-file condition and expected error contract."""
+
+    file_kind: typing.Literal["png", "garbage", "missing"]
+    error_type: type[Exception] | None
+    expected_message_template: str
+
+
+READ_IMAGE_SCENARIOS: dict[str, ReadImageScenario] = {
+    "png_round_trip": ReadImageScenario("png", None, ""),
+    "undecodable_bytes": ReadImageScenario(
+        "garbage",
+        ComicTextDetectorException,
+        "Failed to read image: {path}. Possible cause: Animation file, Corrupted file or Unsupported type",
+    ),
+    "missing_file": ReadImageScenario("missing", FileNotFoundError, ""),
+}
+
+
+def prepare_image_path(scenario: ReadImageScenario, tmp_path: pathlib.Path) -> pathlib.Path:
+    """Create the image fixture requested by scenario and return its path."""
+    image_path = tmp_path / "probe.png"
+    if scenario.file_kind == "png":
+        write_png(image_path, height=3, width=5, bgr=(100, 110, 120))
+    elif scenario.file_kind == "garbage":
+        image_path.write_bytes(b"this is not a png file at all, just some text")
+    return image_path
+
+
+def assert_image_read_success(image_path: pathlib.Path) -> None:
+    """Assert a valid PNG is decoded with its expected shape, type, and pixel."""
+    result = read_image_from_path(image_path)
+    assert result.shape == (3, 5, 3)
+    assert result.dtype == np.uint8
+    assert tuple(int(v) for v in result[0, 0]) == (100, 110, 120)
+
+
+def assert_image_read_error(image_path: pathlib.Path, error_type: type[Exception], expected_message: str) -> None:
+    """Assert image_path raises the requested public error contract."""
+    with pytest.raises(error_type) as exc_info:
+        read_image_from_path(image_path)
+    if isinstance(exc_info.value, FileNotFoundError):
+        assert exc_info.value.errno == errno.ENOENT
+        assert exc_info.value.filename is not None
+        assert pathlib.Path(exc_info.value.filename) == image_path
+    else:
+        assert str(exc_info.value) == expected_message
+
+
 class TestReadImageFromPath:
     """read_image_from_path round-trips PNGs and raises ComicTextDetectorException on garbage."""
 
-    def test_round_trip_png(self, tmp_path: pathlib.Path) -> None:
-        """A small PNG written by cv2 is read back with the expected shape and pixel values."""
-        png_path = tmp_path / "probe.png"
-        write_png(png_path, height=3, width=5, bgr=(100, 110, 120))
-
-        result = read_image_from_path(png_path)
-
-        assert result.shape == (3, 5, 3)
-        assert result.dtype == np.uint8
-        assert tuple(int(v) for v in result[0, 0]) == (100, 110, 120)
-
-    def test_undecodable_bytes_raise(self, tmp_path: pathlib.Path) -> None:
-        """A file with non-image content makes cv2.imdecode return None, which raises ComicTextDetectorException."""
-        garbage = tmp_path / "garbage.png"
-        garbage.write_bytes(b"this is not a png file at all, just some text")
-
-        with pytest.raises(ComicTextDetectorException) as excinfo:
-            read_image_from_path(garbage)
-        assert "Failed to read image" in str(excinfo.value)
-
-    def test_missing_file_raises_file_not_found(self, tmp_path: pathlib.Path) -> None:
-        """A nonexistent path raises FileNotFoundError (np.fromfile's behavior, not the function's contract)."""
-        missing = tmp_path / "does_not_exist.png"
-        with pytest.raises(FileNotFoundError):
-            read_image_from_path(missing)
+    @pytest.mark.parametrize("scenario", READ_IMAGE_SCENARIOS.values(), ids=READ_IMAGE_SCENARIOS.keys())
+    def test_read(self, scenario: ReadImageScenario, tmp_path: pathlib.Path) -> None:
+        """Read valid PNG data and preserve the distinct malformed and missing-file errors."""
+        image_path = prepare_image_path(scenario, tmp_path)
+        if scenario.error_type is None:
+            assert_image_read_success(image_path)
+        else:
+            expected_message = scenario.expected_message_template.format(path=image_path)
+            assert_image_read_error(image_path, scenario.error_type, expected_message)
 
 
 class EmptyImageScenario(typing.NamedTuple):
@@ -219,7 +415,7 @@ class TestPilImageToBgrArrayRejectsEmpty:
     @pytest.mark.parametrize("scenario", EMPTY_IMAGE_SCENARIOS.values(), ids=EMPTY_IMAGE_SCENARIOS.keys())
     def test_empty_image_raises(self, scenario: EmptyImageScenario) -> None:
         """An image with zero width or height raises ComicTextDetectorException."""
-        with pytest.raises(ComicTextDetectorException, match="cannot convert an empty PIL image"):
+        with pytest.raises(ComicTextDetectorException, match=EMPTY_PIL_IMAGE_RE):
             pil_image_to_bgr_array(scenario.image)
 
 
@@ -257,7 +453,7 @@ class TestCropBoxRegionRejectsEmpty:
     def test_degenerate_rect_raises(self, scenario: EmptyCropScenario) -> None:
         """A Rect with zero or negative area raises ComicTextDetectorException."""
         img = make_solid_bgr_array(8, 8, (100, 100, 100))
-        with pytest.raises(ComicTextDetectorException, match="crop region is empty"):
+        with pytest.raises(ComicTextDetectorException, match=EMPTY_CROP_RE):
             crop_box_region(img, scenario.rect)
 
 
