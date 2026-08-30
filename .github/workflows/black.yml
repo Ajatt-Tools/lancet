@@ -3,8 +3,8 @@ name: Lint
 on:
   push:
     # https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore
-    tags-ignore:
-      - '**'
+    branches:
+      - "**"
   pull_request:
 
 jobs:
