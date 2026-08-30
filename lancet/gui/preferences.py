@@ -67,6 +67,9 @@ class PreferencesDialogSplitter(QSplitter):
         """Return the saved splitter state bytes, or None if missing or empty."""
         try:
             state = self._splitter_state_file.read_bytes()
+        except FileNotFoundError:
+            # When the file doesn't exist it's not an error.
+            return None
         except OSError as e:
             logger.warning(f"can't read splitter state: {e}")
             return None
