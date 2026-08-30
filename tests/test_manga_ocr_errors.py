@@ -18,7 +18,10 @@ from lancet.ocr.manga_ocr import (
     load_tokenizer,
     tokenizer_is_fast_label,
 )
-from lancet.ocr.manga_ocr_base import MangaOCRException, MangaOCRTokenizerLoadError
+from lancet.ocr.manga_ocr_base import (
+    MangaOCRLoadError,
+    MangaOCRTokenizerLoadError,
+)
 
 
 class FakeTokenizer(PreTrainedTokenizerBase):
@@ -101,44 +104,73 @@ class TestAdjustErrorMessage:
         assert scenario.expected_substring in str(result)
 
 
+class WebLoadErrorScenario(typing.NamedTuple):
+    """A web-enabled model load failure and its exact public error contract."""
+
+    error_message: str
+    model_name: str
+    expected_message: str
+    preserve_identity: bool = False
+
+
+WEB_LOAD_ERROR_SCENARIOS: dict[str, WebLoadErrorScenario] = {
+    "unsupported_format": WebLoadErrorScenario(
+        "Can't load image processor",
+        "tflite/model",
+        "'tflite/model' is not a compatible HuggingFace transformers model. "
+        "It may be in TFLite, ONNX, or another unsupported format. "
+        "Lancet supports safetensors models like 'tatsumoto/manga-ocr-base' or "
+        "'jzhang533/manga-ocr-base-2025'.",
+    ),
+    "missing_vocabulary": WebLoadErrorScenario(
+        "Unable to load vocabulary",
+        "good/model",
+        "Unable to load vocabulary. This may indicate missing files for fugashi/unidic_lite "
+        "(commonly happens in PyInstaller builds).",
+    ),
+    "unrecognized_passthrough": WebLoadErrorScenario(
+        "Something weird happened", "good/model", "Something weird happened", True
+    ),
+}
+
+
 class TestTryLoadModelWithWebDownload:
     """Tests that _try_load_model_with_web_download_enabled raises improved error messages."""
 
-    def test_raises_improved_error_for_unsupported_format(self) -> None:
+    @pytest.mark.parametrize("scenario", WEB_LOAD_ERROR_SCENARIOS.values(), ids=WEB_LOAD_ERROR_SCENARIOS.keys())
+    def test_normalizes_load_error(self, scenario: WebLoadErrorScenario) -> None:
+        """Known download failures are improved while unknown errors retain their message."""
         mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
-        mocr._load_from_pretrained.side_effect = OSError("Can't load image processor")
+        error = OSError(scenario.error_message)
+        mocr._load_from_pretrained.side_effect = error
         with pytest.raises(OSError) as excinfo:
-            MangaOcr._try_load_model_with_web_download_enabled(mocr, "tflite/model")
-        assert "not a compatible HuggingFace transformers model" in str(excinfo.value)
-
-    def test_raises_improved_error_for_vocabulary(self) -> None:
-        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
-        mocr._load_from_pretrained.side_effect = OSError("Unable to load vocabulary")
-        with pytest.raises(OSError) as excinfo:
-            MangaOcr._try_load_model_with_web_download_enabled(mocr, "good/model")
-        assert "fugashi/unidic_lite" in str(excinfo.value)
-
-    def test_passes_through_unrecognized_error(self) -> None:
-        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
-        original = OSError("Something weird happened")
-        mocr._load_from_pretrained.side_effect = original
-        with pytest.raises(OSError) as excinfo:
-            MangaOcr._try_load_model_with_web_download_enabled(mocr, "good/model")
-        assert str(excinfo.value) == str(original)
+            MangaOcr._try_load_model_with_web_download_enabled(mocr, scenario.model_name)
+        assert str(excinfo.value) == scenario.expected_message
+        if scenario.preserve_identity:
+            assert excinfo.value is error
 
 
 class TestLoadModelRetry:
     """_load_model warns on a local cache miss and then retries with downloads enabled."""
 
-    def test_local_cache_failure_warns_then_retries_with_downloads(self) -> None:
+    @pytest.mark.parametrize(
+        "error_message,model_name",
+        [("cache miss", "model/name"), ("offline cache", "alternate/model")],
+        ids=["cache_miss", "offline_cache"],
+    )
+    def test_local_cache_failure_warns_then_retries_with_downloads(self, error_message: str, model_name: str) -> None:
+        """A local cache miss logs a warning before the download-enabled retry."""
         mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
         with (patch("lancet.ocr.manga_ocr.logger.warning") as mock_warning,):
-            mocr._load_from_pretrained.side_effect = OSError("cache miss")
-            MangaOcr._load_model(mocr, "model/name")
+            mocr._load_from_pretrained.side_effect = OSError(error_message)
+            MangaOcr._load_model(mocr, model_name)
 
             assert mocr._load_from_pretrained.call_count == 1
-            mocr._try_load_model_with_web_download_enabled.assert_called_once_with("model/name")
-            assert "Failed to load OCR model from local cache" in str(mock_warning.call_args.args[0])
+            mocr._try_load_model_with_web_download_enabled.assert_called_once_with(model_name)
+            assert mock_warning.call_args.args == (
+                f"Failed to load OCR model from local cache: OSError: {error_message}. "
+                "Retrying with downloads enabled.",
+            )
 
 
 class AutoTokenizerErrorScenario(typing.NamedTuple):
@@ -293,19 +325,46 @@ class TestLoadTokenizerFallback:
             )
 
 
+class MangaOcrInitErrorScenario(typing.NamedTuple):
+    """A model-load failure and the public exception MangaOcr should raise."""
+
+    input_error_type: type[Exception]
+    input_message: str
+    expected_type: type[Exception]
+    expected_message: str
+    preserve_identity: bool
+
+
+MANGA_OCR_INIT_ERROR_SCENARIOS: dict[str, MangaOcrInitErrorScenario] = {
+    "specific_error_preserved": MangaOcrInitErrorScenario(
+        MangaOCRTokenizerLoadError,
+        "clean message",
+        MangaOCRTokenizerLoadError,
+        "clean message",
+        True,
+    ),
+    "generic_error_wrapped": MangaOcrInitErrorScenario(
+        RuntimeError,
+        "generic failure",
+        MangaOCRLoadError,
+        "RuntimeError: generic failure",
+        False,
+    ),
+}
+
+
 class TestMangaOcrInitErrors:
     """MangaOcr.__init__ preserves specific OCR exceptions instead of double-wrapping them."""
 
-    def test_preserves_manga_ocr_exception(self) -> None:
-        with patch.object(MangaOcr, "_load_model", side_effect=MangaOCRTokenizerLoadError("clean message")):
-            with pytest.raises(MangaOCRTokenizerLoadError) as excinfo:
+    @pytest.mark.parametrize(
+        "scenario", MANGA_OCR_INIT_ERROR_SCENARIOS.values(), ids=MANGA_OCR_INIT_ERROR_SCENARIOS.keys()
+    )
+    def test_load_error(self, scenario: MangaOcrInitErrorScenario) -> None:
+        """Specific OCR errors pass through while generic failures are wrapped."""
+        error = scenario.input_error_type(scenario.input_message)
+        with patch.object(MangaOcr, "_load_model", side_effect=error):
+            with pytest.raises(scenario.expected_type) as excinfo:
                 MangaOcr()
-
-        assert str(excinfo.value) == "clean message"
-
-    def test_wraps_generic_load_exception(self) -> None:
-        with patch.object(MangaOcr, "_load_model", side_effect=RuntimeError("generic failure")):
-            with pytest.raises(MangaOCRException) as excinfo:
-                MangaOcr()
-
-        assert "RuntimeError: generic failure" in str(excinfo.value)
+        assert str(excinfo.value) == scenario.expected_message
+        if scenario.preserve_identity:
+            assert excinfo.value is error
