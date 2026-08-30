@@ -22,9 +22,9 @@ from lancet.gui.utils import DetectorInputSizeSpinBox
 type CfgValueTypes = bool | str | int | float | enum.Enum
 
 
-def is_bool_for_int(old_value: CfgValueTypes, new_value: CfgValueTypes) -> bool:
-    """Return True when a bool would be assigned to a non-bool integer field."""
-    return isinstance(old_value, int) and not isinstance(old_value, bool) and isinstance(new_value, bool)
+def is_bool_for_numeric(old_value: CfgValueTypes, new_value: CfgValueTypes) -> bool:
+    """Return True when a bool would be assigned to a non-bool numeric field."""
+    return isinstance(old_value, (int, float)) and not isinstance(old_value, bool) and isinstance(new_value, bool)
 
 
 def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
@@ -36,9 +36,9 @@ def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
             widget.set_keyboard_shortcut(value)
         case ColorEditPicker() if isinstance(value, str):
             widget.set_color(value)
-        case QDoubleSpinBox() if isinstance(value, (int, float)):
+        case QDoubleSpinBox() if isinstance(value, (int, float)) and not is_bool_for_numeric(widget.value(), value):
             widget.setValue(value)
-        case QSpinBox() if isinstance(value, int):
+        case QSpinBox() if isinstance(value, int) and not is_bool_for_numeric(widget.value(), value):
             widget.setValue(value)
         case QLineEdit() if isinstance(value, str):
             widget.setText(value)
@@ -87,6 +87,6 @@ def set_cfg_value(cfg: Config, cfg_key: str, new_value: CfgValueTypes) -> None:
     if not hasattr(cfg, cfg_key):
         raise AttributeError(f"config has no attribute '{cfg_key}'")
     old_value = getattr(cfg, cfg_key)
-    if not isinstance(new_value, type(old_value)) or is_bool_for_int(old_value, new_value):
+    if not isinstance(new_value, type(old_value)) or is_bool_for_numeric(old_value, new_value):
         raise TypeError(f"types differ in widget and config: {type(old_value)} != {type(new_value)}")
     setattr(cfg, cfg_key, new_value)
