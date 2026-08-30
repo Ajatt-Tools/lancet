@@ -9,7 +9,7 @@ from pynput.keyboard import KeyCode
 
 from lancet.keyboard_shortcuts.global_hotkeys import LancetHotKeyListener
 from lancet.keyboard_shortcuts.types import PyShortcutStr
-from tests.helpers import ALT, KEY_O, KEY_P, SHIFT, Counter
+from tests.helpers import ALT, CTRL, KEY_O, KEY_P, SHIFT, Counter
 
 
 class ListenerEvent(typing.NamedTuple):
@@ -83,6 +83,38 @@ LISTENER_INTEGRATION_SCENARIOS: dict[str, ListenerIntegrationScenario] = {
         events=(lpress(SHIFT), lpress(ALT), lpress(KEY_O), lrelease(SHIFT), lpress(KEY_P)),
         expected_counts=(0, 1),
     ),
+    "remaining_right_shift_blocks_shortcut_without_shift": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"),),
+        events=(lpress(SHIFT), lpress(PynputKey.shift_r), lrelease(SHIFT), lpress(ALT), lpress(KEY_O)),
+        expected_counts=(0,),
+    ),
+    "remaining_right_shift_satisfies_shortcut_with_shift": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<shift>+<alt>+o"),),
+        events=(lpress(SHIFT), lpress(PynputKey.shift_r), lrelease(SHIFT), lpress(ALT), lpress(KEY_O)),
+        expected_counts=(1,),
+    ),
+    "releasing_both_shift_variants_clears_shift": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<alt>+o"),),
+        events=(
+            lpress(SHIFT),
+            lpress(PynputKey.shift_r),
+            lrelease(SHIFT),
+            lrelease(PynputKey.shift_r),
+            lpress(ALT),
+            lpress(KEY_O),
+        ),
+        expected_counts=(1,),
+    ),
+    "right_shift_alone_matches_canonical_shift": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<shift>+<alt>+o"),),
+        events=(lpress(PynputKey.shift_r), lpress(ALT), lpress(KEY_O)),
+        expected_counts=(1,),
+    ),
+    "remaining_right_ctrl_satisfies_shortcut_with_ctrl": ListenerIntegrationScenario(
+        shortcuts=(PyShortcutStr("<ctrl>+<alt>+o"),),
+        events=(lpress(CTRL), lpress(PynputKey.ctrl_r), lrelease(CTRL), lpress(ALT), lpress(KEY_O)),
+        expected_counts=(1,),
+    ),
     "modifier_autorepeat_is_idempotent": ListenerIntegrationScenario(
         shortcuts=(PyShortcutStr("<shift>+<alt>+o"),),
         events=(lpress(SHIFT), lpress(SHIFT), lpress(ALT), lpress(KEY_O)),
@@ -105,11 +137,10 @@ class TestLancetHotKeyListenerIntegration:
         listener = LancetHotKeyListener(dict(zip(scenario.shortcuts, counters)))
 
         for event in scenario.events:
-            canonical_key = listener.canonical(event.key)
             if event.kind == "press":
-                listener._on_press(canonical_key, event.injected)
+                listener._on_press(event.key, event.injected)
             else:
-                listener._on_release(canonical_key, event.injected)
+                listener._on_release(event.key, event.injected)
 
         actual = tuple(c.count for c in counters)
         assert actual == scenario.expected_counts

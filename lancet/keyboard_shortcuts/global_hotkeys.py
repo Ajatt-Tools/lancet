@@ -71,26 +71,38 @@ class LancetHotKeyListener(Listener):
         self._pressed_modifiers = set()
         super().__init__(on_press=self._on_press, on_release=self._on_release)  # type: ignore[arg-type]
 
+    def _canonical_pressed_modifiers(self) -> frozenset[KeyCode | Key]:
+        """Return the canonical modifiers represented by the pressed physical keys."""
+        return frozenset(self.canonical(key) for key in self._pressed_modifiers)
+
+    def _try_activate_tracking_hotkeys(self, key: KeyCode | Key, pressed_modifiers: frozenset[KeyCode | Key]) -> None:
+        """Try to activate only hotkeys that contain the current pressed key."""
+        # All states must be current for sibling suppression, but only this key's
+        # hotkeys may activate; otherwise an unrelated press can fire a stale combo.
+        for hotkey in self._hotkeys:
+            if hotkey.tracks(key):
+                hotkey.try_activate(pressed_modifiers)
+
     def _on_press(self, key: Key | KeyCode | None, injected: bool) -> None:
         """Update every hotkey's state, then ask each to activate if eligible."""
         if injected or key is None:
             return
         canonical = self.canonical(key)
         if canonical in PYNPUT_MODIFIERS:
-            self._pressed_modifiers.add(canonical)
+            # Keep physical variants distinct so releasing one side does not erase the other.
+            self._pressed_modifiers.add(key)
         for hotkey in self._hotkeys:
             hotkey.update_state(canonical)
-        # All states must be current for sibling suppression, but only this key's
-        # hotkeys may activate; otherwise an unrelated press can fire a stale combo.
-        for hotkey in self._hotkeys:
-            if hotkey.tracks(canonical):
-                hotkey.try_activate(self._pressed_modifiers)
+        self._try_activate_tracking_hotkeys(canonical, self._canonical_pressed_modifiers())
 
     def _on_release(self, key: Key | KeyCode | None, injected: bool) -> None:
         """Forward releases to every hotkey so per-combo activation latches reset."""
         if injected or key is None:
             return
         canonical = self.canonical(key)
-        self._pressed_modifiers.discard(canonical)
+        self._pressed_modifiers.discard(key)
+        # Forward a canonical release only after its final physical variant is released.
+        if canonical in self._canonical_pressed_modifiers():
+            return
         for hotkey in self._hotkeys:
             hotkey.release(canonical)
