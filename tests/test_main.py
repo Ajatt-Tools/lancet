@@ -15,7 +15,7 @@ from unittest.mock import Mock, create_autospec
 
 import pytest
 
-from lancet.__main__ import CLI, log_dependency_versions
+from lancet.cli import CLI, log_dependency_versions
 from lancet.config import Config, ConfigFileReadResult, OcrDestination, read_config_file
 from lancet.exceptions import ConfigReadError
 from lancet.ipc.client import LancetIpcClient
