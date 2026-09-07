@@ -91,7 +91,7 @@ class Config:
     anki_image_width: int = 0
     anki_image_height: int = 250
     anki_image_quality: int = 33
-    anki_image_format: AnkiImageFormat = AnkiImageFormat.webp
+    anki_image_format: AnkiImageFormat = AnkiImageFormat.avif
 
     # Screenshot overlay colors (stored as hex ARGB strings, e.g. "#FF0000FF")
     border_thickness: int = 2
