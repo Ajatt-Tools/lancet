@@ -7,9 +7,11 @@ import typing
 
 from beartype.roar import BeartypeCallHintParamViolation
 from loguru import logger
+from PyQt6.QtGui import QColor
+from zala.config import ScreenshotPreviewOpts
 
-from lancet.anki.image_types import AnkiImageFormat
 from lancet.actions import LancetAction
+from lancet.anki.image_types import AnkiImageFormat
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
 from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
@@ -173,3 +175,15 @@ def read_config_file() -> ConfigFileReadResult:
         logger.error(str(ex))
         try_backup_config_file()
         return ConfigFileReadResult(Config(), error=str(ex))
+
+
+def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
+    """Build screenshot overlay options from the current config."""
+    return ScreenshotPreviewOpts(
+        border_thickness=cfg.border_thickness,
+        border_color=QColor.fromString(cfg.border_color),
+        fill_color=QColor.fromString(cfg.fill_color),
+        outline_color=QColor.fromString(cfg.outline_color),
+        fill_brush_color=QColor.fromString(cfg.fill_brush_color),
+        show_help=cfg.show_help_bar,
+    )

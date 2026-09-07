@@ -61,18 +61,6 @@ def format_hotkey(menu_label: str, keyboard_shortcut: str) -> str:
     return menu_label
 
 
-def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
-    """Build screenshot overlay options from the current config."""
-    return ScreenshotPreviewOpts(
-        border_thickness=cfg.border_thickness,
-        border_color=QColor.fromString(cfg.border_color),
-        fill_color=QColor.fromString(cfg.fill_color),
-        outline_color=QColor.fromString(cfg.outline_color),
-        fill_brush_color=QColor.fromString(cfg.fill_brush_color),
-        show_help=cfg.show_help_bar,
-    )
-
-
 class OpenDialogs:
     """Qt-aware wrapper that ties dialog lifetime to a DialogRegistry entry."""
 
