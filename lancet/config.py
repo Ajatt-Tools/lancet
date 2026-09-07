@@ -8,6 +8,7 @@ import typing
 from beartype.roar import BeartypeCallHintParamViolation
 from loguru import logger
 
+from lancet.anki.image_types import AnkiImageFormat
 from lancet.actions import LancetAction
 from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
@@ -40,6 +41,19 @@ def normalize_copy_to(data: dict[str, typing.Any]) -> None:
         data.pop("copy_to", None)
 
 
+def normalize_anki_image_format(data: dict[str, typing.Any]) -> None:
+    """Convert an Anki image-format name to an enum, dropping invalid values to use the default."""
+    try:
+        image_format = data["anki_image_format"]
+    except KeyError:
+        return
+    try:
+        data["anki_image_format"] = AnkiImageFormat[image_format]
+    except (KeyError, TypeError):
+        logger.warning("Cannot handle anki_image_format in config. Falling back to default.")
+        data.pop("anki_image_format", None)
+
+
 @dataclasses.dataclass
 class Config:
     """Application configuration with defaults, loaded from and saved to a JSON file."""
@@ -63,9 +77,19 @@ class Config:
     ocr_shortcut: str = "Alt+O"
     ocr_page_shortcut: str = "Shift+Alt+O"
     screenshot_shortcut: str = ""  # Empty disables the shortcut.
+    anki_shortcut: str = "Alt+I"
 
     # GoldenDict
     path_to_goldendict_executable: str = ""  # Empty enables automatic GoldenDict lookup.
+
+    # Anki
+    anki_connect_url: str = "http://127.0.0.1:8765"
+    anki_connect_api_key: str = ""
+    anki_image_field: str = "Image"
+    anki_image_width: int = 0
+    anki_image_height: int = 250
+    anki_image_quality: int = 33
+    anki_image_format: AnkiImageFormat = AnkiImageFormat.webp
 
     # Screenshot overlay colors (stored as hex ARGB strings, e.g. "#FF0000FF")
     border_thickness: int = 2
@@ -94,6 +118,7 @@ class Config:
         if not isinstance(data, dict):
             raise ConfigReadError("failed to parse config file: top-level JSON value must be an object")
         normalize_copy_to(data)
+        normalize_anki_image_format(data)
         try:
             return cls(**data)
         except (TypeError, BeartypeCallHintParamViolation) as ex:
@@ -108,6 +133,7 @@ class Config:
         """Serialize the config to JSON and write it to the config file."""
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
+        data["anki_image_format"] = data["anki_image_format"].name
         CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CFG_PATH, "w", encoding="utf-8") as of:
             json.dump(data, of, ensure_ascii=False, indent=4)
@@ -119,6 +145,7 @@ class Config:
                 QtShortcutStr(self.ocr_shortcut): LancetAction.ocr,
                 QtShortcutStr(self.ocr_page_shortcut): LancetAction.detect_and_ocr,
                 QtShortcutStr(self.screenshot_shortcut): LancetAction.screenshot,
+                QtShortcutStr(self.anki_shortcut): LancetAction.screenshot_to_anki,
             }
         )
 
