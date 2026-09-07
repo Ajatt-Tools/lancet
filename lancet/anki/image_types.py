@@ -10,3 +10,11 @@ class AnkiImageFormat(enum.Enum):
 
     webp = "webp"
     avif = "avif"
+
+
+class ImageParameters(typing.NamedTuple):
+    """Maximum image dimensions and lossy encoding quality."""
+
+    width: int
+    height: int
+    quality: int

@@ -5,6 +5,7 @@ from collections.abc import Iterable
 
 from PyQt6.QtWidgets import QGridLayout, QLabel, QLayout, QWidget
 
+from lancet.anki.image_types import ImageParameters
 from lancet.consts import ANKI_IMAGE_MAX_DIMENSION
 from lancet.gui.rich_slider import RichSlider
 
@@ -15,14 +16,6 @@ class Sliders(typing.NamedTuple):
     image_width: RichSlider
     image_height: RichSlider
     image_quality: RichSlider
-
-
-class ImageSliderValues(typing.NamedTuple):
-    """Image dimensions and quality selected by an ImageSliderBox."""
-
-    image_width: int
-    image_height: int
-    image_quality: int
 
 
 def sliders_to_grid(sliders: Iterable[RichSlider]) -> QLayout:
@@ -65,12 +58,12 @@ class ImageSliderBox(QWidget):
         self._sliders.image_width.set_upper_limit(width)
         self._sliders.image_height.set_upper_limit(height)
 
-    def values(self) -> ImageSliderValues:
+    def values(self) -> ImageParameters:
         """Return the current width, height, and quality values."""
-        return ImageSliderValues(
-            image_width=self.image_width,
-            image_height=self.image_height,
-            image_quality=self.image_quality,
+        return ImageParameters(
+            width=self.image_width,
+            height=self.image_height,
+            quality=self.image_quality,
         )
 
     def set_values(self, *, width: int, height: int, quality: int) -> None:
