@@ -73,9 +73,10 @@ class LancetIpcClient:
         except LancetException as ex:
             return IpcResponse(status=IpcStatus.error, message=str(ex))
 
-    def ask_screenshot(self) -> IpcResponse:
-        """Tell the running daemon to open the screenshot area selector."""
-        return self._send_and_handle_error(IpcRequest(action=LancetAction.screenshot))
+    def ask_screenshot(self, add_to_anki: bool = False) -> IpcResponse:
+        """Tell Lancet to select a region for a screenshot or Anki attachment."""
+        action = LancetAction.screenshot_to_anki if add_to_anki else LancetAction.screenshot
+        return self._send_and_handle_error(IpcRequest(action=action))
 
     def ask_ocr(self, detect: bool) -> IpcResponse:
         """Tell the running daemon to run OCR, optionally with speech-bubble detection."""

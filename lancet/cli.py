@@ -105,9 +105,9 @@ class CLI:
         self._cfg = cfg
         self._client = client or LancetIpcClient(cfg)
 
-    def screenshot(self) -> None:
-        """Tell the running Lancet to open the screenshot area selector."""
-        r = self._client.ask_screenshot()
+    def screenshot(self, add_to_anki: bool = False) -> None:
+        """Tell Lancet to select a region, optionally attaching it to the last Anki note."""
+        r = self._client.ask_screenshot(add_to_anki=add_to_anki)
         logger.info(f"{r.status.name}: {r.message}")
 
     def ocr(self, detect: bool = False) -> None:

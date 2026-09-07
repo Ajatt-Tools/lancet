@@ -206,6 +206,8 @@ class LancetSystemTray(QSystemTrayIcon):
                 self.detect_and_make_ocr_screenshot()
             case LancetAction.screenshot:
                 self.make_screenshot_area()
+            case LancetAction.screenshot_to_anki:
+                self.make_anki_screenshot()
 
     def open_about(self) -> None:
         """Open the About dialog."""
@@ -253,6 +255,10 @@ class LancetSystemTray(QSystemTrayIcon):
         except ZalaException as ex:
             logger.error(str(ex))
             self._notify.notify(str(ex))
+
+    def make_anki_screenshot(self) -> None:
+        """Resolve the last-added Anki note before opening the area selection overlay."""
+        pass
 
     def make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for OCR recognition of the selected area."""

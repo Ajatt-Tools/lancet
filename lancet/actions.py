@@ -15,3 +15,4 @@ class LancetAction(enum.Enum):
     ocr = "ocr"
     detect_and_ocr = "detect_and_ocr"
     screenshot = "screenshot"
+    screenshot_to_anki = "screenshot_to_anki"
