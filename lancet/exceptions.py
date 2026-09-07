@@ -27,6 +27,18 @@ class LancetHTTPError(LancetException, OSError):
     pass
 
 
+class AnkiConnectError(LancetException, RuntimeError):
+    """Raised when AnkiConnect cannot complete a requested operation."""
+
+    pass
+
+
+class AnkiImageEncodingError(LancetException, RuntimeError):
+    """Raised when Pillow cannot encode the configured Anki image format."""
+
+    pass
+
+
 class KeyboardShortcutParseError(LancetException, ValueError):
     """Raised when a keyboard shortcut string cannot be converted to pynput format."""
 
