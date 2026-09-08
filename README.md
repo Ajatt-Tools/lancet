@@ -183,11 +183,13 @@ Add the following to your `~/.config/sway/config`:
 
 ```
 # Run OCR
-bindsym $mod+o          exec lancet ocr
+bindsym --release $mod+o          exec lancet ocr
 # Run OCR with the speech-bubble detector
-bindsym $mod+Shift+o    exec lancet ocr --detect
+bindsym --release $mod+Shift+o    exec lancet ocr --detect
 # Take a screenshot
-bindsym $mod+Print      exec lancet screenshot
+bindsym --release $mod+Print      exec lancet screenshot
+# Attach a selected screen region to the most recently added Anki note.
+bindsym --release $alt+i          exec lancet screenshot --add-to-anki
 ```
 
 ## Announcements
