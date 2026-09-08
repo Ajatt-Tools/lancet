@@ -37,6 +37,11 @@ Lancet adds an icon to the system tray.
 Right‑click the icon to access actions, including Preferences,
 where you can change the OCR shortcut.
 
+### Executable overrides
+
+"Preferences" > "Advanced" lets you set the GoldenDict executable.
+Leave it empty to use automatic discovery through your system `PATH`.
+
 ## Installation
 
 ### All operating systems
