@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import QLineEdit
 
 
 class MonoSpaceLineEdit(QLineEdit):
-    font_size = 14
-    min_height = 32
+    font_size: int = 14
+    min_height: int = 24
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -33,8 +33,8 @@ class MonoSpaceLineEdit(QLineEdit):
 
 
 class ColorEdit(MonoSpaceLineEdit):
-    font_size = 14
-    min_height = 24
+    font_size: int = 14
+    min_height: int = 24
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
