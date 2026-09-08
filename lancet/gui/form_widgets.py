@@ -3,13 +3,15 @@
 import typing
 from types import SimpleNamespace
 
-from PyQt6.QtWidgets import QCheckBox
+from PyQt6.QtWidgets import QCheckBox, QLineEdit
 
 from lancet.config import Config
 from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
+from lancet.gui.image_slider_box import ImageSliderBox
+from lancet.gui.line_edit import MonoSpaceLineEdit
 from lancet.gui.ocr_model_list import ModelListEditor
 from lancet.gui.utils import (
     BindPortSpinBox,
@@ -36,6 +38,14 @@ class FormWidgets(SimpleNamespace):
     ocr_shortcut: ShortCutGrabButton
     ocr_page_shortcut: ShortCutGrabButton
     screenshot_shortcut: ShortCutGrabButton
+
+    # Anki
+    anki_shortcut: ShortCutGrabButton
+    anki_connect_url: MonoSpaceLineEdit
+    anki_connect_api_key: MonoSpaceLineEdit
+    anki_image_field: MonoSpaceLineEdit
+    anki_image_format: EnumSelectCombo
+    anki_image_settings: ImageSliderBox
 
     # GoldenDict
     path_to_goldendict_executable: LancetFilePicker
@@ -64,6 +74,7 @@ class FormWidgetsBuilder:
         return (
             self.create_ocr_widgets()
             .create_shortcut_widgets()
+            .create_anki_widgets()
             .create_file_picker_widgets()
             .create_overlay_widgets()
             .get_form()
@@ -106,6 +117,23 @@ class FormWidgetsBuilder:
         self._widgets.ocr_page_shortcut = ShortCutGrabButton(initial_value=self._cfg.ocr_page_shortcut)
         # Screenshot shortcut
         self._widgets.screenshot_shortcut = ShortCutGrabButton(initial_value=self._cfg.screenshot_shortcut)
+        # Screenshot-to-Anki shortcut.
+        self._widgets.anki_shortcut = ShortCutGrabButton(initial_value=self._cfg.anki_shortcut)
+        return self
+
+    def create_anki_widgets(self) -> typing.Self:
+        """Create AnkiConnect and image-encoding settings widgets."""
+        self._widgets.anki_connect_url = MonoSpaceLineEdit(self._cfg.anki_connect_url)
+        self._widgets.anki_connect_api_key = MonoSpaceLineEdit(self._cfg.anki_connect_api_key)
+        self._widgets.anki_connect_api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self._widgets.anki_image_field = MonoSpaceLineEdit(self._cfg.anki_image_field)
+        self._widgets.anki_image_format = EnumSelectCombo(initial_value=self._cfg.anki_image_format)
+        self._widgets.anki_image_settings = ImageSliderBox()
+        self._widgets.anki_image_settings.set_values(
+            width=self._cfg.anki_image_width,
+            height=self._cfg.anki_image_height,
+            quality=self._cfg.anki_image_quality,
+        )
         return self
 
     def create_file_picker_widgets(self) -> typing.Self:
