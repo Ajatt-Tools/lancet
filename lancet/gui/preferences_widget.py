@@ -6,6 +6,7 @@ from collections.abc import Iterable, Set
 from PyQt6.QtWidgets import QFormLayout, QTabWidget, QWidget
 
 from lancet.config import Config
+from lancet.consts import DEFAULT_ANKICONNECT_URL
 from lancet.gui.form_widgets import FormWidgets, FormWidgetsBuilder
 from lancet.gui.utils import ui_translate
 from lancet.gui.widgets_to_config_dict import (
@@ -16,7 +17,7 @@ from lancet.gui.widgets_to_config_dict import (
 
 # Keys that cannot be handled by the generic loop because one widget maps to
 # multiple config fields, or the widget key does not match a config field.
-SPECIAL_KEYS: typing.Final[frozenset[str]] = frozenset({"huggingface_model"})
+SPECIAL_KEYS: typing.Final[frozenset[str]] = frozenset({"huggingface_model", "anki_image_settings"})
 ADVANCED_KEYS: typing.Final[frozenset[str]] = frozenset(
     {
         "huggingface_model",
@@ -24,6 +25,16 @@ ADVANCED_KEYS: typing.Final[frozenset[str]] = frozenset(
         "text_detection_resolution",
         "bind_port",
         "path_to_goldendict_executable",
+    }
+)
+ANKI_KEYS: typing.Final[frozenset[str]] = frozenset(
+    {
+        # anki_shortcut is excluded from here and shown in the Main (General) tab with other shortcuts.
+        "anki_connect_url",
+        "anki_connect_api_key",
+        "anki_image_field",
+        "anki_image_format",
+        "anki_image_settings",
     }
 )
 
@@ -55,6 +66,16 @@ def label_replace(cfg_key: str) -> str:
             return "notification_duration"
         case "path_to_goldendict_executable":
             return "goldendict_executable"
+        case "anki_connect_url":
+            return "AnkiConnect URL"
+        case "anki_connect_api_key":
+            return "AnkiConnect API key"
+        case "anki_image_field":
+            return "Image field"
+        case "anki_image_format":
+            return "Image format"
+        case "anki_image_settings":
+            return "Image size and quality"
         case _:
             return cfg_key
 
@@ -83,6 +104,10 @@ class CopySettingsFromWidgetsToConfig:
         # Special case: huggingface_model maps to two config fields.
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
+        anki_settings = self._widgets.anki_image_settings.values()
+        self._cfg.anki_image_width = anki_settings.width
+        self._cfg.anki_image_height = anki_settings.height
+        self._cfg.anki_image_quality = anki_settings.quality
         return self
 
 
@@ -95,7 +120,13 @@ class FormWidgetsToolTips:
 
     def add_tooltips(self) -> typing.Self:
         """Set tooltips on all widgets, grouped by category."""
-        return self._add_main_tooltips()._add_shortcut_tooltips()._add_paths_tooltips()._add_overlay_tooltips()
+        return (
+            self._add_main_tooltips()
+            ._add_shortcut_tooltips()
+            ._add_anki_tooltips()
+            ._add_paths_tooltips()
+            ._add_overlay_tooltips()
+        )
 
     def _add_main_tooltips(self) -> typing.Self:
         """Set tooltips on general OCR, model, and history widgets."""
@@ -120,6 +151,21 @@ class FormWidgetsToolTips:
         self._widgets.ocr_shortcut.setToolTip("Keyboard shortcut to trigger OCR.")
         self._widgets.ocr_page_shortcut.setToolTip("Keyboard shortcut to detect speech bubbles and run OCR.")
         self._widgets.screenshot_shortcut.setToolTip("Keyboard shortcut to take a screenshot.")
+        self._widgets.anki_shortcut.setToolTip(
+            "Keyboard shortcut to attach a selected screen region to the last Anki note."
+        )
+        return self
+
+    def _add_anki_tooltips(self) -> typing.Self:
+        """Set tooltips on AnkiConnect and image-encoding widgets."""
+        self._widgets.anki_connect_url.setToolTip(
+            f"AnkiConnect endpoint. AnkiConnect defaults to {DEFAULT_ANKICONNECT_URL}."
+        )
+        self._widgets.anki_connect_api_key.setToolTip(
+            "Optional AnkiConnect API key. It is masked here but stored in Lancet's plaintext JSON config."
+        )
+        self._widgets.anki_image_field.setToolTip("The Anki note field where selected images are appended.")
+        self._widgets.anki_image_format.setToolTip("The image format used to encode uploaded Anki media.")
         return self
 
     def _add_paths_tooltips(self) -> typing.Self:
@@ -154,6 +200,11 @@ class FormWidgetValues:
         # Special case: huggingface_model maps to two config fields.
         self._widgets.huggingface_model.set_items(self._cfg.huggingface_models)
         self._widgets.huggingface_model.set_current(self._cfg.huggingface_model_name)
+        self._widgets.anki_image_settings.set_values(
+            width=self._cfg.anki_image_width,
+            height=self._cfg.anki_image_height,
+            quality=self._cfg.anki_image_quality,
+        )
         return self
 
 
@@ -175,8 +226,9 @@ class MainPreferencesWidget(QTabWidget):
     def _setup_tabs(self) -> None:
         """Build a form layout with labeled rows for each settings widget."""
         d = self._widgets.__dict__
-        self.addTab(make_tab(filter_dict(d, d.keys() - ADVANCED_KEYS)), "Main")
+        self.addTab(make_tab(filter_dict(d, d.keys() - ADVANCED_KEYS - ANKI_KEYS)), "Main")
         self.addTab(make_tab(filter_dict(d, ADVANCED_KEYS)), "Advanced")
+        self.addTab(make_tab(filter_dict(d, ANKI_KEYS)), "Anki")
 
     def copy_settings_to_cfg(self) -> None:
         """Copy all current widget values into the backing Config object."""
