@@ -18,3 +18,15 @@ class ImageParameters(typing.NamedTuple):
     width: int
     height: int
     quality: int
+
+
+class EncodedImage(typing.NamedTuple):
+    """Encoded Anki media and the settings used to produce it."""
+
+    data: bytes
+    image_format: AnkiImageFormat
+    settings: ImageParameters
+
+    def size_kib(self) -> int:
+        """Return the encoded media size rounded down to KiB."""
+        return len(self.data) // 1024
