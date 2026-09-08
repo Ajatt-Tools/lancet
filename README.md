@@ -37,6 +37,25 @@ Lancet adds an icon to the system tray.
 Right‑click the icon to access actions, including Preferences,
 where you can change the OCR shortcut.
 
+### Anki screenshots
+
+Lancet can attach a selected screen region to the `Image` field
+of the most recently added Anki note.
+This replaces a separate screenshot utility for image-card creation.
+
+1. Install and enable [AnkiConnect](https://ankiweb.net/shared/info/2055492159),
+   then launch Anki.
+2. Create or add the target note.
+3. Press `Alt+I` (the default shortcut),
+   choose the screen region, and Lancet appends the image to that note's `Image` field.
+
+Preferences has an **Anki** tab with the AnkiConnect URL, optional API key,
+target field, shortcut, maximum image width/height, quality, and output format.
+Width and height are maximum bounds.
+`0` leaves an axis unconstrained, and images are never enlarged.
+The API key is masked in Preferences but stored
+in Lancet's plaintext JSON configuration file.
+
 ### Executable overrides
 
 "Preferences" > "Advanced" lets you set the GoldenDict executable.
