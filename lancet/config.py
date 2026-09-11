@@ -12,7 +12,7 @@ from zala.config import ScreenshotPreviewOpts
 
 from lancet.actions import LancetAction
 from lancet.anki.image_types import AnkiImageFormat
-from lancet.consts import CFG_PATH, DEFAULT_MODEL_NAME
+from lancet.consts import CFG_PATH, DEFAULT_ANKICONNECT_URL, DEFAULT_MODEL_NAME
 from lancet.exceptions import ConfigReadError
 from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
 from lancet.keyboard_shortcuts.types import (
@@ -85,7 +85,7 @@ class Config:
     path_to_goldendict_executable: str = ""  # Empty enables automatic GoldenDict lookup.
 
     # Anki
-    anki_connect_url: str = "http://127.0.0.1:8765"
+    anki_connect_url: str = DEFAULT_ANKICONNECT_URL
     anki_connect_api_key: str = ""
     anki_image_field: str = "Image"
     anki_image_width: int = 0
