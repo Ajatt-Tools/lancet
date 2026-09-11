@@ -27,6 +27,7 @@ from lancet.consts import (
     ANKI_SCREENSHOT_ICON_PATH,
     APP_LOGO_PATH,
     APP_NAME,
+    DETECT_AND_OCR_ICON_PATH,
     EXIT_ICON_PATH,
     OCR_ICON_PATH,
     PREFERENCES_ICON_PATH,
@@ -168,7 +169,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self.make_ocr_screenshot,
         )
         menu.addAction(
-            QIcon(str(OCR_ICON_PATH)),
+            QIcon(str(DETECT_AND_OCR_ICON_PATH)),
             format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
             self.detect_and_make_ocr_screenshot,
         )

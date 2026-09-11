@@ -17,6 +17,7 @@ APP_LOGO_PATH: P = ICONS_DIR / "app_logo.png"
 SCREENSHOT_ICON_PATH: P = ICONS_DIR / "screenshot.png"
 ANKI_SCREENSHOT_ICON_PATH: P = ICONS_DIR / "screenshot_to_anki.svg"
 OCR_ICON_PATH: P = ICONS_DIR / "ocr.png"
+DETECT_AND_OCR_ICON_PATH: P = ICONS_DIR / "detect_and_ocr.svg"
 EXIT_ICON_PATH: P = ICONS_DIR / "exit.png"
 RESTART_ICON_PATH: P = ICONS_DIR / "restart.png"
 PREFERENCES_ICON_PATH: P = ICONS_DIR / "preferences.png"
@@ -52,6 +53,7 @@ def self_check() -> None:
         SCREENSHOT_ICON_PATH,
         ANKI_SCREENSHOT_ICON_PATH,
         OCR_ICON_PATH,
+        DETECT_AND_OCR_ICON_PATH,
         EXIT_ICON_PATH,
         RESTART_ICON_PATH,
         PREFERENCES_ICON_PATH,
