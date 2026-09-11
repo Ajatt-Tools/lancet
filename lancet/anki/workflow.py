@@ -15,7 +15,7 @@ from lancet.anki.client import AnkiConnectClient
 from lancet.anki.image import encode_image
 from lancet.anki.image_types import EncodedImage, ImageParameters
 from lancet.config import Config, make_preview_opts
-from lancet.exceptions import PixmapConversionError
+from lancet.exceptions import AnkiConnectUnavailableError, PixmapConversionError
 from lancet.model_utils.ocr_workflow import prepare_pillow_image
 from lancet.notifications import NotifySend
 from lancet.ocr.thread_op import LancetThreadOp
@@ -70,7 +70,13 @@ class AnkiWorkflow:
     def _notify_anki_failure(self, error: Exception) -> None:
         """Log and notify an Anki attachment failure reported by its workflow."""
         logger.warning(f"Anki attachment failed: {error}")
-        self._notify.notify(f"Anki attachment failed: {error}")
+        # Keep transport diagnostics in logs, but make the expected missing-Anki
+        # case immediately understandable in a short desktop notification.
+        match error:
+            case AnkiConnectUnavailableError():
+                self._notify.notify(error.what)
+            case _:
+                self._notify.notify(f"Anki attachment failed: {error}")
 
     def _attach_selection(self, note_id: int, user_selection: UserSelectionResult) -> None:
         """Convert a selected Pixmap on the GUI thread, then attach it in a worker thread."""

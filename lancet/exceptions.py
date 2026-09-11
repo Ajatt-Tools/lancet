@@ -33,6 +33,14 @@ class AnkiConnectError(LancetException, RuntimeError):
     pass
 
 
+class AnkiConnectUnavailableError(AnkiConnectError):
+    """Raised when Lancet cannot establish a connection to AnkiConnect."""
+
+    @property
+    def what(self) -> str:
+        return "AnkiConnect isn't running."
+
+
 class AnkiImageEncodingError(LancetException, RuntimeError):
     """Raised when Pillow cannot encode the configured Anki image format."""
 
