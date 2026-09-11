@@ -24,6 +24,7 @@ from lancet.actions import LancetAction
 from lancet.anki.workflow import AnkiWorkflow
 from lancet.config import Config, make_preview_opts
 from lancet.consts import (
+    ANKI_SCREENSHOT_ICON_PATH,
     APP_LOGO_PATH,
     APP_NAME,
     EXIT_ICON_PATH,
@@ -157,7 +158,7 @@ class LancetSystemTray(QSystemTrayIcon):
             self.make_screenshot_area,
         )
         menu.addAction(
-            QIcon(str(SCREENSHOT_ICON_PATH)),
+            QIcon(str(ANKI_SCREENSHOT_ICON_PATH)),
             format_hotkey("Screenshot to Anki", self._cfg.anki_shortcut),
             self.make_anki_screenshot,
         )
