@@ -39,7 +39,7 @@ class LancetThreadOp[ResultType](QObject):
         *,
         op: Callable[[], ResultType],
         executor: concurrent.futures.ThreadPoolExecutor,
-        app: QCoreApplication | None = None
+        app: QCoreApplication | None = None,
     ) -> None:
         """Initialize the operation and attach its lifetime to the active Qt application."""
         if not (app := app or QCoreApplication.instance()):
@@ -49,7 +49,7 @@ class LancetThreadOp[ResultType](QObject):
         self._executor = executor
         self._success = None
         self._failure = None
-        self._finished.connect(self._dispatch_outcome, Qt.ConnectionType.QueuedConnection)
+        self._finished.connect(self._dispatch_outcome, Qt.ConnectionType.QueuedConnection)  # type: ignore[call-arg]
 
     def success(self, success: Callable[[ResultType], Any]) -> Self:
         """Set the callback to invoke with the result when the operation succeeds."""
@@ -78,7 +78,7 @@ class LancetThreadOp[ResultType](QObject):
             if outcome.error:
                 self._failure(outcome.error)
             else:
-                self._success(outcome.result)
+                self._success(typing.cast(ResultType, outcome.result))
         except Exception as ex:
             logger.exception(f"LancetThreadOp completion callback failed: {ex}")
         finally:

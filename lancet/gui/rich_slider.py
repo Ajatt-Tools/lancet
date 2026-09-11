@@ -10,6 +10,7 @@ SLIDER_STEP: int = 5
 
 
 class RichSliderWidgets(typing.NamedTuple):
+    """Expose RichSlider controls in layout order."""
 
     slider: QSlider
     spinbox: QSpinBox
