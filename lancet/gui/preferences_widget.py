@@ -227,8 +227,8 @@ class MainPreferencesWidget(QTabWidget):
         """Build a form layout with labeled rows for each settings widget."""
         d = self._widgets.__dict__
         self.addTab(make_tab(filter_dict(d, d.keys() - ADVANCED_KEYS - ANKI_KEYS)), "Main")
-        self.addTab(make_tab(filter_dict(d, ADVANCED_KEYS)), "Advanced")
         self.addTab(make_tab(filter_dict(d, ANKI_KEYS)), "Anki")
+        self.addTab(make_tab(filter_dict(d, ADVANCED_KEYS)), "Advanced")
 
     def copy_settings_to_cfg(self) -> None:
         """Copy all current widget values into the backing Config object."""
