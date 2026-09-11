@@ -27,6 +27,6 @@ class EncodedImage(typing.NamedTuple):
     image_format: AnkiImageFormat
     settings: ImageParameters
 
-    def size_kib(self) -> int:
+    def size_kib(self) -> float:
         """Return the encoded media size rounded down to KiB."""
-        return len(self.data) // 1024
+        return len(self.data) / 1024
