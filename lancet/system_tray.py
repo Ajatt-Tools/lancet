@@ -12,16 +12,17 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from loguru import logger
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 from zala.exceptions import ZalaException
-from zala.main_window import ScreenshotPreviewOpts, UserSelectionResult
+from zala.main_window import UserSelectionResult
 from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 from zala.utils import qconnect
 
 from lancet.actions import LancetAction
-from lancet.config import Config
+from lancet.anki.workflow import AnkiWorkflow
+from lancet.config import Config, make_preview_opts
 from lancet.consts import (
     APP_LOGO_PATH,
     APP_NAME,
@@ -91,6 +92,7 @@ class LancetSystemTray(QSystemTrayIcon):
 
     _loader: BackgroundModelLoader
     _ocr_workflow: OcrWorkflow
+    _anki_workflow: AnkiWorkflow
     _app: QApplication
     _take: ZalaTakeScreenRegion
     _cfg: Config
@@ -114,6 +116,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._history = OcrHistory(self._cfg.max_history_size)
         self._loader = BackgroundModelLoader.new(cfg=self._cfg, notify=self._notify, executor=self._executor)
         self._ocr_workflow = self._build_ocr_workflow()
+        self._anki_workflow = AnkiWorkflow(self._cfg, executor=self._executor, notify=self._notify, take=self._take)
         self._hotkeys = LancetShortcutManager(self._build_shortcuts())
         self._insert_tray_menu_actions()
 
@@ -152,6 +155,11 @@ class LancetSystemTray(QSystemTrayIcon):
             QIcon(str(SCREENSHOT_ICON_PATH)),
             format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
             self.make_screenshot_area,
+        )
+        menu.addAction(
+            QIcon(str(SCREENSHOT_ICON_PATH)),
+            format_hotkey("Screenshot to Anki", self._cfg.anki_shortcut),
+            self.make_anki_screenshot,
         )
         menu.addAction(
             QIcon(str(OCR_ICON_PATH)),
@@ -246,7 +254,7 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def make_anki_screenshot(self) -> None:
         """Resolve the last-added Anki note before opening the area selection overlay."""
-        pass
+        self._anki_workflow.screenshot_and_add_to_anki()
 
     def make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for OCR recognition of the selected area."""
