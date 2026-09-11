@@ -1,8 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24">
-  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-    <path d="M4 9V4h5M15 4h5v5M9 20H4v-5"/>
-    <rect x="10" y="10" width="10" height="10" rx="2"/>
-    <path d="M15 13v4M13 15h4"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Scan-frame corners. The Anki star replaces the bottom-right corner. -->
+  <path id="scan-top-left" fill="#000000" d="M22 22H148V64H64V149H22Z"/>
+  <path id="scan-top-right" fill="#000000" d="M362 22H488V149H447V64H362Z"/>
+  <path id="scan-bottom-left" fill="#000000" d="M22 362H63V447H148V489H22Z"/>
+
+  <!-- Hollow Anki-style star similar to the Anki logo, https://github.com/ankitects/anki/ -->
+  <path id="anki-star" fill="none" stroke="#000000" stroke-linejoin="round" stroke-width="20"
+        transform="translate(-61.16 -440.84) scale(1.68)" d="
+    M294.46869,523.45259
+    C285.38826,532.26594 248.89378,505.68266 236.36721,507.47547
+    C223.84063,509.26829 196.26772,545.02094 185.07972,539.10841
+    C173.89171,533.19589 187.8965,490.2729 182.32051,478.91342
+    C176.74452,467.55395 134.22123,452.37873 136.38709,439.91124
+    C138.55295,427.44375 183.70286,427.49916 192.78328,418.6858
+    C201.86371,409.87245 203.15578,364.741 215.68236,362.94818
+    C228.20893,361.15537 242.10833,404.11261 253.29633,410.02513
+    C264.48433,415.93765 307.80617,403.2201 313.38216,414.57958
+    C318.95815,425.93905 282.39853,452.43267 280.23268,464.90017
+    C278.06682,477.36766 303.54911,514.63923 294.46869,523.45259Z
+  "/>
 </svg>
