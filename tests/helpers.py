@@ -1,13 +1,14 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
-"""Test helpers for keyboard-shortcut conversion and overlap-suppression tests."""
+"""Test helpers for keyboard shortcuts and queued Qt callbacks."""
 
 import typing
 from collections.abc import Callable, Iterable
 
 from pynput.keyboard import HotKey, Key, KeyCode
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEventLoop, Qt, QTimer
 from PyQt6.QtGui import QKeySequence
+from zala.utils import qconnect
 
 from lancet.keyboard_shortcuts.consts import PYNPUT_MODIFIERS
 from lancet.keyboard_shortcuts.hotkey import SiblingAwareHotKey
@@ -18,6 +19,7 @@ SHIFT: Key = Key.shift
 CTRL: Key = Key.ctrl
 KEY_O: KeyCode = KeyCode.from_char("o")
 KEY_P: KeyCode = KeyCode.from_char("p")
+QT_EVENT_LOOP_TIMEOUT_MS = 2_000
 
 
 class QtShortcut(typing.NamedTuple):
@@ -38,6 +40,18 @@ class Counter:
 
     def __call__(self) -> None:
         self.count += 1
+
+
+def wait_for_qt_event_loop(loop: QEventLoop, timeout_ms: int = QT_EVENT_LOOP_TIMEOUT_MS) -> None:
+    """Run a nested Qt loop and raise AssertionError when it exceeds its deadline."""
+    timer = QTimer()
+    timer.setSingleShot(True)
+    qconnect(timer.timeout, loop.quit)
+    timer.start(timeout_ms)
+    loop.exec()
+    if not timer.isActive():
+        raise AssertionError(f"Qt event loop did not finish within {timeout_ms} ms")
+    timer.stop()
 
 
 def qt_shortcut_to_string(shortcut: QtShortcut) -> str:
