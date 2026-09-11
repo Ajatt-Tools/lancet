@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!-- The filled Bézier contours preserve custom lettering without font dependencies or angular traces.
-       O and R use even-odd fills because their second closed subpaths form transparent counters; C is one open contour. -->
+       O and R use even-odd fills because their second closed subpaths form transparent counters.
+       C is one open contour. -->
 
   <!-- Scan-frame corners. -->
   <path id="scan-top-left" fill="#000000" d="M22 22H148V64H64V149H22Z"/>
@@ -10,11 +11,22 @@
   <path id="scan-bottom-right" fill="#000000" d="M447 362H488V489H362V447H447Z"/>
 
   <!-- Letter O. -->
-  <path fill="#000000" fill-rule="evenodd" d="M117 171C86 171 64 190 64 217V294C64 322 86 340 117 340S169 320 169 294V217C169 190 148 171 117 171ZM117 213C110 213 106 218 106 224V288C106 294 110 298 117 298S128 294 128 288V224C128 218 124 213 117 213Z"/>
+  <path fill="#000000" fill-rule="evenodd" d="
+    M117 171C86 171 64 190 64 217V294C64 322 86 340 117 340S169 320 169 294V217C169 190 148 171 117 171Z
+    M117 213C110 213 106 218 106 224V288C106 294 110 298 117 298S128 294 128 288V224C128 218 124 213 117 213Z
+  "/>
 
   <!-- Letter C. -->
-  <path fill="#000000" d="M245 171C214 171 192 190 192 217V294C192 321 214 340 245 340C275 340 297 320 297 294V277H256V288C256 294 251 298 245 298C238 298 233 293 233 287V224C233 218 238 213 245 213C251 213 256 218 256 224V234H297V217C297 190 275 171 245 171Z"/>
+  <path fill="#000000" d="
+    M245 171C214 171 192 190 192 217V294C192 321 214 340 245 340C275 340 297 320 297 294V277H256V288
+    C256 294 251 298 245 298C238 298 233 293 233 287V224C233 218 238 213 245 213C251 213 256 218 256 224
+    V234H297V217C297 190 275 171 245 171Z
+  "/>
 
   <!-- Letter R. -->
-  <path fill="#000000" fill-rule="evenodd" d="M319 171V340H361V279L362 278L383 340H424L401 270V268C416 257 425 240 425 220C425 190 407 171 378 171ZM361 213H374C380 213 383 217 383 224C383 231 379 235 373 235H361Z"/>
+  <path fill="#000000" fill-rule="evenodd" d="
+    M319 171V340H361V279L362 278L383 340H424L401 270V268C416 257 425 240 425 220
+    C425 190 407 171 378 171H319Z
+    M361 213H374C380 213 383 217 383 224C383 231 379 235 373 235H361Z
+  "/>
 </svg>
