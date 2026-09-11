@@ -55,6 +55,8 @@ Width and height are maximum bounds.
 `0` leaves an axis unconstrained, and images are never enlarged.
 The API key is masked in Preferences but stored
 in Lancet's plaintext JSON configuration file.
+The field separator controls the HTML placed before each appended image.
+It defaults to `<br>` and may be empty.
 
 ### Executable overrides
 

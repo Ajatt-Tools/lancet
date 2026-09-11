@@ -12,7 +12,12 @@ from zala.config import ScreenshotPreviewOpts
 
 from lancet.actions import LancetAction
 from lancet.anki.image_types import AnkiImageFormat
-from lancet.consts import CFG_PATH, DEFAULT_ANKICONNECT_URL, DEFAULT_MODEL_NAME
+from lancet.consts import (
+    ANKI_FIELD_SEPARATOR,
+    CFG_PATH,
+    DEFAULT_ANKICONNECT_URL,
+    DEFAULT_MODEL_NAME,
+)
 from lancet.exceptions import ConfigReadError
 from lancet.keyboard_shortcuts.listener import to_pynput_shortcuts
 from lancet.keyboard_shortcuts.types import (
@@ -88,6 +93,7 @@ class Config:
     anki_connect_url: str = DEFAULT_ANKICONNECT_URL
     anki_connect_api_key: str = ""
     anki_image_field: str = "Image"
+    anki_field_separator: str = ANKI_FIELD_SEPARATOR
     anki_image_width: int = 0
     anki_image_height: int = 250
     anki_image_quality: int = 33

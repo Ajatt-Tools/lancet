@@ -32,7 +32,6 @@ from lancet.exceptions import AnkiConnectError, AnkiConnectUnavailableError
 
 ANKI_CONNECT_VERSION: typing.Final[int] = 6
 ANKI_CONNECT_TIMEOUT_SEC: typing.Final[int] = 10
-ANKI_FIELD_SEPARATOR: typing.Final[str] = "<br>"
 
 
 def join_html_content(old_content: str, new_content: str, sep: str) -> str:
@@ -116,7 +115,7 @@ class AnkiConnectClient:
         new_html = join_html_content(
             old_content=previous_html,
             new_content=f'<img src="{filename}">',
-            sep=ANKI_FIELD_SEPARATOR,
+            sep=self._cfg.anki_field_separator,
         )
         try:
             self.browse_note(0)

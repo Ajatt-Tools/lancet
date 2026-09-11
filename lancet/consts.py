@@ -43,6 +43,7 @@ CHAT_URL: S = "https://ajatt.top/blog/join-our-community.html"
 DEFAULT_MODEL_NAME: S = "tatsumoto/manga-ocr-base"
 OCR_JOIN_STR: S = " "
 DEFAULT_ANKICONNECT_URL: S = "http://127.0.0.1:8765"
+ANKI_FIELD_SEPARATOR: S = "<br>"
 
 
 def self_check() -> None:

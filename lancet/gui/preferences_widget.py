@@ -33,6 +33,7 @@ ANKI_KEYS: typing.Final[frozenset[str]] = frozenset(
         "anki_connect_url",
         "anki_connect_api_key",
         "anki_image_field",
+        "anki_field_separator",
         "anki_image_format",
         "anki_image_settings",
     }
@@ -72,6 +73,8 @@ def label_replace(cfg_key: str) -> str:
             return "AnkiConnect API key"
         case "anki_image_field":
             return "Image field"
+        case "anki_field_separator":
+            return "Field separator"
         case "anki_image_format":
             return "Image format"
         case "anki_image_settings":
@@ -165,6 +168,9 @@ class FormWidgetsToolTips:
             "Optional AnkiConnect API key. It is masked here but stored in Lancet's plaintext JSON config."
         )
         self._widgets.anki_image_field.setToolTip("The Anki note field where selected images are appended.")
+        self._widgets.anki_field_separator.setToolTip(
+            "HTML inserted between existing field content and an appended image. Leave empty for no separator."
+        )
         self._widgets.anki_image_format.setToolTip("The image format used to encode uploaded Anki media.")
         return self
 

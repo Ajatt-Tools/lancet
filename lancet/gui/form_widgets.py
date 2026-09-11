@@ -44,6 +44,7 @@ class FormWidgets(SimpleNamespace):
     anki_connect_url: MonoSpaceLineEdit
     anki_connect_api_key: MonoSpaceLineEdit
     anki_image_field: MonoSpaceLineEdit
+    anki_field_separator: MonoSpaceLineEdit
     anki_image_format: EnumSelectCombo
     anki_image_settings: ImageSliderBox
 
@@ -127,6 +128,7 @@ class FormWidgetsBuilder:
         self._widgets.anki_connect_api_key = MonoSpaceLineEdit(self._cfg.anki_connect_api_key)
         self._widgets.anki_connect_api_key.setEchoMode(QLineEdit.EchoMode.Password)
         self._widgets.anki_image_field = MonoSpaceLineEdit(self._cfg.anki_image_field)
+        self._widgets.anki_field_separator = MonoSpaceLineEdit(self._cfg.anki_field_separator)
         self._widgets.anki_image_format = EnumSelectCombo(initial_value=self._cfg.anki_image_format)
         self._widgets.anki_image_settings = ImageSliderBox()
         self._widgets.anki_image_settings.set_values(
