@@ -39,13 +39,14 @@ class AnkiWorkflow:
         executor: concurrent.futures.ThreadPoolExecutor,
         notify: NotifySend,
         take: ZalaTakeScreenRegion,
+        client: AnkiConnectClient | None = None,
     ) -> None:
         """Initialize the workflow with live configuration and its shared worker executor."""
         self._cfg = cfg
         self._executor = executor
         self._notify = notify
         self._take = take
-        self._client = AnkiConnectClient(self._cfg)
+        self._client = client or AnkiConnectClient(self._cfg)
 
     def screenshot_and_add_to_anki(self) -> None:
         """Resolve a stable target note before asking the user to select an image."""
