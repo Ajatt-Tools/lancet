@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24">
-  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-    <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>
-    <path d="M7 9.5A2.5 2.5 0 0 1 9.5 7h5A2.5 2.5 0 0 1 17 9.5v3a2.5 2.5 0 0 1-2.5 2.5H12l-3 2v-2.5A2.5 2.5 0 0 1 7 12z"/>
-    <path d="M10 10h4M10 12.5h3"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Scan-frame corners. -->
+  <path id="scan-top-left" fill="#000000" d="M22 22H148V64H64V149H22Z"/>
+  <path id="scan-top-right" fill="#000000" d="M362 22H488V149H447V64H362Z"/>
+  <path id="scan-bottom-left" fill="#000000" d="M22 362H63V447H148V489H22Z"/>
+  <path id="scan-bottom-right" fill="#000000" d="M447 362H488V489H362V447H447Z"/>
+
+  <!-- Speech-bubble outline. The even-odd inner contour keeps the bubble body transparent. -->
+  <path id="speech-bubble" fill="#000000" fill-rule="evenodd" d="
+    M130 145H382C400 145 414 159 414 177V297C414 315 400 329 382 329H270L206 373V329H130
+    C112 329 98 315 98 297V177C98 159 112 145 130 145Z
+    M150 187H362C368 187 372 191 372 197V277C372 283 368 287 362 287H150C144 287 140 283 140 277
+    V197C140 191 144 187 150 187Z
+  "/>
+
+  <!-- Text lines inside the speech bubble. -->
+  <path id="detected-text" fill="#000000" d="M160 218H350V236H160ZM160 250H315V268H160Z"/>
 </svg>
