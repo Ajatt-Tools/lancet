@@ -8,7 +8,8 @@ import importlib.metadata
 import json
 import pathlib
 import typing
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from types import MappingProxyType
 from unittest.mock import MagicMock, Mock, call, create_autospec
 
 import pytest
@@ -247,12 +248,29 @@ class CliScenario(typing.NamedTuple):
     method_name: str
     args: Sequence[object]
     client_method_name: str
+    expected_kwargs: Mapping[str, bool]
 
 
 CLI_SCENARIOS: dict[str, CliScenario] = {
-    "screenshot": CliScenario("screenshot", (), "ask_screenshot"),
-    "ocr": CliScenario("ocr", (False,), "ask_ocr"),
-    "detect_and_ocr": CliScenario("ocr", (True,), "ask_ocr"),
+    "screenshot": CliScenario("screenshot", (), "ask_screenshot", MappingProxyType({"add_to_anki": False})),
+    "screenshot_to_anki": CliScenario("screenshot", (True,), "ask_screenshot", MappingProxyType({"add_to_anki": True})),
+    "ocr": CliScenario("ocr", (False,), "ask_ocr", MappingProxyType({"detect": False})),
+    "detect_and_ocr": CliScenario("ocr", (True,), "ask_ocr", MappingProxyType({"detect": True})),
+}
+
+
+class FireCliScenario(typing.NamedTuple):
+    """A Fire command and the screenshot call it must produce."""
+
+    command: Sequence[str]
+    expected_kwargs: Mapping[str, bool]
+
+
+FIRE_CLI_SCENARIOS: dict[str, FireCliScenario] = {
+    "hyphenated_add_to_anki": FireCliScenario(
+        command=("screenshot", "--add-to-anki"),
+        expected_kwargs=MappingProxyType({"add_to_anki": True}),
+    ),
 }
 
 
@@ -271,11 +289,21 @@ class TestCliCommands:
 
         getattr(cli, scenario.method_name)(*scenario.args)
 
-        if scenario.client_method_name == "ask_ocr":
-            assert getattr(client, scenario.client_method_name).call_args.kwargs == {"detect": scenario.args[0]}
-        else:
-            assert getattr(client, scenario.client_method_name).call_args.args == scenario.args
+        assert getattr(client, scenario.client_method_name).call_args.args == ()
+        assert getattr(client, scenario.client_method_name).call_args.kwargs == scenario.expected_kwargs
         assert info.call_args.args == ("ok: accepted",)
+
+    @pytest.mark.parametrize("scenario", FIRE_CLI_SCENARIOS.values(), ids=FIRE_CLI_SCENARIOS.keys())
+    def test_fire_accepts_hyphenated_add_to_anki_flag(
+        self, scenario: FireCliScenario, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The requested CLI spelling maps Fire's hyphenated flag to screenshot's snake-case argument."""
+        response = IpcResponse(status=IpcStatus.ok, message="accepted")
+        client = create_autospec(LancetIpcClient, instance=True)
+        client.ask_screenshot.return_value = response
+        monkeypatch.setattr("lancet.cli.logger.info", Mock())
+        lancet_main.fire.Fire(CLI(Config(), client), command=scenario.command)
+        client.ask_screenshot.assert_called_once_with(**scenario.expected_kwargs)
 
 
 class MainDispatchScenario(typing.NamedTuple):
@@ -296,7 +324,18 @@ MAIN_DISPATCH_SCENARIOS: dict[str, MainDispatchScenario] = {
 }
 
 
-class MainDispatchHarness(typing.NamedTuple):
+class MainDispatchSupport(typing.NamedTuple):
+    """Mocks for entry-point effects beyond config, CLI, and IPC collaborators."""
+
+    warning: Mock
+    save_config: Mock
+    setup_frozen: Mock
+    log_versions: Mock
+    read_config: Mock
+    error_log: Mock
+
+
+class MainDispatchContext(typing.NamedTuple):
     """Mocks used to verify one main-entry-point dispatch."""
 
     cfg: Config
@@ -308,15 +347,10 @@ class MainDispatchHarness(typing.NamedTuple):
     ipc_context: MagicMock
     ipc_type: Mock
     run_program: Mock
-    warning: Mock
-    save_config: Mock
-    setup_frozen: Mock
-    log_versions: Mock
-    read_config: Mock
-    error_log: Mock
+    support: MainDispatchSupport
 
 
-class MainConfigHarness(typing.NamedTuple):
+class MainConfigState(typing.NamedTuple):
     """Config state and persistence mock for one main dispatch."""
 
     cfg: Config
@@ -324,7 +358,7 @@ class MainConfigHarness(typing.NamedTuple):
     save_config: Mock
 
 
-class MainIpcHarness(typing.NamedTuple):
+class MainIpcContext(typing.NamedTuple):
     """IPC context mocks for one main dispatch."""
 
     entered: IpcServer
@@ -333,14 +367,14 @@ class MainIpcHarness(typing.NamedTuple):
     run_program: Mock
 
 
-def make_main_config_harness(scenario: MainDispatchScenario) -> MainConfigHarness:
+def create_main_config_state(scenario: MainDispatchScenario) -> MainConfigState:
     """Create Config state for one dispatch scenario."""
     cfg = create_autospec(Config, instance=True)
     cfg.file_exists.return_value = scenario.config_exists
-    return MainConfigHarness(cfg, ConfigFileReadResult(cfg, error=scenario.config_error), Mock())
+    return MainConfigState(cfg=cfg, result=ConfigFileReadResult(cfg, error=scenario.config_error), save_config=Mock())
 
 
-def make_main_ipc_harness(scenario: MainDispatchScenario) -> MainIpcHarness:
+def create_main_ipc_context(scenario: MainDispatchScenario) -> MainIpcContext:
     """Create IPC context state for one dispatch scenario."""
     entered_ipc = create_autospec(IpcServer, instance=True)
     ipc_context = MagicMock()
@@ -348,62 +382,74 @@ def make_main_ipc_harness(scenario: MainDispatchScenario) -> MainIpcHarness:
     if scenario.port_in_use:
         ipc_context.__enter__.side_effect = PortAlreadyInUseError("port occupied")
     ipc_type, run_program = Mock(return_value=ipc_context), Mock()
-    return MainIpcHarness(entered_ipc, ipc_context, ipc_type, run_program)
+    return MainIpcContext(entered=entered_ipc, context=ipc_context, ipc_type=ipc_type, run_program=run_program)
 
 
-def assemble_main_dispatch_harness(
-    config: MainConfigHarness, ipc: MainIpcHarness, cli: CLI, cli_type: Mock, fire: Mock
-) -> MainDispatchHarness:
-    """Assemble grouped collaborators into the assertion harness."""
-    return MainDispatchHarness(
-        config.cfg,
-        config.result,
-        cli,
-        cli_type,
-        fire,
-        ipc.entered,
-        ipc.context,
-        ipc.ipc_type,
-        ipc.run_program,
-        Mock(),
-        config.save_config,
-        Mock(),
-        Mock(),
-        Mock(return_value=config.result),
-        Mock(),
+def create_main_dispatch_support(config: MainConfigState) -> MainDispatchSupport:
+    """Create independent mocks for main's setup, logging, read, and save effects."""
+    return MainDispatchSupport(
+        warning=Mock(),
+        save_config=config.save_config,
+        setup_frozen=Mock(),
+        log_versions=Mock(),
+        read_config=Mock(return_value=config.result),
+        error_log=Mock(),
     )
 
 
-def make_main_dispatch_harness(scenario: MainDispatchScenario) -> MainDispatchHarness:
+def create_main_dispatch_context(
+    config: MainConfigState,
+    ipc: MainIpcContext,
+    cli: CLI,
+    *,
+    cli_type: Mock,
+    fire: Mock,
+) -> MainDispatchContext:
+    """Group entry-point collaborators used by one dispatch assertion."""
+    return MainDispatchContext(
+        cfg=config.cfg,
+        result=config.result,
+        cli=cli,
+        cli_type=cli_type,
+        fire=fire,
+        entered_ipc=ipc.entered,
+        ipc_context=ipc.context,
+        ipc_type=ipc.ipc_type,
+        run_program=ipc.run_program,
+        support=create_main_dispatch_support(config),
+    )
+
+
+def create_main_dispatch_context_for(scenario: MainDispatchScenario) -> MainDispatchContext:
     """Construct entry-point collaborators without installing patches."""
-    config = make_main_config_harness(scenario)
-    ipc = make_main_ipc_harness(scenario)
+    config = create_main_config_state(scenario)
+    ipc = create_main_ipc_context(scenario)
     cli = create_autospec(CLI, instance=True)
-    return assemble_main_dispatch_harness(config, ipc, cli, Mock(return_value=cli), Mock())
+    return create_main_dispatch_context(config, ipc, cli, cli_type=Mock(return_value=cli), fire=Mock())
 
 
 def install_main_dispatch_patches(
-    harness: MainDispatchHarness, scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch
+    context: MainDispatchContext, scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Install one harness as the entry point's collaborators."""
+    """Install one dispatch context as the entry point's collaborators."""
     monkeypatch.setattr(lancet_main.sys, "argv", ["lancet", *scenario.args])
-    monkeypatch.setattr(lancet_main, "setup_frozen_binary", harness.setup_frozen)
-    monkeypatch.setattr(lancet_main, "log_dependency_versions", harness.log_versions)
-    monkeypatch.setattr(harness.cfg, "save_to_file", harness.save_config)
-    monkeypatch.setattr(lancet_main, "read_config_file", harness.read_config)
-    monkeypatch.setattr(lancet_main, "CLI", harness.cli_type)
-    monkeypatch.setattr(lancet_main.fire, "Fire", harness.fire)
-    monkeypatch.setattr(lancet_main, "IpcServer", harness.ipc_type)
-    monkeypatch.setattr(lancet_main, "run_program", harness.run_program)
-    monkeypatch.setattr(lancet_main.logger, "warning", harness.warning)
-    monkeypatch.setattr(lancet_main.logger, "error", harness.error_log)
+    monkeypatch.setattr(lancet_main, "setup_frozen_binary", context.support.setup_frozen)
+    monkeypatch.setattr(lancet_main, "log_dependency_versions", context.support.log_versions)
+    monkeypatch.setattr(context.cfg, "save_to_file", context.support.save_config)
+    monkeypatch.setattr(lancet_main, "read_config_file", context.support.read_config)
+    monkeypatch.setattr(lancet_main, "CLI", context.cli_type)
+    monkeypatch.setattr(lancet_main.fire, "Fire", context.fire)
+    monkeypatch.setattr(lancet_main, "IpcServer", context.ipc_type)
+    monkeypatch.setattr(lancet_main, "run_program", context.run_program)
+    monkeypatch.setattr(lancet_main.logger, "warning", context.support.warning)
+    monkeypatch.setattr(lancet_main.logger, "error", context.support.error_log)
 
 
-def install_main_dispatch(scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch) -> MainDispatchHarness:
+def install_main_dispatch(scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch) -> MainDispatchContext:
     """Construct and install entry-point collaborators."""
-    harness = make_main_dispatch_harness(scenario)
-    install_main_dispatch_patches(harness, scenario, monkeypatch)
-    return harness
+    context = create_main_dispatch_context_for(scenario)
+    install_main_dispatch_patches(context, scenario, monkeypatch)
+    return context
 
 
 class TestMainDispatch:
@@ -412,19 +458,21 @@ class TestMainDispatch:
     @pytest.mark.parametrize("scenario", MAIN_DISPATCH_SCENARIOS.values(), ids=MAIN_DISPATCH_SCENARIOS.keys())
     def test_dispatches_by_arguments(self, scenario: MainDispatchScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """Arguments invoke Fire; an empty argument list enters the IPC-backed GUI."""
-        harness = install_main_dispatch(scenario, monkeypatch)
+        context = install_main_dispatch(scenario, monkeypatch)
         lancet_main.main()
-        harness.setup_frozen.assert_called_once_with()
-        harness.log_versions.assert_called_once_with()
-        harness.read_config.assert_called_once_with()
-        assert harness.cli_type.call_args_list == ([call(harness.cfg)] if scenario.uses_cli else [])
-        assert harness.fire.call_args_list == ([call(harness.cli)] if scenario.uses_cli else [])
-        assert harness.save_config.call_count == int(not scenario.config_exists)
-        assert harness.ipc_type.call_args_list == ([] if scenario.uses_cli else [call(harness.cfg)])
+        context.support.setup_frozen.assert_called_once_with()
+        context.support.log_versions.assert_called_once_with()
+        context.support.read_config.assert_called_once_with()
+        assert context.cli_type.call_args_list == ([call(context.cfg)] if scenario.uses_cli else [])
+        assert context.fire.call_args_list == ([call(context.cli)] if scenario.uses_cli else [])
+        assert context.support.save_config.call_count == int(not scenario.config_exists)
+        assert context.ipc_type.call_args_list == ([] if scenario.uses_cli else [call(context.cfg)])
         expected_run = (
-            [call(harness.result, harness.entered_ipc)] if not (scenario.uses_cli or scenario.port_in_use) else []
+            [call(context.result, context.entered_ipc)] if not (scenario.uses_cli or scenario.port_in_use) else []
         )
-        assert harness.run_program.call_args_list == expected_run
-        assert harness.ipc_context.__exit__.call_count == int(not (scenario.uses_cli or scenario.port_in_use))
-        assert harness.warning.call_args_list == ([call("port occupied")] if scenario.port_in_use else [])
-        assert harness.error_log.call_args_list == ([call(scenario.config_error)] if scenario.config_error else [])
+        assert context.run_program.call_args_list == expected_run
+        assert context.ipc_context.__exit__.call_count == int(not (scenario.uses_cli or scenario.port_in_use))
+        assert context.support.warning.call_args_list == ([call("port occupied")] if scenario.port_in_use else [])
+        assert context.support.error_log.call_args_list == (
+            [call(scenario.config_error)] if scenario.config_error else []
+        )
