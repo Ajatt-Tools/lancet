@@ -8,7 +8,9 @@ import typing
 import pytest
 
 from lancet.actions import LancetAction
+from lancet.anki.image_types import AnkiImageFormat
 from lancet.config import Config, OcrDestination
+from lancet.consts import ANKI_FIELD_SEPARATOR
 from lancet.exceptions import ConfigReadError
 
 
@@ -81,36 +83,128 @@ class TestConfigReadFromFile:
         assert len(warnings) == scenario.expected_warning_count
 
 
+class AnkiFormatScenario(typing.NamedTuple):
+    """A serialized Anki image format and the enum expected after config parsing."""
+
+    serialized: object
+    expected: AnkiImageFormat
+    expected_warning_count: int
+
+
+ANKI_FORMAT_SCENARIOS: dict[str, AnkiFormatScenario] = {
+    "avif": AnkiFormatScenario("avif", AnkiImageFormat.avif, 0),
+    "webp": AnkiFormatScenario("webp", AnkiImageFormat.webp, 0),
+    "invalid_name_uses_default": AnkiFormatScenario("png", AnkiImageFormat.avif, 1),
+    "invalid_type_uses_default": AnkiFormatScenario(None, AnkiImageFormat.avif, 1),
+}
+
+
+class TestConfigAnkiImageFormat:
+    """Test Anki image-format enum parsing and fallback behavior."""
+
+    @pytest.mark.parametrize("scenario", ANKI_FORMAT_SCENARIOS.values(), ids=ANKI_FORMAT_SCENARIOS.keys())
+    def test_read(self, scenario: AnkiFormatScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        """Serialized format names become enum members, while invalid names use the AVIF default."""
+        warnings: list[str] = []
+        cfg_path = tmp_path / "lancet.json"
+        cfg_path.write_text(json.dumps({"anki_image_format": scenario.serialized}), encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        monkeypatch.setattr("lancet.config.logger.warning", lambda message: warnings.append(message))
+        assert Config.read_from_file().anki_image_format == scenario.expected
+        assert len(warnings) == scenario.expected_warning_count
+
+
+class AnkiDefaultsScenario(typing.NamedTuple):
+    """The Anki defaults that must produce an enabled screenshot shortcut."""
+
+    shortcut: str
+    field_separator: str
+    image_format: AnkiImageFormat
+    expected_actions: frozenset[LancetAction]
+
+
+ANKI_DEFAULT_SCENARIOS: dict[str, AnkiDefaultsScenario] = {
+    "default_config": AnkiDefaultsScenario(
+        shortcut="Alt+I",
+        field_separator=ANKI_FIELD_SEPARATOR,
+        image_format=AnkiImageFormat.avif,
+        expected_actions=frozenset({LancetAction.ocr, LancetAction.detect_and_ocr, LancetAction.screenshot_to_anki}),
+    ),
+}
+
+
+class TestConfigAnkiDefaults:
+    """Test that a fresh configuration enables the documented Anki defaults."""
+
+    @pytest.mark.parametrize("scenario", ANKI_DEFAULT_SCENARIOS.values(), ids=ANKI_DEFAULT_SCENARIOS.keys())
+    def test_defaults(self, scenario: AnkiDefaultsScenario) -> None:
+        """Fresh configuration values produce the expected Anki shortcut action."""
+        config = Config()
+        assert config.anki_shortcut == scenario.shortcut
+        assert config.anki_field_separator == scenario.field_separator
+        assert config.anki_image_format == scenario.image_format
+        assert frozenset(config.get_pynput_shortcuts().hotkeys.values()) == scenario.expected_actions
+
+
+class ConfigRoundTripScenario(typing.NamedTuple):
+    """Non-default configuration values that must survive JSON serialization."""
+
+    copy_to: OcrDestination
+    config_relpath: str
+    goldendict_path: str
+    image_format: AnkiImageFormat
+    field_separator: str
+
+
+ROUND_TRIP_SCENARIOS: dict[str, ConfigRoundTripScenario] = {
+    "default_avif": ConfigRoundTripScenario(
+        copy_to=OcrDestination.goldendict,
+        config_relpath="lancet.json",
+        goldendict_path="",
+        image_format=AnkiImageFormat.avif,
+        field_separator=ANKI_FIELD_SEPARATOR,
+    ),
+    "custom_webp_separator": ConfigRoundTripScenario(
+        copy_to=OcrDestination.clipboard,
+        config_relpath="subdir/lancet.json",
+        goldendict_path="/opt/goldendict/goldendict",
+        image_format=AnkiImageFormat.webp,
+        field_separator="<hr>",
+    ),
+}
+
+
 class TestConfigSaveToFile:
     """Test Config.save_to_file serialization."""
 
-    @pytest.mark.parametrize(
-        "copy_to, config_relpath, goldendict_path",
-        [
-            (OcrDestination.goldendict, "lancet.json", ""),
-            (OcrDestination.clipboard, "subdir/lancet.json", "/opt/goldendict/goldendict"),
-        ],
-    )
+    @pytest.mark.parametrize("scenario", ROUND_TRIP_SCENARIOS.values(), ids=ROUND_TRIP_SCENARIOS.keys())
     def test_round_trip(
         self,
-        copy_to: OcrDestination,
-        config_relpath: str,
-        goldendict_path: str,
+        scenario: ConfigRoundTripScenario,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: pathlib.Path,
     ) -> None:
         """Test that saving and reading a config produces the same values."""
-        cfg_path = tmp_path / config_relpath
+        cfg_path = tmp_path / scenario.config_relpath
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
-        cfg = Config(copy_to=copy_to, path_to_goldendict_executable=goldendict_path)
+        cfg = Config(
+            copy_to=scenario.copy_to,
+            path_to_goldendict_executable=scenario.goldendict_path,
+            anki_image_format=scenario.image_format,
+            anki_field_separator=scenario.field_separator,
+        )
         cfg.save_to_file()
         assert cfg_path.is_file()
         data = json.loads(cfg_path.read_text(encoding="utf-8"))
-        assert data["copy_to"] == copy_to.name
-        assert data["path_to_goldendict_executable"] == goldendict_path
+        assert data["copy_to"] == scenario.copy_to.name
+        assert data["anki_image_format"] == scenario.image_format.name
+        assert data["anki_field_separator"] == scenario.field_separator
+        assert data["path_to_goldendict_executable"] == scenario.goldendict_path
         loaded = Config.read_from_file()
-        assert loaded.copy_to == copy_to
-        assert loaded.path_to_goldendict_executable == goldendict_path
+        assert loaded.copy_to == scenario.copy_to
+        assert loaded.anki_image_format == scenario.image_format
+        assert loaded.anki_field_separator == scenario.field_separator
+        assert loaded.path_to_goldendict_executable == scenario.goldendict_path
 
 
 class TestConfigReadInvalidFile:
@@ -141,41 +235,46 @@ class GetPynputShortcutsScenario(typing.NamedTuple):
     ocr_shortcut: str
     ocr_page_shortcut: str
     screenshot_shortcut: str
+    anki_shortcut: str
     expected_hotkey_count: int
     expected_failure_count: int
     expected_actions: frozenset[LancetAction]
 
 
 GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
-    "all_defaults_two_hotkeys": GetPynputShortcutsScenario(
+    "all_defaults_three_hotkeys": GetPynputShortcutsScenario(
         ocr_shortcut="Alt+O",
         ocr_page_shortcut="Shift+Alt+O",
         screenshot_shortcut="",
-        expected_hotkey_count=2,
+        anki_shortcut="Alt+I",
+        expected_hotkey_count=3,
         expected_failure_count=0,
-        expected_actions=frozenset({LancetAction.ocr, LancetAction.detect_and_ocr}),
+        expected_actions=frozenset({LancetAction.ocr, LancetAction.detect_and_ocr, LancetAction.screenshot_to_anki}),
     ),
     "all_blank_yields_nothing": GetPynputShortcutsScenario(
         ocr_shortcut="",
         ocr_page_shortcut="",
         screenshot_shortcut="",
+        anki_shortcut="",
         expected_hotkey_count=0,
         expected_failure_count=0,
         expected_actions=frozenset(),
     ),
-    "one_invalid_one_valid": GetPynputShortcutsScenario(
+    "one_invalid_two_valid": GetPynputShortcutsScenario(
         ocr_shortcut="Alt+O",
         ocr_page_shortcut="GibberishKey+X",
         screenshot_shortcut="",
-        expected_hotkey_count=1,
+        anki_shortcut="Alt+I",
+        expected_hotkey_count=2,
         expected_failure_count=1,
-        expected_actions=frozenset({LancetAction.ocr}),
+        expected_actions=frozenset({LancetAction.ocr, LancetAction.screenshot_to_anki}),
     ),
-    "all_three_distinct_valid": GetPynputShortcutsScenario(
+    "all_four_distinct_valid": GetPynputShortcutsScenario(
         ocr_shortcut="Alt+O",
         ocr_page_shortcut="Shift+Alt+O",
         screenshot_shortcut="Ctrl+Shift+S",
-        expected_hotkey_count=3,
+        anki_shortcut="Alt+I",
+        expected_hotkey_count=4,
         expected_failure_count=0,
         expected_actions=frozenset(LancetAction),
     ),
@@ -183,7 +282,7 @@ GET_PYNPUT_SHORTCUTS_SCENARIOS: dict[str, GetPynputShortcutsScenario] = {
 
 
 class TestConfigGetPynputShortcuts:
-    """Verify Config.get_pynput_shortcuts converts the three shortcut fields correctly."""
+    """Verify Config.get_pynput_shortcuts converts all four shortcut fields correctly."""
 
     @pytest.mark.parametrize(
         "scenario", GET_PYNPUT_SHORTCUTS_SCENARIOS.values(), ids=GET_PYNPUT_SHORTCUTS_SCENARIOS.keys()
@@ -194,6 +293,7 @@ class TestConfigGetPynputShortcuts:
             ocr_shortcut=scenario.ocr_shortcut,
             ocr_page_shortcut=scenario.ocr_page_shortcut,
             screenshot_shortcut=scenario.screenshot_shortcut,
+            anki_shortcut=scenario.anki_shortcut,
         )
         result = cfg.get_pynput_shortcuts()
         assert len(result.hotkeys) == scenario.expected_hotkey_count
