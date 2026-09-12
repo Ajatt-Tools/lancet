@@ -28,18 +28,29 @@ class GoldenDictPathScenario(typing.NamedTuple):
 
 GOLDENDICT_PATH_SCENARIOS: dict[str, GoldenDictPathScenario] = {
     "configured_path_resolves": GoldenDictPathScenario(
-        "  custom-goldendict  ",
-        "/opt/goldendict/goldendict",
-        "custom-goldendict",
-        "/opt/goldendict/goldendict",
+        path_override="  custom-goldendict  ",
+        resolved_path="/opt/goldendict/goldendict",
+        expected_lookup="custom-goldendict",
+        expected_path="/opt/goldendict/goldendict",
     ),
     "unresolved_configured_path_is_preserved": GoldenDictPathScenario(
-        "  /custom/goldendict  ", None, "/custom/goldendict", "/custom/goldendict"
+        path_override="  /custom/goldendict  ",
+        resolved_path=None,
+        expected_lookup="/custom/goldendict",
+        expected_path="/custom/goldendict",
     ),
     "empty_configuration_auto_detects": GoldenDictPathScenario(
-        "  ", "/usr/bin/goldendict", "goldendict", "/usr/bin/goldendict"
+        path_override="  ",
+        resolved_path="/usr/bin/goldendict",
+        expected_lookup="goldendict",
+        expected_path="/usr/bin/goldendict",
     ),
-    "failed_auto_detection_uses_command_name": GoldenDictPathScenario("", None, "goldendict", "goldendict"),
+    "failed_auto_detection_uses_command_name": GoldenDictPathScenario(
+        path_override="",
+        resolved_path=None,
+        expected_lookup="goldendict",
+        expected_path="goldendict",
+    ),
 }
 
 
@@ -59,17 +70,17 @@ class TestResolveGoldenDictPath:
         resolve.assert_called_once_with(scenario.expected_lookup)
 
 
-class WorkflowHarness(typing.NamedTuple):
+class OcrWorkflowContext(typing.NamedTuple):
     """An OCR workflow and its mocked notification service."""
 
     workflow: OcrWorkflow
     notify: MagicMock
 
 
-def make_workflow(app: QApplication, cfg: Config) -> WorkflowHarness:
+def create_ocr_workflow_context(app: QApplication, cfg: Config) -> OcrWorkflowContext:
     """Construct an OCR workflow using autospecced collaborators."""
     notify = create_autospec(NotifySend, instance=True)
-    return WorkflowHarness(
+    return OcrWorkflowContext(
         workflow=OcrWorkflow(
             app=app,
             cfg=cfg,
@@ -86,18 +97,26 @@ def make_workflow(app: QApplication, cfg: Config) -> WorkflowHarness:
 class GoldenDictLaunchScenario(typing.NamedTuple):
     """A GoldenDict launch outcome and expected notification."""
 
-    launch_error: OSError | None
+    launch_error_type: type[OSError] | None
+    launch_error_message: str
     expected_notification: str
 
 
 GOLDENDICT_LAUNCH_SCENARIOS: dict[str, GoldenDictLaunchScenario] = {
-    "success": GoldenDictLaunchScenario(None, "OCR result copied: recognized text"),
+    "success": GoldenDictLaunchScenario(
+        launch_error_type=None,
+        launch_error_message="",
+        expected_notification="OCR result copied: recognized text",
+    ),
     "executable_not_found": GoldenDictLaunchScenario(
-        FileNotFoundError("missing executable"),
-        "Executable not found: '/resolved/goldendict'. Check Preferences or PATH.",
+        launch_error_type=FileNotFoundError,
+        launch_error_message="missing executable",
+        expected_notification="Executable not found: '/resolved/goldendict'. Check Preferences or PATH.",
     ),
     "other_os_error": GoldenDictLaunchScenario(
-        PermissionError("permission denied"), "Failed to launch GoldenDict: permission denied"
+        launch_error_type=PermissionError,
+        launch_error_message="permission denied",
+        expected_notification="Failed to launch GoldenDict: permission denied",
     ),
 }
 
@@ -108,7 +127,7 @@ class TestGoldenDictDelivery:
     @pytest.mark.parametrize("scenario", GOLDENDICT_LAUNCH_SCENARIOS.values(), ids=GOLDENDICT_LAUNCH_SCENARIOS.keys())
     def test_copy_ocr_result(self, scenario: GoldenDictLaunchScenario, qapp: QApplication) -> None:
         """Invoke GoldenDict with the resolved path and report exactly one result."""
-        harness = make_workflow(
+        context = create_ocr_workflow_context(
             qapp,
             Config(copy_to=OcrDestination.goldendict, path_to_goldendict_executable="/configured/goldendict"),
         )
@@ -121,13 +140,15 @@ class TestGoldenDictDelivery:
             patch(
                 "lancet.model_utils.ocr_workflow.run_and_disown",
                 autospec=True,
-                side_effect=scenario.launch_error,
+                side_effect=(
+                    scenario.launch_error_type(scenario.launch_error_message) if scenario.launch_error_type else None
+                ),
             ) as run,
         ):
-            harness.workflow.copy_ocr_result("recognized text")
+            context.workflow.copy_ocr_result("recognized text")
         resolve.assert_called_once_with("/configured/goldendict")
         run.assert_called_once_with(("/resolved/goldendict", "recognized text"))
-        harness.notify.notify.assert_called_once_with(scenario.expected_notification)
+        context.notify.notify.assert_called_once_with(scenario.expected_notification)
 
 
 CLIPBOARD_SCENARIOS: dict[str, str] = {"recognized_text": "clipboard result"}
@@ -139,9 +160,9 @@ class TestClipboardDelivery:
     @pytest.mark.parametrize("text", CLIPBOARD_SCENARIOS.values(), ids=CLIPBOARD_SCENARIOS.keys())
     def test_copy_ocr_result(self, text: str, qapp: QApplication) -> None:
         """Clipboard delivery writes text and reports success."""
-        harness = make_workflow(qapp, Config(copy_to=OcrDestination.clipboard))
-        harness.workflow.copy_ocr_result(text)
+        context = create_ocr_workflow_context(qapp, Config(copy_to=OcrDestination.clipboard))
+        context.workflow.copy_ocr_result(text)
         clipboard = qapp.clipboard()
         assert clipboard is not None
         assert clipboard.text() == text
-        harness.notify.notify.assert_called_once_with(f"OCR result copied: {text}")
+        context.notify.notify.assert_called_once_with(f"OCR result copied: {text}")
