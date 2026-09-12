@@ -62,6 +62,11 @@ VALID_REQUEST_SCENARIOS: dict[str, ParseScenario] = {
         expected_request=IpcRequest(action=LancetAction.screenshot),
         expected_error=None,
     ),
+    "valid_screenshot_to_anki": ParseScenario(
+        body='{"action": "screenshot_to_anki"}',
+        expected_request=IpcRequest(action=LancetAction.screenshot_to_anki),
+        expected_error=None,
+    ),
     "extra_fields_ignored": ParseScenario(
         body='{"action": "ocr", "image_path": "/foo/bar.png"}',
         expected_request=IpcRequest(action=LancetAction.ocr),
@@ -153,11 +158,19 @@ SEND_SCENARIOS: dict[str, SendScenario] = {
         action=LancetAction.detect_and_ocr,
         expected_message="detect_and_ocr command accepted",
     ),
+    "screenshot_to_anki": SendScenario(
+        action=LancetAction.screenshot_to_anki,
+        expected_message="screenshot_to_anki command accepted",
+    ),
 }
 
 
 class TestSendIpcRequest:
     """Test that send_ipc_request sends an HTTP POST and returns a correctly parsed response."""
+
+    def test_scenarios_cover_all_actions(self) -> None:
+        """Every action supported by the IPC protocol has a real HTTP send scenario."""
+        assert frozenset(scenario.action for scenario in SEND_SCENARIOS.values()) == frozenset(LancetAction)
 
     @pytest.mark.parametrize("scenario", SEND_SCENARIOS.values(), ids=SEND_SCENARIOS.keys())
     def test_send_ipc_request(self, ipc_server: IpcServer, scenario: SendScenario) -> None:
@@ -180,6 +193,11 @@ class AskScenario(typing.NamedTuple):
 
 ASK_SCENARIOS: dict[str, AskScenario] = {
     "screenshot": AskScenario(method_name="ask_screenshot", args=(), action=LancetAction.screenshot),
+    "screenshot_to_anki": AskScenario(
+        method_name="ask_screenshot",
+        args=(True,),
+        action=LancetAction.screenshot_to_anki,
+    ),
     "ocr": AskScenario(method_name="ask_ocr", args=(False,), action=LancetAction.ocr),
     "detect_and_ocr": AskScenario(method_name="ask_ocr", args=(True,), action=LancetAction.detect_and_ocr),
 }
