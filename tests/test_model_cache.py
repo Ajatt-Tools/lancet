@@ -156,7 +156,7 @@ CACHE_STATE_SCENARIOS: dict[str, CacheStateScenario] = {
 }
 
 
-class CacheStateHarness(typing.NamedTuple):
+class PreparedCacheState(typing.NamedTuple):
     """Prepared cache paths, response body, and network mock."""
 
     model_path: pathlib.Path
@@ -167,7 +167,7 @@ class CacheStateHarness(typing.NamedTuple):
 
 def prepare_cache_state(
     scenario: CacheStateScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> CacheStateHarness:
+) -> PreparedCacheState:
     """Create one initial cache state and configure its network behavior."""
     model_path = install_cache_dir(monkeypatch, tmp_path)
     partial_path = model_path.with_suffix(".pt.part")
@@ -180,18 +180,23 @@ def prepare_cache_state(
     if not scenario.expect_download:
         fake_get.side_effect = AssertionError("requests.get must not be called")
         monkeypatch.setattr("lancet.text_detector_client.model_cache.requests.get", fake_get)
-    return CacheStateHarness(model_path, partial_path, body, fake_get)
+    return PreparedCacheState(
+        model_path=model_path,
+        partial_path=partial_path,
+        body=body,
+        fake_get=fake_get,
+    )
 
 
-def assert_cache_state(scenario: CacheStateScenario, harness: CacheStateHarness) -> None:
+def assert_cache_state(scenario: CacheStateScenario, context: PreparedCacheState) -> None:
     """Assert final cache bytes, partial cleanup, and network behavior."""
-    expected_contents = harness.body if scenario.expect_download else scenario.model_contents
-    assert harness.model_path.read_bytes() == expected_contents
-    assert harness.partial_path.exists() is False
-    assert harness.fake_get.call_count == int(scenario.expect_download)
+    expected_contents = context.body if scenario.expect_download else scenario.model_contents
+    assert context.model_path.read_bytes() == expected_contents
+    assert context.partial_path.exists() is False
+    assert context.fake_get.call_count == int(scenario.expect_download)
     if scenario.expect_download:
-        assert harness.fake_get.call_args.args == (DOWNLOAD_URL,)
-        assert harness.fake_get.call_args.kwargs == {
+        assert context.fake_get.call_args.args == (DOWNLOAD_URL,)
+        assert context.fake_get.call_args.kwargs == {
             "stream": True,
             "verify": True,
             "timeout": DOWNLOAD_TIMEOUT_SEC,
@@ -206,10 +211,10 @@ class TestComicTextDetectorCache:
         self, scenario: CacheStateScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
     ) -> None:
         """Use valid caches and replace missing, corrupt, or partial checkpoints."""
-        harness = prepare_cache_state(scenario, monkeypatch, tmp_path)
+        context = prepare_cache_state(scenario, monkeypatch, tmp_path)
         result = ComicTextDetectorCache().comic_text_detector_path()
-        assert result == harness.model_path
-        assert_cache_state(scenario, harness)
+        assert result == context.model_path
+        assert_cache_state(scenario, context)
 
 
 class DownloadFailureScenario(typing.NamedTuple):
