@@ -12,6 +12,8 @@ from collections.abc import Callable, Iterator, Sequence
 
 import pytest
 from PIL import Image
+from PyQt6.QtCore import QEventLoop, QTimer
+from zala.utils import qconnect
 
 from lancet.config import Config
 from lancet.model_utils.base import LancetModel, ModelLoadRecipe, ModelName
@@ -22,6 +24,7 @@ from lancet.text_detector_client.text_detector_base import (
     ComicTextDetectorBase,
     SpeechBubbleResult,
 )
+from tests.helpers import wait_for_qt_event_loop
 
 
 class FakeMangaOcr(MangaOcrBase):
@@ -76,31 +79,52 @@ class FakeTextDetector(ComicTextDetectorBase):
         return SpeechBubbleResult(version="", img_width=0, img_height=0)
 
 
+class ModelLoaderSettler:
+    """Run a nested Qt event loop until a model loader reaches a settled state."""
+
+    def __init__(self, loader: BackgroundModelLoader) -> None:
+        """Store the loader whose status should be observed."""
+        self._loader = loader
+        self._loop = QEventLoop()
+
+    def wait(self) -> None:
+        """Process queued Qt callbacks until all model operations settle or the timeout expires."""
+        if self._loader.status().all_settled:
+            return
+        poll = QTimer()
+        qconnect(poll.timeout, self._quit_if_settled)
+        poll.start(1)
+        try:
+            wait_for_qt_event_loop(self._loop)
+        finally:
+            poll.stop()
+
+    def _quit_if_settled(self) -> None:
+        """Exit the nested loop when all queued model callbacks have completed."""
+        if self._loader.status().all_settled:
+            self._loop.quit()
+
+
 class NotifySpy(NotifySend):
     """Stand-in for NotifySend that records each call without touching desktop notifications."""
 
     def __init__(self) -> None:
-        """Initialize recorded messages and completion synchronization."""
+        """Initialize recorded messages."""
         # Skip NotifySend.__init__ entirely; we only need to record notify() calls.
         self.messages: list[str] = []
-        self._condition = threading.Condition()
 
     def notify(self, msg: str) -> "NotifySpy":
-        """Record a notification and wake completion waiters."""
-        with self._condition:
-            self.messages.append(msg)
-            self._condition.notify_all()
+        """Record a notification."""
+        self.messages.append(msg)
         return self
 
     def set_duration(self, duration_sec: int) -> "NotifySpy":
         """Ignore notification duration changes and return self."""
         return self
 
-    def wait_until_settled(self, loader: BackgroundModelLoader, *, timeout_sec: float = 5.0) -> None:
-        """Wait until every model load has succeeded or failed."""
-        with self._condition:
-            if not self._condition.wait_for(lambda: loader.status().all_settled, timeout=timeout_sec):
-                raise AssertionError("loader did not settle within timeout")
+    def wait_until_settled(self, loader: BackgroundModelLoader) -> None:
+        """Process Qt callbacks until every model load has succeeded or failed."""
+        ModelLoaderSettler(loader).wait()
 
 
 class CountingOp:
