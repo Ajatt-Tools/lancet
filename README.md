@@ -50,11 +50,12 @@ This replaces a separate screenshot utility for image-card creation.
    choose the screen region, and Lancet appends the image to that note's `Image` field.
 
 Preferences has an **Anki** tab with the AnkiConnect URL, optional API key,
-target field, shortcut, maximum image width/height, quality, and output format.
+target field, maximum image width/height, quality, and output format.
+The shortcut can be changed on the **Main** tab with Lancet's other shortcuts.
 Width and height are maximum bounds.
 `0` leaves an axis unconstrained, and images are never enlarged.
-The API key is masked in Preferences but stored
-in Lancet's plaintext JSON configuration file.
+The API key is masked in Preferences
+but stored in Lancet's plaintext JSON configuration file.
 The field separator controls the HTML placed before each appended image.
 It defaults to `<br>` and may be empty.
 
