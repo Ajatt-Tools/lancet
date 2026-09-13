@@ -118,6 +118,11 @@ class AnkiConnectClient:
 
     def attach_image(self, note_id: int, field_name: str, image: EncodedImage) -> str:
         """Upload an image, append it to a note field, and reselect the updated note."""
+        # Selecting an impossible note ID forces Anki's Browser editor to lose focus
+        # and flush pending edits. This must happen before notesInfo. Reading first
+        # could capture stale HTML and overwrite the newer content during our update.
+        self.browse_note(0)
+
         previous_html = self.note_field(note_id, field_name)
         filename = self.store_media(make_image_filename(note_id, image.image_format.value), image.data)
         new_html = join_html_content(
@@ -126,7 +131,6 @@ class AnkiConnectClient:
             sep=self._cfg.anki_field_separator,
         )
         try:
-            self.browse_note(0)
             self.update_note_field(note_id, field_name, new_html)
         except Exception as ex:
             # Delete media and re-raise.
@@ -135,5 +139,8 @@ class AnkiConnectClient:
             with contextlib.suppress(Exception):
                 self.delete_media(filename)
             raise
+
+        # Reselect the target only after the update so the Browser displays the
+        # field contents containing the newly attached image.
         self.browse_note(note_id)
         return filename
