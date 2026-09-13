@@ -3,16 +3,20 @@
 
 import dataclasses
 import typing
+from collections.abc import Callable, Sequence
 
 import pytest
 from PyQt6.QtWidgets import QApplication
 
+from lancet.anki.image_types import AnkiImageFormat
 from lancet.config import Config, OcrDestination
 from lancet.gui.form_widgets import FormWidgets, FormWidgetsBuilder
 from lancet.gui.preferences_widget import (
+    ANKI_KEYS,
     SPECIAL_KEYS,
     CopySettingsFromWidgetsToConfig,
     FormWidgetValues,
+    MainPreferencesWidget,
     label_replace,
 )
 from lancet.gui.widgets_to_config_dict import set_from_cfg
@@ -26,9 +30,17 @@ class FieldParityScenario(typing.NamedTuple):
 
 
 FIELD_PARITY_SCENARIOS: dict[str, FieldParityScenario] = {
-    "huggingface_model": FieldParityScenario(
-        special_widget_fields=frozenset({"huggingface_model"}),
-        represented_config_fields=frozenset({"huggingface_model_name", "huggingface_models"}),
+    "composite_widgets": FieldParityScenario(
+        special_widget_fields=frozenset({"huggingface_model", "anki_image_settings"}),
+        represented_config_fields=frozenset(
+            {
+                "huggingface_model_name",
+                "huggingface_models",
+                "anki_image_width",
+                "anki_image_height",
+                "anki_image_quality",
+            }
+        ),
     )
 }
 
@@ -45,8 +57,15 @@ class TestFormWidgetFieldParity:
         assert form_fields - scenario.special_widget_fields == config_fields - scenario.represented_config_fields
 
 
-ROUND_TRIP_SCENARIOS: dict[str, Config] = {
-    "non_default_values": Config(
+class ConfigScenario(typing.NamedTuple):
+    """A fresh configuration factory used to prevent mutable scenario state leakage."""
+
+    create: Callable[[], Config]
+
+
+def make_round_trip_config() -> Config:
+    """Create a configuration with non-default values for every preferences control."""
+    return Config(
         copy_to=OcrDestination.clipboard,
         notification_duration_sec=17,
         huggingface_model_name="custom/model",
@@ -59,6 +78,15 @@ ROUND_TRIP_SCENARIOS: dict[str, Config] = {
         ocr_shortcut="Ctrl+Shift+J",
         ocr_page_shortcut="Alt+P",
         screenshot_shortcut="Meta+S",
+        anki_shortcut="Ctrl+Shift+A",
+        anki_connect_url="http://localhost:8765",
+        anki_connect_api_key="secret",
+        anki_image_field="AnkiImage",
+        anki_field_separator="<hr>",
+        anki_image_width=600,
+        anki_image_height=400,
+        anki_image_quality=77,
+        anki_image_format=AnkiImageFormat.webp,
         path_to_goldendict_executable="/opt/goldendict",
         border_thickness=7,
         border_color="#AA112233",
@@ -67,15 +95,20 @@ ROUND_TRIP_SCENARIOS: dict[str, Config] = {
         fill_brush_color="#DD445566",
         bind_port=23456,
     )
+
+
+ROUND_TRIP_SCENARIOS: dict[str, ConfigScenario] = {
+    "non_default_values": ConfigScenario(create=make_round_trip_config),
 }
 
 
 class TestConfigFormRoundTrip:
     """Test complete Config-to-widget-to-Config conversion."""
 
-    @pytest.mark.parametrize("source", ROUND_TRIP_SCENARIOS.values(), ids=ROUND_TRIP_SCENARIOS.keys())
-    def test_round_trip(self, source: Config, qapp: QApplication) -> None:
+    @pytest.mark.parametrize("scenario", ROUND_TRIP_SCENARIOS.values(), ids=ROUND_TRIP_SCENARIOS.keys())
+    def test_round_trip(self, scenario: ConfigScenario, qapp: QApplication) -> None:
         """All configuration fields survive conversion through form widgets."""
+        source = scenario.create()
         target = Config()
         widgets = FormWidgetsBuilder(target).create_form_widgets()
         FormWidgetValues(source, widgets).set_widget_values()
@@ -91,11 +124,14 @@ class LabelReplaceScenario(typing.NamedTuple):
 
 
 LABEL_REPLACE_SCENARIOS: dict[str, LabelReplaceScenario] = {
-    "sec_suffix": LabelReplaceScenario("notification_duration_sec", "notification_duration"),
-    "goldendict_prefix": LabelReplaceScenario("path_to_goldendict_executable", "goldendict_executable"),
-    "passthrough_simple": LabelReplaceScenario("border_thickness", "border_thickness"),
-    "passthrough_copy_to": LabelReplaceScenario("copy_to", "copy_to"),
-    "passthrough_shortcut": LabelReplaceScenario("ocr_shortcut", "ocr_shortcut"),
+    "sec_suffix": LabelReplaceScenario(cfg_key="notification_duration_sec", expected="notification_duration"),
+    "goldendict_prefix": LabelReplaceScenario(
+        cfg_key="path_to_goldendict_executable", expected="goldendict_executable"
+    ),
+    "anki_separator": LabelReplaceScenario(cfg_key="anki_field_separator", expected="Field separator"),
+    "passthrough_simple": LabelReplaceScenario(cfg_key="border_thickness", expected="border_thickness"),
+    "passthrough_copy_to": LabelReplaceScenario(cfg_key="copy_to", expected="copy_to"),
+    "passthrough_shortcut": LabelReplaceScenario(cfg_key="ocr_shortcut", expected="ocr_shortcut"),
 }
 
 
@@ -108,31 +144,75 @@ class TestLabelReplace:
         assert label_replace(scenario.cfg_key) == scenario.expected
 
 
-MODIFIED_CONFIG = Config(
-    notification_duration_sec=30,
-    max_history_size=500,
-    bind_port=20000,
-    force_cpu=True,
-    show_help_bar=False,
-    recover_missed_text=False,
-    text_detection_resolution=1536,
-    border_thickness=5,
-    border_color="#AAAAAAAA",
-    fill_color="#BBBBBBBB",
-    outline_color="#CCCCCCCC",
-    fill_brush_color="#DDDDDDDD",
-    ocr_shortcut="Ctrl+O",
-    ocr_page_shortcut="Ctrl+Shift+O",
-    screenshot_shortcut="Ctrl+S",
-    path_to_goldendict_executable="/usr/bin/goldendict",
-    huggingface_model_name="test/model",
-    huggingface_models=["test/model", "other/model"],
-)
+class AnkiTabScenario(typing.NamedTuple):
+    """Expected tab titles and ownership of Anki image/connection controls."""
+
+    tab_titles: Sequence[str]
+    anki_keys: frozenset[str]
 
 
-ADDITIONAL_ROUND_TRIP_SCENARIOS: dict[str, Config] = {
-    "default_config": Config(),
-    "alternate_modified_config": MODIFIED_CONFIG,
+ANKI_TAB_SCENARIOS: dict[str, AnkiTabScenario] = {
+    "connection_and_image_settings": AnkiTabScenario(
+        tab_titles=("Main", "Anki", "Advanced"),
+        anki_keys=frozenset(
+            {
+                "anki_connect_url",
+                "anki_connect_api_key",
+                "anki_image_field",
+                "anki_field_separator",
+                "anki_image_format",
+                "anki_image_settings",
+            }
+        ),
+    ),
+}
+
+
+class TestAnkiPreferencesTab:
+    """Test the dedicated Preferences tab for Anki connection and image controls."""
+
+    @pytest.mark.parametrize("scenario", ANKI_TAB_SCENARIOS.values(), ids=ANKI_TAB_SCENARIOS.keys())
+    def test_anki_widget_ownership(self, scenario: AnkiTabScenario, qapp: QApplication) -> None:
+        """Anki image/connection widgets belong to the Anki tab while its shortcut stays on Main."""
+        preferences = MainPreferencesWidget(Config())
+        main_tab, anki_tab = preferences.widget(0), preferences.widget(1)
+        assert tuple(preferences.tabText(index) for index in range(preferences.count())) == scenario.tab_titles
+        assert ANKI_KEYS == scenario.anki_keys
+        assert all(getattr(preferences.widgets, key).parentWidget() == anki_tab for key in scenario.anki_keys)
+        assert preferences.widgets.anki_shortcut.parentWidget() == main_tab
+        assert (
+            preferences.widgets.anki_connect_api_key.echoMode()
+            == preferences.widgets.anki_connect_api_key.EchoMode.Password
+        )
+
+
+def make_modified_config() -> Config:
+    """Create a second fresh non-default configuration for round-trip coverage."""
+    return Config(
+        notification_duration_sec=30,
+        max_history_size=500,
+        bind_port=20000,
+        force_cpu=True,
+        show_help_bar=False,
+        recover_missed_text=False,
+        text_detection_resolution=1536,
+        border_thickness=5,
+        border_color="#AAAAAAAA",
+        fill_color="#BBBBBBBB",
+        outline_color="#CCCCCCCC",
+        fill_brush_color="#DDDDDDDD",
+        ocr_shortcut="Ctrl+O",
+        ocr_page_shortcut="Ctrl+Shift+O",
+        screenshot_shortcut="Ctrl+S",
+        path_to_goldendict_executable="/usr/bin/goldendict",
+        huggingface_model_name="test/model",
+        huggingface_models=["test/model", "other/model"],
+    )
+
+
+ADDITIONAL_ROUND_TRIP_SCENARIOS: dict[str, ConfigScenario] = {
+    "default_config": ConfigScenario(create=Config),
+    "alternate_modified_config": ConfigScenario(create=make_modified_config),
 }
 
 
@@ -140,29 +220,31 @@ class TestAdditionalRoundTripScenarios:
     """Preserve default and alternate modified-config round-trip cases."""
 
     @pytest.mark.parametrize(
-        "source", ADDITIONAL_ROUND_TRIP_SCENARIOS.values(), ids=ADDITIONAL_ROUND_TRIP_SCENARIOS.keys()
+        "scenario", ADDITIONAL_ROUND_TRIP_SCENARIOS.values(), ids=ADDITIONAL_ROUND_TRIP_SCENARIOS.keys()
     )
-    def test_round_trip(self, source: Config, qapp: QApplication) -> None:
+    def test_round_trip(self, scenario: ConfigScenario, qapp: QApplication) -> None:
         """Widgets preserve all fields for each additional config scenario."""
-        source = dataclasses.replace(source, huggingface_models=list(source.huggingface_models))
+        source = scenario.create()
         target = Config()
         widgets = FormWidgetsBuilder(source).create_form_widgets()
         CopySettingsFromWidgetsToConfig(target, widgets).copy_settings_to_cfg()
         assert dataclasses.asdict(target) == dataclasses.asdict(source)
 
 
-SAME_OBJECT_ROUND_TRIP_SCENARIOS: dict[str, Config] = {"default_config": Config()}
+SAME_OBJECT_ROUND_TRIP_SCENARIOS: dict[str, ConfigScenario] = {
+    "default_config": ConfigScenario(create=Config),
+}
 
 
 class TestSameObjectDefaultRoundTrip:
     """Verify copying default widgets back into their source Config does not mutate defaults."""
 
     @pytest.mark.parametrize(
-        "source", SAME_OBJECT_ROUND_TRIP_SCENARIOS.values(), ids=SAME_OBJECT_ROUND_TRIP_SCENARIOS.keys()
+        "scenario", SAME_OBJECT_ROUND_TRIP_SCENARIOS.values(), ids=SAME_OBJECT_ROUND_TRIP_SCENARIOS.keys()
     )
-    def test_source_remains_default(self, source: Config, qapp: QApplication) -> None:
+    def test_source_remains_default(self, scenario: ConfigScenario, qapp: QApplication) -> None:
         """A default Config remains equal to fresh defaults after serving as source and target."""
-        source = dataclasses.replace(source, huggingface_models=list(source.huggingface_models))
+        source = scenario.create()
         widgets = FormWidgetsBuilder(source).create_form_widgets()
         CopySettingsFromWidgetsToConfig(source, widgets).copy_settings_to_cfg()
         assert dataclasses.asdict(source) == dataclasses.asdict(Config())
@@ -205,23 +287,29 @@ class TestSetFromCfgSupportedFields:
         set_from_cfg(getattr(widgets, cfg_attr), getattr(cfg, cfg_attr))
 
 
-WIDGET_POPULATION_SCENARIOS: dict[str, Config] = {
-    "selected_non_default_fields": Config(
+def make_widget_population_config() -> Config:
+    """Create the non-default source configuration for widget population assertions."""
+    return Config(
         force_cpu=True,
         notification_duration_sec=45,
         border_thickness=10,
         ocr_shortcut="Ctrl+O",
         huggingface_model_name="test/model",
     )
+
+
+WIDGET_POPULATION_SCENARIOS: dict[str, ConfigScenario] = {
+    "selected_non_default_fields": ConfigScenario(create=make_widget_population_config),
 }
 
 
 class TestFormWidgetValuesPopulatesSelectedFields:
     """Test selected fields after populating an existing form."""
 
-    @pytest.mark.parametrize("cfg", WIDGET_POPULATION_SCENARIOS.values(), ids=WIDGET_POPULATION_SCENARIOS.keys())
-    def test_populated_values(self, cfg: Config, qapp: QApplication) -> None:
+    @pytest.mark.parametrize("scenario", WIDGET_POPULATION_SCENARIOS.values(), ids=WIDGET_POPULATION_SCENARIOS.keys())
+    def test_populated_values(self, scenario: ConfigScenario, qapp: QApplication) -> None:
         """Selected widgets reflect their supplied non-default config values."""
+        cfg = scenario.create()
         widgets = FormWidgetsBuilder(Config()).create_form_widgets()
         FormWidgetValues(cfg, widgets).set_widget_values()
         assert widgets.force_cpu.isChecked() is True
