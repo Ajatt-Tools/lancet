@@ -152,7 +152,8 @@ class Config:
         return CFG_PATH.is_file()
 
     def save_to_file(self) -> None:
-        """Serialize the config to JSON and write it to the config file."""
+        """Normalize and serialize the config to JSON."""
+        self.normalize_anki_image_dimensions()
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
         data["anki_image_format"] = data["anki_image_format"].name
