@@ -92,7 +92,13 @@ class LancetSystemTray(QSystemTrayIcon):
         self._history = OcrHistory(self._cfg.max_history_size)
         self._loader = BackgroundModelLoader.new(cfg=self._cfg, notify=self._notify, executor=self._executor)
         self._ocr_workflow = self._build_ocr_workflow()
-        self._anki_workflow = AnkiWorkflow(self._cfg, executor=self._executor, notify=self._notify, take=self._take)
+        self._anki_workflow = AnkiWorkflow(
+            self._cfg,
+            executor=self._executor,
+            notify=self._notify,
+            take=self._take,
+            open_dialogs=self._open_dialogs,
+        )
         self._hotkeys = LancetShortcutManager(self._build_shortcuts())
         self._insert_tray_menu_actions()
 

@@ -16,6 +16,7 @@ from lancet.anki.image import encode_image
 from lancet.anki.image_types import EncodedImage, ImageParameters
 from lancet.config import Config, make_preview_opts
 from lancet.exceptions import AnkiConnectUnavailableError, PixmapConversionError
+from lancet.gui.open_dialogs import OpenDialogs
 from lancet.model_utils.ocr_workflow import prepare_pillow_image
 from lancet.notifications import NotifySend
 from lancet.ocr.thread_op import LancetThreadOp
@@ -39,6 +40,7 @@ class AnkiWorkflow:
         executor: concurrent.futures.ThreadPoolExecutor,
         notify: NotifySend,
         take: ZalaTakeScreenRegion,
+        open_dialogs: OpenDialogs,
         client: AnkiConnectClient | None = None,
     ) -> None:
         """Initialize the workflow with live configuration and its shared worker executor."""
@@ -46,6 +48,7 @@ class AnkiWorkflow:
         self._executor = executor
         self._notify = notify
         self._take = take
+        self._open_dialogs = open_dialogs
         self._client = client or AnkiConnectClient(self._cfg)
 
     def screenshot_and_add_to_anki(self) -> None:
@@ -59,6 +62,16 @@ class AnkiWorkflow:
 
     def _start_anki_selection(self, note_id: int) -> None:
         """Open the area selector after Anki preflight resolves a stable target note."""
+        # Recheck after asynchronous preflight because the command dispatcher's
+        # earlier dialog check may no longer reflect the current UI state.
+        if self._open_dialogs.is_locked():
+            logger.info("Anki preflight finished while a dialog was open; skipping selection")
+            return
+
+        # ZalaTakeScreenRegion owns screenshot-selection concurrency. Its lock
+        # rejects overlapping select_area() calls and releases automatically
+        # after selection finishes or initialization fails, so Lancet must not
+        # add a second selection lock with a competing lifecycle.
         try:
             self._take.select_area(
                 on_finish=functools.partial(self._attach_selection, note_id),

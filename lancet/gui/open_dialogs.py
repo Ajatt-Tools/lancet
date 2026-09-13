@@ -1,8 +1,8 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-from contextlib import contextmanager
 from collections.abc import Generator
+from contextlib import contextmanager
 
 from zala.utils import qconnect
 
