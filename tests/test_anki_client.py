@@ -14,6 +14,7 @@ import requests
 from lancet.anki.client import (
     ANKI_CONNECT_TIMEOUT_SEC,
     AnkiConnectClient,
+    join_html_content,
     make_image_filename,
 )
 from lancet.anki.client_types import (
@@ -170,12 +171,61 @@ STORE_MEDIA_SCENARIOS: dict[str, StoreMediaScenario] = {
 
 
 class AttachmentSetup(typing.NamedTuple):
-    """An Anki client, ordered operation mock, and image for attachment tests."""
+    """An Anki client, ordered operation recorder, and image for attachment tests."""
 
     client: AnkiConnectClient
-    operations: Mock
+    operations: "AttachmentOperationRecorder"
     image: EncodedImage
     filename_factory: Mock
+
+
+class AttachmentOperation(enum.StrEnum):
+    """Client operations whose ordering matters when attaching one image."""
+
+    browse_note = "browse_note"
+    note_field = "note_field"
+    store_media = "store_media"
+    update_note_field = "update_note_field"
+
+
+class AttachmentOperationCall(typing.NamedTuple):
+    """One Anki client operation performed while attaching an image."""
+
+    name: AttachmentOperation
+    args: Sequence[int | str | bytes]
+
+
+class AttachmentOperationRecorder:
+    """Record the ordered client operations used by an image attachment test."""
+
+    def __init__(self) -> None:
+        """Initialize the empty attachment operation log."""
+        self._calls: list[AttachmentOperationCall] = []
+
+    @property
+    def calls(self) -> tuple[AttachmentOperationCall, ...]:
+        """Return an immutable snapshot of the recorded attachment operations."""
+        return tuple(self._calls)
+
+    def note_field(self, note_id: int, field_name: str) -> str:
+        """Record a field lookup and return preexisting HTML content."""
+        self._calls.append(AttachmentOperationCall(name=AttachmentOperation.note_field, args=(note_id, field_name)))
+        return "<p>existing</p>"
+
+    def store_media(self, filename: str, data: bytes) -> str:
+        """Record media storage and return the filename assigned by Anki."""
+        self._calls.append(AttachmentOperationCall(name=AttachmentOperation.store_media, args=(filename, data)))
+        return "lancet_actual.webp"
+
+    def browse_note(self, note_id: int) -> None:
+        """Record opening Anki Browse for one note ID."""
+        self._calls.append(AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(note_id,)))
+
+    def update_note_field(self, note_id: int, field_name: str, value: str) -> None:
+        """Record the final HTML update for one note field."""
+        self._calls.append(
+            AttachmentOperationCall(name=AttachmentOperation.update_note_field, args=(note_id, field_name, value))
+        )
 
 
 class FixedDateTime(datetime.datetime):
@@ -197,13 +247,11 @@ def expected_request(api_key: str) -> AnkiConnectRequest:
 
 
 def create_attachment_setup(scenario: AttachmentScenario, monkeypatch: pytest.MonkeyPatch) -> AttachmentSetup:
-    """Create an attachment client whose collaborators are ordered by one parent mock."""
+    """Create an attachment client whose collaborators report their ordered operations."""
     client = AnkiConnectClient(
         Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_field_separator=scenario.separator)
     )
-    operations = Mock()
-    operations.note_field.return_value = "<p>existing</p>"
-    operations.store_media.return_value = "lancet_actual.webp"
+    operations = AttachmentOperationRecorder()
     filename_factory = Mock(return_value="lancet_actual.webp")
     monkeypatch.setattr(client, "note_field", operations.note_field)
     monkeypatch.setattr(client, "store_media", operations.store_media)
@@ -213,7 +261,11 @@ def create_attachment_setup(scenario: AttachmentScenario, monkeypatch: pytest.Mo
     return AttachmentSetup(
         client=client,
         operations=operations,
-        image=EncodedImage(IMAGE_DATA, AnkiImageFormat.webp, ImageParameters(0, 250, 33)),
+        image=EncodedImage(
+            data=IMAGE_DATA,
+            image_format=AnkiImageFormat.webp,
+            settings=ImageParameters(width=0, height=250, quality=33),
+        ),
         filename_factory=filename_factory,
     )
 
@@ -340,13 +392,16 @@ class TestAnkiNoteOperations:
         setup = create_attachment_setup(scenario, monkeypatch)
         assert setup.client.attach_image(NOTE_ID, IMAGE_FIELD, setup.image) == "lancet_actual.webp"
         setup.filename_factory.assert_called_once_with(NOTE_ID, AnkiImageFormat.webp.value)
-        assert setup.operations.mock_calls == [
-            call.note_field(NOTE_ID, IMAGE_FIELD),
-            call.store_media("lancet_actual.webp", IMAGE_DATA),
-            call.browse_note(0),
-            call.update_note_field(NOTE_ID, IMAGE_FIELD, scenario.expected_html),
-            call.browse_note(NOTE_ID),
-        ]
+        assert setup.operations.calls == (
+            AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(0,)),
+            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID, IMAGE_FIELD)),
+            AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
+            AttachmentOperationCall(
+                name=AttachmentOperation.update_note_field,
+                args=(NOTE_ID, IMAGE_FIELD, scenario.expected_html),
+            ),
+            AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(NOTE_ID,)),
+        )
 
     @pytest.mark.parametrize("scenario", CLEANUP_SCENARIOS.values(), ids=CLEANUP_SCENARIOS.keys())
     def test_failed_update_preserves_original_error(
@@ -363,3 +418,51 @@ class TestAnkiNoteOperations:
             attachment.client.attach_image(NOTE_ID, IMAGE_FIELD, attachment.image)
         assert exc_info.value is expected_error
         assert delete_media.call_args == call("lancet_actual.webp")
+
+
+class JoinHtmlScenario(typing.NamedTuple):
+    """Two HTML fragments, a separator, and the exact joined field value."""
+
+    old_content: str
+    new_content: str
+    separator: str
+    expected: str
+
+
+JOIN_HTML_SCENARIOS: dict[str, JoinHtmlScenario] = {
+    "preserves_meaningful_whitespace": JoinHtmlScenario(
+        old_content="  old  ",
+        new_content="  new  ",
+        separator="<br>",
+        expected="  old  <br>  new  ",
+    ),
+    "whitespace_only_old_content": JoinHtmlScenario(
+        old_content="   ",
+        new_content="<img>",
+        separator="<br>",
+        expected="<img>",
+    ),
+    "whitespace_only_new_content": JoinHtmlScenario(
+        old_content="old",
+        new_content="   ",
+        separator="<br>",
+        expected="old",
+    ),
+    "empty_separator": JoinHtmlScenario(
+        old_content="old",
+        new_content="new",
+        separator="",
+        expected="oldnew",
+    ),
+}
+
+
+class TestJoinHtmlContent:
+    """Test semantic emptiness and exact HTML preservation when appending media."""
+
+    @pytest.mark.parametrize("scenario", JOIN_HTML_SCENARIOS.values(), ids=JOIN_HTML_SCENARIOS.keys())
+    def test_preserves_non_empty_fragments(self, scenario: JoinHtmlScenario) -> None:
+        """Whitespace decides emptiness but never modifies retained HTML."""
+        assert (
+            join_html_content(scenario.old_content, scenario.new_content, sep=scenario.separator) == scenario.expected
+        )
