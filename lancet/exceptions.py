@@ -38,6 +38,7 @@ class AnkiConnectUnavailableError(AnkiConnectError):
 
     @property
     def what(self) -> str:
+        """Return a concise user-facing explanation."""
         return "AnkiConnect isn't running."
 
 

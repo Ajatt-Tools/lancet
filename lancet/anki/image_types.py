@@ -28,5 +28,5 @@ class EncodedImage(typing.NamedTuple):
     settings: ImageParameters
 
     def size_kib(self) -> float:
-        """Return the encoded media size rounded down to KiB."""
+        """Return the encoded media size as a floating-point KiB value."""
         return len(self.data) / 1024
