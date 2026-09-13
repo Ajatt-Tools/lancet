@@ -61,6 +61,23 @@ def normalize_anki_image_format(data: dict[str, typing.Any]) -> None:
         data.pop("anki_image_format", None)
 
 
+def read_config_dict() -> dict[str, object]:
+    try:
+        with open(CFG_PATH, encoding="utf-8") as f:
+            data: object = json.load(f)
+    except FileNotFoundError:
+        logger.info("config file does not exist, falling back to default.")
+        return {}  # Missing config file is not an error.
+    except json.JSONDecodeError as ex:
+        raise ConfigReadError(f"failed to decode json config file: {ex}") from ex
+    except OSError as ex:
+        # Permission denied, is a directory, I/O error, etc. Treat as a recoverable read failure.
+        raise ConfigReadError(f"failed to open config file: {ex}") from ex
+    if not isinstance(data, dict):
+        raise ConfigReadError("failed to parse config file: top-level JSON value must be an object")
+    return data
+
+
 @dataclasses.dataclass
 class Config:
     """Application configuration with defaults, loaded from and saved to a JSON file."""
@@ -112,19 +129,7 @@ class Config:
     @classmethod
     def read_from_file(cls) -> typing.Self:
         """Read the config from the JSON file, returning defaults if the file does not exist."""
-        try:
-            with open(CFG_PATH, encoding="utf-8") as f:
-                data: object = json.load(f)
-        except FileNotFoundError:
-            logger.info("config file does not exist, falling back to default.")
-            return cls()  # Missing config file is not an error.
-        except json.JSONDecodeError as ex:
-            raise ConfigReadError(f"failed to decode json config file: {ex}") from ex
-        except OSError as ex:
-            # Permission denied, is a directory, I/O error, etc. Treat as a recoverable read failure.
-            raise ConfigReadError(f"failed to open config file: {ex}") from ex
-        if not isinstance(data, dict):
-            raise ConfigReadError("failed to parse config file: top-level JSON value must be an object")
+        data = read_config_dict()
         normalize_copy_to(data)
         normalize_anki_image_format(data)
         try:
