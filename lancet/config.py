@@ -16,6 +16,7 @@ from lancet.anki.image_types import AnkiImageFormat
 from lancet.consts import (
     ANKI_FIELD_SEPARATOR,
     ANKI_IMAGE_MAX_DIMENSION,
+    ANKI_IMAGE_MAX_QUALITY,
     CFG_PATH,
     DEFAULT_ANKICONNECT_URL,
     DEFAULT_MODEL_NAME,
@@ -125,13 +126,14 @@ class Config:
             self = cls(**data)
         except (TypeError, BeartypeCallHintParamViolation) as ex:
             raise ConfigReadError(f"failed to parse config file: {ex}") from ex
-        self.normalize_anki_image_dimensions()
+        self.normalize_anki_image_settings()
         return self
 
-    def normalize_anki_image_dimensions(self) -> None:
-        """Clamp Anki image dimensions to the supported configuration range."""
+    def normalize_anki_image_settings(self) -> None:
+        """Clamp Anki image dimensions and quality to the supported ranges."""
         self.anki_image_width = clamp(0, self.anki_image_width, ANKI_IMAGE_MAX_DIMENSION)
         self.anki_image_height = clamp(0, self.anki_image_height, ANKI_IMAGE_MAX_DIMENSION)
+        self.anki_image_quality = clamp(0, self.anki_image_quality, ANKI_IMAGE_MAX_QUALITY)
 
     @staticmethod
     def file_exists() -> bool:
@@ -140,7 +142,7 @@ class Config:
 
     def save_to_file(self) -> None:
         """Normalize and serialize the config to JSON."""
-        self.normalize_anki_image_dimensions()
+        self.normalize_anki_image_settings()
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
         data["anki_image_format"] = data["anki_image_format"].name

@@ -33,6 +33,7 @@ GEOMETRY_FILE_PATH: P = CACHE_DIR_PATH / "geometry"
 PREFERENCES_SPLITTER_SETTINGS_WIDTH: typing.Final[int] = 400
 PREFERENCES_SPLITTER_HISTORY_WIDTH: typing.Final[int] = 300
 ANKI_IMAGE_MAX_DIMENSION: typing.Final[int] = 4096
+ANKI_IMAGE_MAX_QUALITY: typing.Final[int] = 100
 
 IS_MAC: B = sys.platform.startswith("darwin")
 IS_WIN: B = sys.platform.startswith("win32")
