@@ -4,7 +4,7 @@
 import concurrent.futures
 import typing
 from collections.abc import Callable
-from typing import Any, Self
+from typing import Self
 
 from loguru import logger
 from PyQt6.QtCore import QCoreApplication, QObject, Qt, pyqtSignal, pyqtSlot
@@ -31,8 +31,8 @@ class LancetThreadOp[ResultType](QObject):
     _finished = pyqtSignal(ThreadOpResult)
 
     # Callbacks
-    _success: Callable[[ResultType], Any] | None
-    _failure: Callable[[Exception], Any] | None
+    _success: Callable[[ResultType], None] | None
+    _failure: Callable[[Exception], None] | None
 
     def __init__(
         self,
@@ -51,12 +51,12 @@ class LancetThreadOp[ResultType](QObject):
         self._failure = None
         self._finished.connect(self._dispatch_outcome, Qt.ConnectionType.QueuedConnection)  # type: ignore[call-arg]
 
-    def success(self, success: Callable[[ResultType], Any]) -> Self:
+    def success(self, success: Callable[[ResultType], None]) -> Self:
         """Set the callback to invoke with the result when the operation succeeds."""
         self._success = success
         return self
 
-    def failure(self, failure: Callable[[Exception], Any]) -> Self:
+    def failure(self, failure: Callable[[Exception], None]) -> Self:
         """Set the callback to invoke with the exception when the operation fails."""
         self._failure = failure
         return self
