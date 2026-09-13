@@ -58,22 +58,8 @@ class GuiBrowseParams(typing.TypedDict):
     query: str
 
 
-class DeleteMediaFileParams(typing.TypedDict):
-    """
-    Parameters for AnkiConnect's deleteMediaFile action.
-    https://git.sr.ht/~foosoft/anki-connect/tree/master/item/README.md#codedeletemediafilecode
-    """
-
-    filename: str
-
-
 type AnkiConnectParams = (
-    FindNotesParams
-    | NotesInfoParams
-    | StoreMediaFileParams
-    | UpdateNoteFieldsParams
-    | GuiBrowseParams
-    | DeleteMediaFileParams
+    FindNotesParams | NotesInfoParams | StoreMediaFileParams | UpdateNoteFieldsParams | GuiBrowseParams
 )
 
 

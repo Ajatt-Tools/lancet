@@ -1,18 +1,15 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import base64
-import contextlib
 import datetime
 import typing
 
 import requests
-from loguru import logger
 
 from lancet.anki.client_types import (
     AnkiConnectParams,
     AnkiConnectRequest,
     AnkiConnectResult,
-    DeleteMediaFileParams,
     FindNotesParams,
     GuiBrowseParams,
     NotesInfoParams,
@@ -111,11 +108,6 @@ class AnkiConnectClient:
         params: GuiBrowseParams = {"query": f"nid:{note_id}"}
         self.invoke("guiBrowse", params)
 
-    def delete_media(self, filename: str) -> None:
-        """Delete an uploaded Anki media file after a failed note update."""
-        params: DeleteMediaFileParams = {"filename": filename}
-        self.invoke("deleteMediaFile", params)
-
     def attach_image(self, note_id: int, field_name: str, image: EncodedImage) -> str:
         """Upload an image, append it to a note field, and reselect the updated note."""
         # Selecting an impossible note ID forces Anki's Browser editor to lose focus
@@ -130,15 +122,11 @@ class AnkiConnectClient:
             new_content=f'<img src="{filename}">',
             sep=self._cfg.anki_field_separator,
         )
-        try:
-            self.update_note_field(note_id, field_name, new_html)
-        except Exception as ex:
-            # Delete media and re-raise.
-            logger.error(f"failed to update note field: {ex}")
-            # Preserve the update failure even when rollback cannot contact Anki.
-            with contextlib.suppress(Exception):
-                self.delete_media(filename)
-            raise
+
+        # A transport failure cannot prove whether Anki committed the update.
+        # Keep uploaded media intact because deleting it could break a note that now references it.
+        # Anki's Check Media removes true orphans safely.
+        self.update_note_field(note_id, field_name, new_html)
 
         # Reselect the target only after the update so the Browser displays the
         # field contents containing the newly attached image.
