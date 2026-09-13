@@ -8,8 +8,6 @@ import pathlib
 import signal
 import sys
 import typing
-from collections.abc import Generator
-from contextlib import contextmanager
 
 from loguru import logger
 from PyQt6.QtGui import QIcon
@@ -35,8 +33,7 @@ from lancet.consts import (
     SCREENSHOT_ICON_PATH,
 )
 from lancet.gui.about_dialog import AboutDialog
-from lancet.gui.dialog_registry import DialogRegistry
-from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
+from lancet.gui.open_dialogs import OpenDialogs
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
 from lancet.keyboard_shortcuts.listener import LancetShortcutManager
 from lancet.keyboard_shortcuts.types import PyShortcutStr
@@ -62,29 +59,6 @@ def format_hotkey(menu_label: str, keyboard_shortcut: str) -> str:
     if keyboard_shortcut:
         return f"{menu_label} ({keyboard_shortcut})"
     return menu_label
-
-
-class OpenDialogs:
-    """Qt-aware wrapper that ties dialog lifetime to a DialogRegistry entry."""
-
-    _registry: DialogRegistry
-
-    def __init__(self) -> None:
-        """Initialize the dialog registry."""
-        self._registry = DialogRegistry()
-
-    def is_locked(self) -> bool:
-        """Return True when at least one dialog is currently open."""
-        return self._registry.is_locked()
-
-    @contextmanager
-    def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> Generator[D]:
-        with self._registry.acquire(dialog.name):
-            # The dialog's result code is passed to the slot:
-            # https://doc.qt.io/qt-6/qdialog.html#finished
-            # Wiring 'finished' to disown_if_present clears the registry entry as soon as the dialog closes.
-            qconnect(dialog.finished, lambda exit_code: self._registry.disown_if_present(dialog.name))
-            yield dialog
 
 
 class LancetSystemTray(QSystemTrayIcon):
