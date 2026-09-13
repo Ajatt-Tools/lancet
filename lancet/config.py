@@ -9,11 +9,13 @@ from beartype.roar import BeartypeCallHintParamViolation
 from loguru import logger
 from PyQt6.QtGui import QColor
 from zala.config import ScreenshotPreviewOpts
+from zala.utils import clamp
 
 from lancet.actions import LancetAction
 from lancet.anki.image_types import AnkiImageFormat
 from lancet.consts import (
     ANKI_FIELD_SEPARATOR,
+    ANKI_IMAGE_MAX_DIMENSION,
     CFG_PATH,
     DEFAULT_ANKICONNECT_URL,
     DEFAULT_MODEL_NAME,
@@ -133,9 +135,16 @@ class Config:
         normalize_copy_to(data)
         normalize_anki_image_format(data)
         try:
-            return cls(**data)
+            self = cls(**data)
         except (TypeError, BeartypeCallHintParamViolation) as ex:
             raise ConfigReadError(f"failed to parse config file: {ex}") from ex
+        self.normalize_anki_image_dimensions()
+        return self
+
+    def normalize_anki_image_dimensions(self) -> None:
+        """Clamp Anki image dimensions to the supported configuration range."""
+        self.anki_image_width = clamp(0, self.anki_image_width, ANKI_IMAGE_MAX_DIMENSION)
+        self.anki_image_height = clamp(0, self.anki_image_height, ANKI_IMAGE_MAX_DIMENSION)
 
     @staticmethod
     def file_exists() -> bool:
