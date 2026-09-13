@@ -182,6 +182,7 @@ You can define shortcuts in your Wayland compositor instead.
 
 Below is an example for [Sway](https://wiki.archlinux.org/title/Sway).
 Add the following to your `~/.config/sway/config`:
+The example also works for `i3wm` (`~/.config/i3/config`).
 
 ```
 # Run OCR
@@ -191,7 +192,7 @@ bindsym --release $mod+Shift+o    exec lancet ocr --detect
 # Take a screenshot
 bindsym --release $mod+Print      exec lancet screenshot
 # Attach a selected screen region to the most recently added Anki note.
-bindsym --release $alt+i          exec lancet screenshot --add-to-anki
+bindsym --release $mod+i          exec lancet screenshot --add-to-anki
 ```
 
 ## Announcements
