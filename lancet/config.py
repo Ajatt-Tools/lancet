@@ -35,32 +35,19 @@ class OcrDestination(enum.Enum):
     clipboard = "clipboard"
 
 
-def normalize_copy_to(data: dict[str, typing.Any]) -> None:
-    """Convert copy_to from a serialized enum name, or drop invalid values to use the default."""
+def normalize_enum[T: enum.Enum](data: dict[str, typing.Any], *, key: str, enum_type: type[T]) -> None:
+    """Convert one serialized enum name or remove an invalid value."""
     try:
-        copy_to = data["copy_to"]
+        value = data[key]
     except KeyError:
         return
     try:
-        data["copy_to"] = OcrDestination[copy_to]
+        data[key] = enum_type[value]
     except (KeyError, TypeError):
         # "invalid", 42 or None → KeyError
         # [] or {} → TypeError
-        logger.warning(f"Cannot handle copy_to={copy_to!r} in config. Falling back to default.")
-        data.pop("copy_to", None)
-
-
-def normalize_anki_image_format(data: dict[str, typing.Any]) -> None:
-    """Convert an Anki image-format name to an enum, dropping invalid values to use the default."""
-    try:
-        image_format = data["anki_image_format"]
-    except KeyError:
-        return
-    try:
-        data["anki_image_format"] = AnkiImageFormat[image_format]
-    except (KeyError, TypeError):
-        logger.warning("Cannot handle anki_image_format in config. Falling back to default.")
-        data.pop("anki_image_format", None)
+        logger.warning(f"Cannot handle {key}={value!r} in config. Falling back to default.")
+        data.pop(key, None)
 
 
 def read_config_dict() -> dict[str, object]:
@@ -132,8 +119,8 @@ class Config:
     def read_from_file(cls) -> typing.Self:
         """Read the config from the JSON file, returning defaults if the file does not exist."""
         data = read_config_dict()
-        normalize_copy_to(data)
-        normalize_anki_image_format(data)
+        normalize_enum(data, key="copy_to", enum_type=OcrDestination)
+        normalize_enum(data, key="anki_image_format", enum_type=AnkiImageFormat)
         try:
             self = cls(**data)
         except (TypeError, BeartypeCallHintParamViolation) as ex:
