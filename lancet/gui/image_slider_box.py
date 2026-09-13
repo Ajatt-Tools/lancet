@@ -54,7 +54,7 @@ class ImageSliderBox(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
-    def set_limits(self, width: int, height: int) -> None:
+    def set_limits(self, *, width: int, height: int) -> None:
         """Set inclusive maximum bounds for image dimensions."""
         self._sliders.image_width.set_upper_limit(width)
         self._sliders.image_height.set_upper_limit(height)
