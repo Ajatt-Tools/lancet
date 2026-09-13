@@ -35,9 +35,17 @@ ANKI_CONNECT_TIMEOUT_SEC: typing.Final[int] = 10
 
 
 def join_html_content(old_content: str, new_content: str, sep: str) -> str:
-    """Join non-empty HTML fragments with one configured separator."""
-    combined = (old_content.strip(), new_content.strip())
-    return sep.join(html for html in combined if html)
+    """Join non-empty HTML fragments without modifying their contents."""
+    # Whitespace-only fragments are semantically empty, so they should not
+    # introduce a separator before or after the actual field content.
+    if not old_content.strip():
+        return new_content
+    if not new_content.strip():
+        return old_content
+
+    # Strip only for the emptiness checks above. Whitespace can be meaningful
+    # inside HTML such as <pre>, so preserve both original fragments exactly.
+    return f"{old_content}{sep}{new_content}"
 
 
 def make_image_filename(note_id: int, container: str) -> str:
