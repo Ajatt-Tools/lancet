@@ -34,7 +34,7 @@ ANKI_CONNECT_VERSION: typing.Final[int] = 6
 ANKI_CONNECT_TIMEOUT_SEC: typing.Final[int] = 10
 
 
-def join_html_content(old_content: str, new_content: str, sep: str) -> str:
+def join_html_content(old_content: str, new_content: str, *, sep: str) -> str:
     """Join non-empty HTML fragments without modifying their contents."""
     # Whitespace-only fragments are semantically empty, so they should not
     # introduce a separator before or after the actual field content.
