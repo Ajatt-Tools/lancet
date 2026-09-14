@@ -51,7 +51,8 @@ def normalize_enum[T: enum.Enum](data: dict[str, typing.Any], *, key: str, enum_
         data.pop(key, None)
 
 
-def read_config_dict() -> dict[str, object]:
+def read_config_dict() -> dict[str, typing.Any]:
+    """Decode the config file and validate that its root is a JSON object."""
     try:
         with open(CFG_PATH, encoding="utf-8") as f:
             data: object = json.load(f)
