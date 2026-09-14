@@ -92,13 +92,7 @@ class LancetSystemTray(QSystemTrayIcon):
         self._history = OcrHistory(self._cfg.max_history_size)
         self._loader = BackgroundModelLoader.new(cfg=self._cfg, notify=self._notify, executor=self._executor)
         self._ocr_workflow = self._build_ocr_workflow()
-        self._anki_workflow = AnkiWorkflow(
-            self._cfg,
-            executor=self._executor,
-            notify=self._notify,
-            take=self._take,
-            open_dialogs=self._open_dialogs,
-        )
+        self._anki_workflow = self._build_anki_workflow()
         self._hotkeys = LancetShortcutManager(self._build_shortcuts())
         self._insert_tray_menu_actions()
 
@@ -120,6 +114,16 @@ class LancetSystemTray(QSystemTrayIcon):
             notify=self._notify,
             history=self._history,
             executor=self._executor,
+        )
+
+    def _build_anki_workflow(self) -> AnkiWorkflow:
+        """Construct the Anki screenshot workflow with shared application services."""
+        return AnkiWorkflow(
+            self._cfg,
+            executor=self._executor,
+            notify=self._notify,
+            take=self._take,
+            open_dialogs=self._open_dialogs,
         )
 
     def _insert_tray_menu_actions(self) -> None:
