@@ -8,9 +8,13 @@ import typing
 import pytest
 
 from lancet.actions import LancetAction
-from lancet.anki.image_types import AnkiImageFormat
+from lancet.anki.image_types import AnkiImageFormat, ImageParameters
 from lancet.config import Config, OcrDestination
-from lancet.consts import ANKI_FIELD_SEPARATOR
+from lancet.consts import (
+    ANKI_FIELD_SEPARATOR,
+    ANKI_IMAGE_MAX_DIMENSION,
+    ANKI_IMAGE_MAX_QUALITY,
+)
 from lancet.exceptions import ConfigReadError
 
 
@@ -112,6 +116,88 @@ class TestConfigAnkiImageFormat:
         monkeypatch.setattr("lancet.config.logger.warning", lambda message: warnings.append(message))
         assert Config.read_from_file().anki_image_format == scenario.expected
         assert len(warnings) == scenario.expected_warning_count
+
+
+class ImageSettingsScenario(typing.NamedTuple):
+    """Serialized image settings and their normalized configuration values."""
+
+    source: ImageParameters
+    expected: ImageParameters
+
+
+IMAGE_SETTINGS_SCENARIOS: dict[str, ImageSettingsScenario] = {
+    "negative_values": ImageSettingsScenario(
+        source=ImageParameters(width=-1, height=-100, quality=-1),
+        expected=ImageParameters(width=0, height=0, quality=0),
+    ),
+    "in_range_values": ImageSettingsScenario(
+        source=ImageParameters(width=600, height=250, quality=33),
+        expected=ImageParameters(width=600, height=250, quality=33),
+    ),
+    "values_above_limit": ImageSettingsScenario(
+        source=ImageParameters(
+            width=ANKI_IMAGE_MAX_DIMENSION + 1,
+            height=ANKI_IMAGE_MAX_DIMENSION + 100,
+            quality=ANKI_IMAGE_MAX_QUALITY + 1,
+        ),
+        expected=ImageParameters(
+            width=ANKI_IMAGE_MAX_DIMENSION,
+            height=ANKI_IMAGE_MAX_DIMENSION,
+            quality=ANKI_IMAGE_MAX_QUALITY,
+        ),
+    ),
+}
+
+
+class TestConfigAnkiImageSettings:
+    """Test Anki image dimension and quality normalization at configuration boundaries."""
+
+    @pytest.mark.parametrize("scenario", IMAGE_SETTINGS_SCENARIOS.values(), ids=IMAGE_SETTINGS_SCENARIOS.keys())
+    def test_read_clamps_dimensions(
+        self, scenario: ImageSettingsScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        """Config reads clamp image dimensions and quality to the UI-supported range."""
+        cfg_path = tmp_path / "lancet.json"
+        cfg_path.write_text(
+            json.dumps(
+                {
+                    "anki_image_width": scenario.source.width,
+                    "anki_image_height": scenario.source.height,
+                    "anki_image_quality": scenario.source.quality,
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+
+        cfg = Config.read_from_file()
+
+        assert cfg.anki_image_width == scenario.expected.width
+        assert cfg.anki_image_height == scenario.expected.height
+        assert cfg.anki_image_quality == scenario.expected.quality
+
+    @pytest.mark.parametrize("scenario", IMAGE_SETTINGS_SCENARIOS.values(), ids=IMAGE_SETTINGS_SCENARIOS.keys())
+    def test_save_clamps_dimensions(
+        self, scenario: ImageSettingsScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        """Config saves normalized constructor settings to both memory and JSON."""
+        cfg_path = tmp_path / "lancet.json"
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        cfg = Config(
+            anki_image_width=scenario.source.width,
+            anki_image_height=scenario.source.height,
+            anki_image_quality=scenario.source.quality,
+        )
+
+        cfg.save_to_file()
+
+        assert cfg.anki_image_width == scenario.expected.width
+        assert cfg.anki_image_height == scenario.expected.height
+        assert cfg.anki_image_quality == scenario.expected.quality
+        saved = json.loads(cfg_path.read_text(encoding="utf-8"))
+        assert saved["anki_image_width"] == scenario.expected.width
+        assert saved["anki_image_height"] == scenario.expected.height
+        assert saved["anki_image_quality"] == scenario.expected.quality
 
 
 class AnkiDefaultsScenario(typing.NamedTuple):
