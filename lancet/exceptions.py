@@ -42,6 +42,12 @@ class AnkiConnectUnavailableError(AnkiConnectError):
         return "AnkiConnect isn't running."
 
 
+class AnkiAttachmentInProgressError(AnkiConnectError):
+    """Raised when another Lancet attachment transaction already owns Anki media updates."""
+
+    pass
+
+
 class AnkiImageEncodingError(LancetException, RuntimeError):
     """Raised when Pillow cannot encode the configured Anki image format."""
 

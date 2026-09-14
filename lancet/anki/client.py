@@ -2,7 +2,10 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import base64
 import datetime
+import threading
 import typing
+from collections.abc import Generator
+from contextlib import contextmanager
 
 import requests
 
@@ -25,7 +28,11 @@ from lancet.anki.response_parser import (
 )
 from lancet.config import Config
 from lancet.consts import APP_NAME
-from lancet.exceptions import AnkiConnectError, AnkiConnectUnavailableError
+from lancet.exceptions import (
+    AnkiAttachmentInProgressError,
+    AnkiConnectError,
+    AnkiConnectUnavailableError,
+)
 
 ANKI_CONNECT_VERSION: typing.Final[int] = 6
 ANKI_CONNECT_TIMEOUT_SEC: typing.Final[int] = 10
@@ -55,10 +62,12 @@ class AnkiConnectClient:
     """Synchronous client for AnkiConnect's local JSON HTTP API."""
 
     _cfg: Config
+    _attachment_lock: threading.Lock
 
     def __init__(self, cfg: Config) -> None:
         """Configure the AnkiConnect endpoint and optional API key."""
         self._cfg = cfg
+        self._attachment_lock = threading.Lock()
 
     def invoke(self, action: str, params: AnkiConnectParams) -> AnkiConnectResult:
         """Invoke one AnkiConnect action and return its validated envelope result."""
@@ -109,7 +118,22 @@ class AnkiConnectClient:
         self.invoke("guiBrowse", params)
 
     def attach_image(self, note_id: int, field_name: str, image: EncodedImage) -> str:
-        """Upload an image, append it to a note field, and reselect the updated note."""
+        """Serialize and perform one complete Anki field attachment transaction."""
+        with self._exclusive_attachment():
+            return self._attach_image(note_id, field_name, image)
+
+    @contextmanager
+    def _exclusive_attachment(self) -> Generator[None]:
+        """Own the attachment transaction or reject concurrent Lancet updates."""
+        if not self._attachment_lock.acquire(blocking=False):
+            raise AnkiAttachmentInProgressError("Another Anki attachment is already in progress")
+        try:
+            yield
+        finally:
+            self._attachment_lock.release()
+
+    def _attach_image(self, note_id: int, field_name: str, image: EncodedImage) -> str:
+        """Upload one image, append it to a note field, and reselect the updated note."""
         # Selecting an impossible note ID forces Anki's Browser editor to lose focus
         # and flush pending edits. This must happen before notesInfo. Reading first
         # could capture stale HTML and overwrite the newer content during our update.
