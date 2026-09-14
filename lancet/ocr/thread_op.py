@@ -75,7 +75,7 @@ class LancetThreadOp[ResultType](QObject):
         assert self._success is not None
         assert self._failure is not None
         try:
-            if outcome.error:
+            if outcome.error is not None:
                 self._failure(outcome.error)
             else:
                 self._success(typing.cast(ResultType, outcome.result))
