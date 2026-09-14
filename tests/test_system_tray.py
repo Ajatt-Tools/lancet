@@ -27,8 +27,8 @@ from lancet.consts import (
     OCR_ICON_PATH,
     SCREENSHOT_ICON_PATH,
 )
-from lancet.keyboard_shortcuts.listener import LancetShortcutManager
 from lancet.gui.open_dialogs import OpenDialogs
+from lancet.keyboard_shortcuts.listener import LancetShortcutManager
 from lancet.model_utils.model_loader import BackgroundModelLoader
 from lancet.model_utils.ocr_service import OcrService
 from lancet.notifications import NotifySend
