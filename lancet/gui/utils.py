@@ -14,6 +14,9 @@ def ui_translate(key: str) -> str:
         .replace("cpu", "CPU")
         .replace("Ocr", "OCR")
         .replace("Goldendict", "GoldenDict")
+        .replace("Ankiconnect", "AnkiConnect")
+        .replace(" api", " API")
+        .replace(" url", " URL")
     )
 
 
