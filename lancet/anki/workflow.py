@@ -73,8 +73,10 @@ class AnkiAttachmentJob:
 
     def start(self) -> None:
         """Resolve the target note before opening region selection."""
-        if self._on_failure is None or self._on_success is None:
-            raise ValueError("callbacks are not set")
+        if self._on_success is None:
+            raise ValueError("success handler is not set")
+        if self._on_failure is None:
+            raise ValueError("failure handler is not set")
         (
             LancetThreadOp[int](op=self._client.last_added_note_id, executor=self._executor)
             .success(self._start_anki_selection)
