@@ -11,7 +11,7 @@ from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.image_slider_box import ImageSliderBox
-from lancet.gui.line_edit import MonoSpaceLineEdit
+from lancet.gui.line_edit import MonoSpaceLineEdit, StripLineEdit
 from lancet.gui.ocr_model_list import ModelListEditor
 from lancet.gui.utils import (
     BindPortSpinBox,
@@ -41,9 +41,9 @@ class FormWidgets(SimpleNamespace):
 
     # Anki
     anki_shortcut: ShortCutGrabButton
-    anki_connect_url: MonoSpaceLineEdit
+    anki_connect_url: StripLineEdit
     anki_connect_api_key: MonoSpaceLineEdit
-    anki_image_field: MonoSpaceLineEdit
+    anki_image_field: StripLineEdit
     anki_field_separator: MonoSpaceLineEdit
     anki_image_format: EnumSelectCombo
     anki_image_settings: ImageSliderBox
@@ -124,10 +124,10 @@ class FormWidgetsBuilder:
 
     def create_anki_widgets(self) -> typing.Self:
         """Create AnkiConnect and image-encoding settings widgets."""
-        self._widgets.anki_connect_url = MonoSpaceLineEdit(self._cfg.anki_connect_url)
+        self._widgets.anki_connect_url = StripLineEdit(self._cfg.anki_connect_url)
         self._widgets.anki_connect_api_key = MonoSpaceLineEdit(self._cfg.anki_connect_api_key)
         self._widgets.anki_connect_api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self._widgets.anki_image_field = MonoSpaceLineEdit(self._cfg.anki_image_field)
+        self._widgets.anki_image_field = StripLineEdit(self._cfg.anki_image_field)
         self._widgets.anki_field_separator = MonoSpaceLineEdit(self._cfg.anki_field_separator)
         self._widgets.anki_image_format = EnumSelectCombo(initial_value=self._cfg.anki_image_format)
         self._widgets.anki_image_settings = ImageSliderBox()

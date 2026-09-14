@@ -32,6 +32,14 @@ class MonoSpaceLineEdit(QLineEdit):
         self.setFont(font)
 
 
+class StripLineEdit(MonoSpaceLineEdit):
+    """A monospace line edit whose saved value excludes surrounding whitespace."""
+
+    def text_stripped(self) -> str:
+        """Return the current text without leading or trailing whitespace."""
+        return self.text().strip()
+
+
 class ColorEdit(MonoSpaceLineEdit):
     font_size: int = 14
     min_height: int = 24

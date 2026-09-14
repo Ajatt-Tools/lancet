@@ -17,6 +17,7 @@ from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
+from lancet.gui.line_edit import StripLineEdit
 from lancet.gui.utils import DetectorInputSizeSpinBox
 
 type CfgValueTypes = bool | str | int | float | enum.Enum
@@ -71,6 +72,8 @@ def get_from_widget(widget: QWidget) -> CfgValueTypes:
             return widget.color_hex()
         case QComboBox():
             return widget.currentText()
+        case StripLineEdit():
+            return widget.text_stripped()
         case QLineEdit():
             return widget.text()
         case QCheckBox():
