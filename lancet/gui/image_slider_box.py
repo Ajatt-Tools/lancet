@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from PyQt6.QtWidgets import QGridLayout, QLabel, QLayout, QWidget
 
 from lancet.anki.image_types import ImageParameters
-from lancet.consts import ANKI_IMAGE_MAX_DIMENSION
+from lancet.consts import ANKI_IMAGE_MAX_DIMENSION, ANKI_IMAGE_MAX_QUALITY
 from lancet.gui.rich_slider import RichSlider
 
 
@@ -43,7 +43,7 @@ class ImageSliderBox(QWidget):
         self._sliders = Sliders(
             image_width=RichSlider("Width", "px", upper_limit=max_width),
             image_height=RichSlider("Height", "px", upper_limit=max_height),
-            image_quality=RichSlider("Quality", "%", upper_limit=100, step=1),
+            image_quality=RichSlider("Quality", "%", upper_limit=ANKI_IMAGE_MAX_QUALITY, step=1),
         )
         self._setup_ui()
         self.set_tooltips()
@@ -109,7 +109,9 @@ class ImageSliderBox(QWidget):
             "Maximum image %s. Zero leaves this dimension unconstrained.\n"
             "Images preserve aspect ratio and are never enlarged."
         )
-        quality_tooltip = "Compression quality from 0 to 100. Higher values produce larger, clearer images."
+        quality_tooltip = (
+            f"Compression quality from 0 to {ANKI_IMAGE_MAX_QUALITY}. " "Higher values produce larger, clearer images."
+        )
         self._sliders.image_width.set_tooltip(dimension_tooltip % "width")
         self._sliders.image_height.set_tooltip(dimension_tooltip % "height")
         self._sliders.image_quality.set_tooltip(quality_tooltip)

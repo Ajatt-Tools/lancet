@@ -5,6 +5,7 @@ import io
 from PIL import Image, features
 
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
+from lancet.consts import ANKI_IMAGE_MAX_QUALITY
 from lancet.exceptions import AnkiImageEncodingError
 
 
@@ -21,8 +22,8 @@ def validate_image_parameters(settings: ImageParameters) -> None:
     """Raise when image dimensions or quality are outside their supported ranges."""
     if settings.width < 0 or settings.height < 0:
         raise AnkiImageEncodingError("Image dimensions cannot be negative")
-    if not 0 <= settings.quality <= 100:
-        raise AnkiImageEncodingError("Image quality must be between 0 and 100")
+    if not 0 <= settings.quality <= ANKI_IMAGE_MAX_QUALITY:
+        raise AnkiImageEncodingError(f"Image quality must be between 0 and {ANKI_IMAGE_MAX_QUALITY}")
 
 
 def resize_image(image: Image.Image, settings: ImageParameters) -> Image.Image:
