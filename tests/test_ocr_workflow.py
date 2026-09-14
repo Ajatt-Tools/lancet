@@ -121,6 +121,19 @@ GOLDENDICT_LAUNCH_SCENARIOS: dict[str, GoldenDictLaunchScenario] = {
 }
 
 
+def assert_goldendict_delivery(
+    context: OcrWorkflowContext,
+    scenario: GoldenDictLaunchScenario,
+    *,
+    resolve: MagicMock,
+    run: MagicMock,
+) -> None:
+    """Assert GoldenDict resolution, launch, and notification for one scenario."""
+    resolve.assert_called_once_with("/configured/goldendict")
+    run.assert_called_once_with(("/resolved/goldendict", "recognized text"))
+    context.notify.notify.assert_called_once_with(scenario.expected_notification)
+
+
 class TestGoldenDictDelivery:
     """Test GoldenDict invocation with unittest.mock.patch."""
 
@@ -146,9 +159,7 @@ class TestGoldenDictDelivery:
             ) as run,
         ):
             context.workflow.copy_ocr_result("recognized text")
-        resolve.assert_called_once_with("/configured/goldendict")
-        run.assert_called_once_with(("/resolved/goldendict", "recognized text"))
-        context.notify.notify.assert_called_once_with(scenario.expected_notification)
+        assert_goldendict_delivery(context, scenario, resolve=resolve, run=run)
 
 
 CLIPBOARD_SCENARIOS: dict[str, str] = {"recognized_text": "clipboard result"}
