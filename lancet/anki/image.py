@@ -47,5 +47,8 @@ def encode_image(
     ensure_image_format_supported(image_format)
     resized = resize_image(image, settings)
     output = io.BytesIO()
-    resized.save(output, format=image_format.name.upper(), quality=settings.quality)
+    try:
+        resized.save(output, format=image_format.name.upper(), quality=settings.quality)
+    except (OSError, ValueError) as ex:
+        raise AnkiImageEncodingError(f"Could not encode {image_format.value.upper()} image: {ex}") from ex
     return EncodedImage(output.getvalue(), image_format, settings)
