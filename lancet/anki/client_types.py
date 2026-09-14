@@ -30,7 +30,7 @@ class StoreMediaFileParams(typing.TypedDict):
 
     filename: str
     data: str
-    deleteExisting: bool  # Any existing file with the same name is deleted by default.
+    deleteExisting: bool  # False makes Anki assign a non-conflicting filename when needed.
 
 
 class UpdateNoteFieldsNote(typing.TypedDict):

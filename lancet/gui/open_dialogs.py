@@ -25,6 +25,7 @@ class OpenDialogs:
 
     @contextmanager
     def lock[D: SaveAndRestoreGeomDialog](self, dialog: D) -> Generator[D]:
+        """Register a dialog until it finishes or the context exits."""
         with self._registry.acquire(dialog.name):
             # The dialog's result code is passed to the slot:
             # https://doc.qt.io/qt-6/qdialog.html#finished
