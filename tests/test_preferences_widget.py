@@ -6,7 +6,7 @@ import typing
 from collections.abc import Callable, Sequence
 
 import pytest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QFormLayout, QLabel
 
 from lancet.anki.image_types import AnkiImageFormat
 from lancet.config import Config, OcrDestination
@@ -64,7 +64,11 @@ class ConfigScenario(typing.NamedTuple):
 
 
 def make_round_trip_config() -> Config:
-    """Create a configuration with non-default values for every preferences control."""
+    """Create a configuration with non-default values for every preferences control.
+
+    The single declarative constructor makes the complete form contract visible;
+    splitting it by UI section would obscure which settings the round trip covers.
+    """
     return Config(
         copy_to=OcrDestination.clipboard,
         notification_duration_sec=17,
@@ -176,6 +180,8 @@ class TestAnkiPreferencesTab:
         """Anki image/connection widgets belong to the Anki tab while its shortcut stays on Main."""
         preferences = MainPreferencesWidget(Config())
         main_tab, anki_tab = preferences.widget(0), preferences.widget(1)
+        assert main_tab is not None
+        assert anki_tab is not None
         assert tuple(preferences.tabText(index) for index in range(preferences.count())) == scenario.tab_titles
         assert ANKI_KEYS == scenario.anki_keys
         assert all(getattr(preferences.widgets, key).parentWidget() == anki_tab for key in scenario.anki_keys)
@@ -184,6 +190,88 @@ class TestAnkiPreferencesTab:
             preferences.widgets.anki_connect_api_key.echoMode()
             == preferences.widgets.anki_connect_api_key.EchoMode.Password
         )
+
+
+class AnkiFormLabelScenario(typing.NamedTuple):
+    """One Anki widget and the label rendered for it in the form layout."""
+
+    widget_name: str
+    expected_label: str
+
+
+ANKI_FORM_LABEL_SCENARIOS: dict[str, AnkiFormLabelScenario] = {
+    "connect_url": AnkiFormLabelScenario(widget_name="anki_connect_url", expected_label="AnkiConnect URL"),
+    "api_key": AnkiFormLabelScenario(widget_name="anki_connect_api_key", expected_label="AnkiConnect API key"),
+    "image_field": AnkiFormLabelScenario(widget_name="anki_image_field", expected_label="Image field"),
+    "field_separator": AnkiFormLabelScenario(widget_name="anki_field_separator", expected_label="Field separator"),
+    "image_format": AnkiFormLabelScenario(widget_name="anki_image_format", expected_label="Image format"),
+    "image_settings": AnkiFormLabelScenario(
+        widget_name="anki_image_settings",
+        expected_label="Image size and quality",
+    ),
+}
+
+
+class TextNormalizationScenario(typing.NamedTuple):
+    """An Anki text widget input and the config value copied from it."""
+
+    widget_name: str
+    entered_value: str
+    config_name: str
+    expected_value: str
+
+
+TEXT_NORMALIZATION_SCENARIOS: dict[str, TextNormalizationScenario] = {
+    "connect_url_strips": TextNormalizationScenario(
+        widget_name="anki_connect_url",
+        entered_value="  http://localhost:8765  ",
+        config_name="anki_connect_url",
+        expected_value="http://localhost:8765",
+    ),
+    "image_field_strips": TextNormalizationScenario(
+        widget_name="anki_image_field",
+        entered_value="  Image  ",
+        config_name="anki_image_field",
+        expected_value="Image",
+    ),
+    "api_key_preserves": TextNormalizationScenario(
+        widget_name="anki_connect_api_key",
+        entered_value="  key  ",
+        config_name="anki_connect_api_key",
+        expected_value="  key  ",
+    ),
+    "field_separator_preserves": TextNormalizationScenario(
+        widget_name="anki_field_separator",
+        entered_value="  <hr>  ",
+        config_name="anki_field_separator",
+        expected_value="  <hr>  ",
+    ),
+}
+
+
+class TestAnkiFormWidgets:
+    """Test labels and text normalization for Anki preferences widgets."""
+
+    @pytest.mark.parametrize("scenario", ANKI_FORM_LABEL_SCENARIOS.values(), ids=ANKI_FORM_LABEL_SCENARIOS.keys())
+    def test_form_labels(self, scenario: AnkiFormLabelScenario, qapp: QApplication) -> None:
+        """Every Anki form widget is paired with the expected visible label."""
+        preferences = MainPreferencesWidget(Config())
+        anki_tab = preferences.widget(1)
+        assert anki_tab is not None
+        layout = anki_tab.layout()
+        assert isinstance(layout, QFormLayout)
+        label = layout.labelForField(getattr(preferences.widgets, scenario.widget_name))
+        assert isinstance(label, QLabel)
+        assert label.text() == scenario.expected_label
+
+    @pytest.mark.parametrize("scenario", TEXT_NORMALIZATION_SCENARIOS.values(), ids=TEXT_NORMALIZATION_SCENARIOS.keys())
+    def test_copy_text_normalization(self, scenario: TextNormalizationScenario, qapp: QApplication) -> None:
+        """Copying preferences applies only the text normalization chosen by each widget type."""
+        cfg = Config()
+        preferences = MainPreferencesWidget(cfg)
+        getattr(preferences.widgets, scenario.widget_name).setText(scenario.entered_value)
+        preferences.copy_settings_to_cfg()
+        assert getattr(cfg, scenario.config_name) == scenario.expected_value
 
 
 def make_modified_config() -> Config:
