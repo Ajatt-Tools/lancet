@@ -4,6 +4,7 @@
 
 import datetime
 import enum
+import threading
 import typing
 from collections.abc import Sequence
 from unittest.mock import Mock, call, create_autospec
@@ -14,13 +15,13 @@ import requests
 from lancet.anki.client import (
     ANKI_CONNECT_TIMEOUT_SEC,
     AnkiConnectClient,
+    AnkiConnectClientFactory,
     join_html_content,
     make_image_filename,
 )
 from lancet.anki.client_types import (
     AnkiConnectParams,
     AnkiConnectRequest,
-    DeleteMediaFileParams,
     FindNotesParams,
     GuiBrowseParams,
     UpdateNoteFieldsParams,
@@ -28,13 +29,18 @@ from lancet.anki.client_types import (
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
 from lancet.config import Config
 from lancet.consts import DEFAULT_ANKICONNECT_URL
-from lancet.exceptions import AnkiConnectError, AnkiConnectUnavailableError
+from lancet.exceptions import (
+    AnkiAttachmentInProgressError,
+    AnkiConnectError,
+    AnkiConnectUnavailableError,
+)
 
 NOTE_ID = 42
 IMAGE_FIELD = "Image"
 IMAGE_DATA = b"image"
 IMAGE_FILENAME = "lancet_42_2026-09-12-12-30-45.webp"
 UPDATE_ERROR_MESSAGE = "update failed"
+THREAD_WAIT_TIMEOUT_SEC = 5
 
 
 class RequestScenario(typing.NamedTuple):
@@ -92,7 +98,6 @@ class SideEffectOperation(enum.StrEnum):
 
     update_note_field = "updateNoteFields"
     browse_note = "guiBrowse"
-    delete_media = "deleteMediaFile"
 
 
 class SideEffectScenario(typing.NamedTuple):
@@ -104,7 +109,6 @@ class SideEffectScenario(typing.NamedTuple):
 SIDE_EFFECT_SCENARIOS: dict[str, SideEffectScenario] = {
     "update_note_field": SideEffectScenario(operation=SideEffectOperation.update_note_field),
     "browse_note": SideEffectScenario(operation=SideEffectOperation.browse_note),
-    "delete_media": SideEffectScenario(operation=SideEffectOperation.delete_media),
 }
 
 
@@ -119,18 +123,6 @@ ATTACHMENT_SCENARIOS: dict[str, AttachmentScenario] = {
     "default_break": AttachmentScenario("<br>", '<p>existing</p><br><img src="lancet_actual.webp">'),
     "custom_rule": AttachmentScenario("<hr>", '<p>existing</p><hr><img src="lancet_actual.webp">'),
     "empty_separator": AttachmentScenario("", '<p>existing</p><img src="lancet_actual.webp">'),
-}
-
-
-class CleanupScenario(typing.NamedTuple):
-    """Whether failed media cleanup also raises after the note update fails."""
-
-    cleanup_error_type: type[Exception] | None
-
-
-CLEANUP_SCENARIOS: dict[str, CleanupScenario] = {
-    "cleanup_succeeds": CleanupScenario(cleanup_error_type=None),
-    "cleanup_fails": CleanupScenario(cleanup_error_type=AnkiConnectError),
 }
 
 
@@ -207,9 +199,9 @@ class AttachmentOperationRecorder:
         """Return an immutable snapshot of the recorded attachment operations."""
         return tuple(self._calls)
 
-    def note_field(self, note_id: int, field_name: str) -> str:
+    def note_field(self, note_id: int) -> str:
         """Record a field lookup and return preexisting HTML content."""
-        self._calls.append(AttachmentOperationCall(name=AttachmentOperation.note_field, args=(note_id, field_name)))
+        self._calls.append(AttachmentOperationCall(name=AttachmentOperation.note_field, args=(note_id,)))
         return "<p>existing</p>"
 
     def store_media(self, filename: str, data: bytes) -> str:
@@ -221,11 +213,133 @@ class AttachmentOperationRecorder:
         """Record opening Anki Browse for one note ID."""
         self._calls.append(AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(note_id,)))
 
-    def update_note_field(self, note_id: int, field_name: str, value: str) -> None:
+    def update_note_field(self, note_id: int, value: str) -> None:
         """Record the final HTML update for one note field."""
-        self._calls.append(
-            AttachmentOperationCall(name=AttachmentOperation.update_note_field, args=(note_id, field_name, value))
+        self._calls.append(AttachmentOperationCall(name=AttachmentOperation.update_note_field, args=(note_id, value)))
+
+
+class AttachmentTransactionScenario(typing.NamedTuple):
+    """The first attachment transaction's terminal outcome before its lock releases."""
+
+    update_error_type: type[Exception] | None
+    update_error_message: str
+
+
+ATTACHMENT_TRANSACTION_SCENARIOS: dict[str, AttachmentTransactionScenario] = {
+    "first_transaction_succeeds": AttachmentTransactionScenario(update_error_type=None, update_error_message=""),
+    "first_transaction_update_fails": AttachmentTransactionScenario(
+        update_error_type=AnkiConnectError,
+        update_error_message=UPDATE_ERROR_MESSAGE,
+    ),
+}
+
+
+class ConcurrentAttachmentContext:
+    """A blocked first transaction used to probe concurrent attachment rejection."""
+
+    def __init__(self, scenario: AttachmentTransactionScenario, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Create two factory clients whose first transaction blocks until released."""
+        factory = AnkiConnectClientFactory(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
+        self.first_client = factory.create()
+        self.second_client = factory.create()
+        self.image = EncodedImage(
+            data=IMAGE_DATA,
+            image_format=AnkiImageFormat.webp,
+            settings=ImageParameters(width=0, height=0, quality=33),
         )
+        self.first_started = threading.Event()
+        self.allow_first = threading.Event()
+        self._errors: list[Exception] = []
+        self.first_error = (
+            scenario.update_error_type(scenario.update_error_message) if scenario.update_error_type else None
+        )
+        self.second_invoke = create_autospec(self.second_client.invoke)
+        monkeypatch.setattr(self.first_client, "browse_note", self._browse_note)
+        monkeypatch.setattr(
+            self.first_client, "note_field", create_autospec(self.first_client.note_field, return_value="")
+        )
+        monkeypatch.setattr(
+            self.first_client,
+            "store_media",
+            create_autospec(self.first_client.store_media, return_value="image.webp"),
+        )
+        monkeypatch.setattr(
+            self.first_client,
+            "update_note_field",
+            create_autospec(self.first_client.update_note_field, side_effect=self.first_error),
+        )
+        monkeypatch.setattr(self.second_client, "invoke", self.second_invoke)
+
+    def _browse_note(self, note_id: int) -> None:
+        """Block only the first transaction's flush operation."""
+        if note_id == 0:
+            self.first_started.set()
+            self.allow_first.wait()
+
+    def _attach_first(self) -> None:
+        """Run the blocked first attachment and retain unexpected failures."""
+        try:
+            self.first_client.attach_image(NOTE_ID, self.image)
+        except Exception as error:
+            self._errors.append(error)
+
+    @property
+    def errors(self) -> tuple[Exception, ...]:
+        """Return an immutable snapshot of first-transaction failures."""
+        return tuple(self._errors)
+
+    def start(self) -> threading.Thread:
+        """Start the first attachment transaction in a worker thread."""
+        thread = threading.Thread(target=self._attach_first)
+        thread.start()
+        return thread
+
+    def configure_second_success(self) -> None:
+        """Configure the second client to complete after the first transaction releases the lock."""
+        self.second_invoke.side_effect = [
+            None,
+            [{"fields": {IMAGE_FIELD: {"value": ""}}}],
+            "second.webp",
+            None,
+            None,
+        ]
+
+
+class AttachmentTargetSnapshot(typing.NamedTuple):
+    """A client with captured target settings and its configured AnkiConnect spy."""
+
+    client: AnkiConnectClient
+    invoke: Mock
+
+
+def create_attachment_target_snapshot(monkeypatch: pytest.MonkeyPatch) -> AttachmentTargetSnapshot:
+    """Create a client, mutate live config, and retain spies for captured-target assertions."""
+    cfg = Config(
+        anki_connect_url="http://original:8765",
+        anki_connect_api_key="original-key",
+        anki_image_field="Original",
+        anki_field_separator="<hr>",
+    )
+    client = make_client(cfg)
+    cfg.anki_connect_url, cfg.anki_connect_api_key = "http://changed:8765", "changed-key"
+    cfg.anki_image_field, cfg.anki_field_separator = "Changed", "<br>"
+    invoke = Mock(side_effect=[None, [{"fields": {"Original": {"value": "previous"}}}], "actual.webp", None, None])
+    monkeypatch.setattr(client, "invoke", invoke)
+    monkeypatch.setattr("lancet.anki.client.make_image_filename", Mock(return_value="requested.webp"))
+    return AttachmentTargetSnapshot(client=client, invoke=invoke)
+
+
+def assert_attachment_target_calls(invoke: Mock) -> None:
+    """Assert the exact AnkiConnect calls for an attachment to the captured target field."""
+    assert invoke.mock_calls == [
+        call("guiBrowse", {"query": "nid:0"}),
+        call("notesInfo", {"notes": [NOTE_ID]}),
+        call("storeMediaFile", {"filename": "requested.webp", "data": "aW1hZ2U=", "deleteExisting": False}),
+        call(
+            "updateNoteFields", {"note": {"id": NOTE_ID, "fields": {"Original": 'previous<hr><img src="actual.webp">'}}}
+        ),
+        call("guiBrowse", {"query": f"nid:{NOTE_ID}"}),
+    ]
 
 
 class FixedDateTime(datetime.datetime):
@@ -246,11 +360,14 @@ def expected_request(api_key: str) -> AnkiConnectRequest:
     return payload
 
 
+def make_client(cfg: Config) -> AnkiConnectClient:
+    """Create one immutable-target client from test configuration."""
+    return AnkiConnectClientFactory(cfg).create()
+
+
 def create_attachment_setup(scenario: AttachmentScenario, monkeypatch: pytest.MonkeyPatch) -> AttachmentSetup:
     """Create an attachment client whose collaborators report their ordered operations."""
-    client = AnkiConnectClient(
-        Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_field_separator=scenario.separator)
-    )
+    client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_field_separator=scenario.separator))
     operations = AttachmentOperationRecorder()
     filename_factory = Mock(return_value="lancet_actual.webp")
     monkeypatch.setattr(client, "note_field", operations.note_field)
@@ -274,11 +391,9 @@ def invoke_side_effect(client: AnkiConnectClient, scenario: SideEffectScenario) 
     """Invoke one action whose successful AnkiConnect result is intentionally unused."""
     match scenario.operation:
         case SideEffectOperation.update_note_field:
-            client.update_note_field(NOTE_ID, IMAGE_FIELD, "<img>")
+            client.update_note_field(NOTE_ID, "<img>")
         case SideEffectOperation.browse_note:
             client.browse_note(NOTE_ID)
-        case SideEffectOperation.delete_media:
-            client.delete_media("image.avif")
 
 
 def expected_side_effect_params(scenario: SideEffectScenario) -> AnkiConnectParams:
@@ -290,9 +405,6 @@ def expected_side_effect_params(scenario: SideEffectScenario) -> AnkiConnectPara
         case SideEffectOperation.browse_note:
             browse_params: GuiBrowseParams = {"query": f"nid:{NOTE_ID}"}
             return browse_params
-        case SideEffectOperation.delete_media:
-            delete_params: DeleteMediaFileParams = {"filename": "image.avif"}
-            return delete_params
 
 
 class TestAnkiConnectInvoke:
@@ -305,9 +417,7 @@ class TestAnkiConnectInvoke:
         response.json.return_value = {"result": [1], "error": None}
         post = Mock(return_value=response)
         monkeypatch.setattr("lancet.anki.client.requests.post", post)
-        client = AnkiConnectClient(
-            Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_connect_api_key=scenario.api_key)
-        )
+        client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_connect_api_key=scenario.api_key))
         assert client.invoke("findNotes", {"query": "added:1"}) == [1]
         assert post.call_args == call(
             DEFAULT_ANKICONNECT_URL,
@@ -323,10 +433,40 @@ class TestAnkiConnectInvoke:
         """Transport failures retain their details in the appropriate public exception type."""
         request_error = scenario.error_type(scenario.error_message)
         monkeypatch.setattr("lancet.anki.client.requests.post", Mock(side_effect=request_error))
-        client = AnkiConnectClient(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
+        client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
         with pytest.raises(scenario.expected_error_type) as exc_info:
             client.invoke("findNotes", {"query": "added:1"})
         assert str(exc_info.value) == f"Could not reach AnkiConnect: {scenario.error_message}"
+
+    def test_factory_client_snapshots_connection_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A client retains endpoint and API key captured before later config changes."""
+        cfg = Config(anki_connect_url="http://original:8765", anki_connect_api_key="original-key")
+        client = make_client(cfg)
+        cfg.anki_connect_url = "http://changed:8765"
+        cfg.anki_connect_api_key = "changed-key"
+        response = create_autospec(requests.Response, instance=True)
+        response.json.return_value = {"result": [], "error": None}
+        post = Mock(return_value=response)
+        monkeypatch.setattr("lancet.anki.client.requests.post", post)
+
+        client.invoke("findNotes", {"query": "added:1"})
+
+        assert post.call_args == call(
+            "http://original:8765",
+            json=expected_request("original-key"),
+            timeout=ANKI_CONNECT_TIMEOUT_SEC,
+        )
+
+    def test_factory_client_snapshots_attachment_target(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A client retains captured field and separator settings after later config changes."""
+        snapshot = create_attachment_target_snapshot(monkeypatch)
+        image = EncodedImage(
+            data=IMAGE_DATA,
+            image_format=AnkiImageFormat.webp,
+            settings=ImageParameters(width=0, height=0, quality=33),
+        )
+        assert snapshot.client.attach_image(NOTE_ID, image) == "actual.webp"
+        assert_attachment_target_calls(snapshot.invoke)
 
 
 class TestAnkiNoteOperations:
@@ -335,7 +475,7 @@ class TestAnkiNoteOperations:
     @pytest.mark.parametrize("scenario", NOTE_SELECTION_SCENARIOS.values(), ids=NOTE_SELECTION_SCENARIOS.keys())
     def test_last_added_note_id(self, scenario: NoteSelectionScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """The added:1 result selects the greatest ID or rejects a missing recent note."""
-        client = AnkiConnectClient(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
+        client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
         invoke = Mock(return_value=list(scenario.note_ids))
         monkeypatch.setattr(client, "invoke", invoke)
         if scenario.expected_note_id is None:
@@ -351,7 +491,7 @@ class TestAnkiNoteOperations:
         self, scenario: SideEffectScenario, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Side-effect operations rely on envelope validation and ignore unused success results."""
-        client = AnkiConnectClient(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
+        client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
         invoke = Mock(return_value={"unexpected": "but successful"})
         monkeypatch.setattr(client, "invoke", invoke)
         invoke_side_effect(client, scenario)
@@ -360,16 +500,16 @@ class TestAnkiNoteOperations:
     @pytest.mark.parametrize("scenario", NOTE_FIELD_SCENARIOS.values(), ids=NOTE_FIELD_SCENARIOS.keys())
     def test_note_field_request(self, scenario: NoteFieldScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """notesInfo requests the target note and extracts its current field HTML."""
-        client = AnkiConnectClient(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
+        client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
         invoke = Mock(return_value=[{"fields": {IMAGE_FIELD: {"value": scenario.current_value}}}])
         monkeypatch.setattr(client, "invoke", invoke)
-        assert client.note_field(NOTE_ID, IMAGE_FIELD) == scenario.current_value
+        assert client.note_field(NOTE_ID) == scenario.current_value
         assert invoke.call_args == call("notesInfo", {"notes": [NOTE_ID]})
 
     @pytest.mark.parametrize("scenario", STORE_MEDIA_SCENARIOS.values(), ids=STORE_MEDIA_SCENARIOS.keys())
     def test_store_media_request(self, scenario: StoreMediaScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """storeMediaFile receives base64 image bytes and returns Anki's assigned filename."""
-        client = AnkiConnectClient(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
+        client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
         invoke = Mock(return_value=scenario.returned_filename)
         monkeypatch.setattr(client, "invoke", invoke)
         assert client.store_media(scenario.filename, IMAGE_DATA) == scenario.returned_filename
@@ -390,34 +530,53 @@ class TestAnkiNoteOperations:
     ) -> None:
         """Attach validates content, inserts the separator, and reopens the target note."""
         setup = create_attachment_setup(scenario, monkeypatch)
-        assert setup.client.attach_image(NOTE_ID, IMAGE_FIELD, setup.image) == "lancet_actual.webp"
+        assert setup.client.attach_image(NOTE_ID, setup.image) == "lancet_actual.webp"
         setup.filename_factory.assert_called_once_with(NOTE_ID, AnkiImageFormat.webp.value)
         assert setup.operations.calls == (
             AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(0,)),
-            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID, IMAGE_FIELD)),
+            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID,)),
             AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
             AttachmentOperationCall(
                 name=AttachmentOperation.update_note_field,
-                args=(NOTE_ID, IMAGE_FIELD, scenario.expected_html),
+                args=(NOTE_ID, scenario.expected_html),
             ),
             AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(NOTE_ID,)),
         )
 
-    @pytest.mark.parametrize("scenario", CLEANUP_SCENARIOS.values(), ids=CLEANUP_SCENARIOS.keys())
-    def test_failed_update_preserves_original_error(
-        self, scenario: CleanupScenario, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Media rollback never masks the original update failure, even when cleanup also fails."""
+    def test_failed_update_preserves_uploaded_media(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Ambiguous update failures leave uploaded media for Anki Check Media to reconcile."""
         attachment = create_attachment_setup(ATTACHMENT_SCENARIOS["default_break"], monkeypatch)
         expected_error = AnkiConnectError(UPDATE_ERROR_MESSAGE)
         monkeypatch.setattr(attachment.client, "update_note_field", Mock(side_effect=expected_error))
-        cleanup_error = scenario.cleanup_error_type("cleanup failed") if scenario.cleanup_error_type else None
-        delete_media = Mock(side_effect=cleanup_error)
-        monkeypatch.setattr(attachment.client, "delete_media", delete_media)
         with pytest.raises(AnkiConnectError) as exc_info:
-            attachment.client.attach_image(NOTE_ID, IMAGE_FIELD, attachment.image)
+            attachment.client.attach_image(NOTE_ID, attachment.image)
         assert exc_info.value is expected_error
-        assert delete_media.call_args == call("lancet_actual.webp")
+
+    @pytest.mark.parametrize(
+        "scenario", ATTACHMENT_TRANSACTION_SCENARIOS.values(), ids=ATTACHMENT_TRANSACTION_SCENARIOS.keys()
+    )
+    def test_factory_clients_share_attachment_lock(
+        self,
+        scenario: AttachmentTransactionScenario,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Concurrent rejection is transport-free and the lock releases after either terminal first outcome."""
+        context = ConcurrentAttachmentContext(scenario, monkeypatch)
+        first = context.start()
+        try:
+            assert context.first_started.wait(timeout=THREAD_WAIT_TIMEOUT_SEC) is True
+            assert context.first_client is not context.second_client
+            with pytest.raises(AnkiAttachmentInProgressError) as exc_info:
+                context.second_client.attach_image(NOTE_ID, context.image)
+            assert str(exc_info.value) == "Another Anki attachment is already in progress"
+            context.second_invoke.assert_not_called()
+        finally:
+            context.allow_first.set()
+            first.join(timeout=THREAD_WAIT_TIMEOUT_SEC)
+        assert first.is_alive() is False
+        assert context.errors == (() if context.first_error is None else (context.first_error,))
+        context.configure_second_success()
+        assert context.second_client.attach_image(NOTE_ID, context.image) == "second.webp"
 
 
 class JoinHtmlScenario(typing.NamedTuple):
