@@ -2,11 +2,15 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import typing
+import pathlib
 
 import pytest
+from PyQt6.QtWidgets import QApplication, QDialog
 
 from lancet.exceptions import LancetException
 from lancet.gui.dialog_registry import DialogRegistry
+from lancet.gui.geom_dialog import SaveAndRestoreGeomDialog
+from lancet.gui.open_dialogs import OpenDialogs
 
 
 class AcquireScenario(typing.NamedTuple):
@@ -130,5 +134,41 @@ class TestDialogRegistryMultiName:
         with dialogs.acquire("first"):
             with dialogs.acquire("second"):
                 assert dialogs.is_locked() is True
+
+        assert dialogs.is_locked() is False
+
+
+class DialogCompletionScenario(typing.NamedTuple):
+    """A named Qt dialog completion result that emits the finished signal."""
+
+    result: QDialog.DialogCode
+
+
+DIALOG_COMPLETION_SCENARIOS: dict[str, DialogCompletionScenario] = {
+    "accepted": DialogCompletionScenario(result=QDialog.DialogCode.Accepted),
+    "rejected": DialogCompletionScenario(result=QDialog.DialogCode.Rejected),
+}
+
+
+class TestOpenDialogs:
+    """Test Qt signal-driven release through the dialog wrapper."""
+
+    @pytest.mark.parametrize("scenario", DIALOG_COMPLETION_SCENARIOS.values(), ids=DIALOG_COMPLETION_SCENARIOS.keys())
+    def test_finished_signal_releases_dialog(
+        self,
+        scenario: DialogCompletionScenario,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+        qapp: QApplication,
+    ) -> None:
+        """Accepted and rejected completion signals release the registry before context exit."""
+        monkeypatch.setattr(SaveAndRestoreGeomDialog, "_geom_file", tmp_path / "dialog.geometry")
+        dialogs = OpenDialogs()
+        dialog = SaveAndRestoreGeomDialog()
+
+        with dialogs.lock(dialog):
+            assert dialogs.is_locked() is True
+            dialog.done(scenario.result.value)
+            assert dialogs.is_locked() is False
 
         assert dialogs.is_locked() is False
