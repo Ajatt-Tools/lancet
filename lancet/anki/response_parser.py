@@ -52,7 +52,7 @@ def parse_note_ids(result: AnkiConnectResult) -> Sequence[int]:
 
 def parse_media_filename(result: AnkiConnectResult) -> str:
     """Validate a storeMediaFile result as a filename string."""
-    if not isinstance(result, str):
+    if not (isinstance(result, str) and result):
         raise AnkiConnectError("AnkiConnect returned an invalid media filename")
     return result
 
