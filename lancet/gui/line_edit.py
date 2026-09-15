@@ -13,7 +13,7 @@ class MonoSpaceLineEdit(QLineEdit):
     # Compact rows keep the preferences dialog dense without changing font size.
     min_height: int = 24
 
-    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+    def __init__(self, text: str = "", *, parent: QWidget | None = None) -> None:
         """Create a compact line edit with optional initial text and parent widget."""
         super().__init__(text, parent)
         font = self.font()
@@ -50,9 +50,9 @@ class ColorEdit(MonoSpaceLineEdit):
     font_size: int = 14
     min_height: int = 24
 
-    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+    def __init__(self, text: str = "", *, parent: QWidget | None = None) -> None:
         """Create a color-constrained compact line edit."""
-        super().__init__(text, parent)
+        super().__init__(text, parent=parent)
         color_regex = QRegularExpression(r"^#?\w+$")  # OR stricter: r"^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
         color_validator = QRegularExpressionValidator(color_regex, self)
         self.setValidator(color_validator)
