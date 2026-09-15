@@ -19,7 +19,7 @@ def ensure_image_format_supported(image_format: AnkiImageFormat) -> None:
 
 
 def validate_image_parameters(settings: ImageParameters) -> None:
-    """Raise when image dimensions or quality are outside their supported ranges."""
+    """Reject negative dimensions and quality outside the codec-supported range."""
     if settings.width < 0 or settings.height < 0:
         raise AnkiImageEncodingError("Image dimensions cannot be negative")
     if not 0 <= settings.quality <= ANKI_IMAGE_MAX_QUALITY:

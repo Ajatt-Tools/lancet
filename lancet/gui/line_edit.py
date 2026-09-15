@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QLineEdit
 
 class MonoSpaceLineEdit(QLineEdit):
     font_size: int = 14
+    # Compact rows keep the preferences dialog dense without changing font size.
     min_height: int = 24
 
     def __init__(self, *args, **kwargs) -> None:

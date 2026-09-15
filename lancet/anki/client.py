@@ -139,9 +139,9 @@ class AnkiConnectClient:
 
     def _attach_image(self, note_id: int, image: EncodedImage) -> str:
         """Upload one image, append it to a note field, and reselect the updated note."""
-        # Selecting an impossible note ID forces Anki's Browser editor to lose focus
-        # and flush pending edits. This must happen before notesInfo. Reading first
-        # could capture stale HTML and overwrite the newer content during our update.
+        # Selecting an impossible note ID asks Anki Browser to flush pending edits
+        # before notesInfo. AnkiConnect does not expose a synchronous save barrier,
+        # so users should finish active Browser edits before attaching an image.
         self.browse_note(0)
 
         previous_html = self.note_field(note_id)

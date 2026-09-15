@@ -85,7 +85,7 @@ class LancetThreadOp[ResultType](QObject):
             self.deleteLater()
 
     def run_in_background(self) -> None:
-        """Submit the operation to the thread pool for asynchronous execution."""
+        """Submit this one-shot operation to the thread pool for asynchronous execution."""
         if self._success is None:
             raise MangaOCRException("success handler is not set")
         if self._failure is None:
