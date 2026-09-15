@@ -167,6 +167,7 @@ class LancetSystemTray(QSystemTrayIcon):
                 # Can't use lambda in a loop.
                 functools.partial(self.process_received_command, lancet_action),
             )
+            assert action is not None
             action.setData(lancet_action)
 
     def _add_system_menu_actions(self, menu: QMenu) -> None:

@@ -93,7 +93,7 @@ class AnkiConnectClient:
         note_ids = parse_note_ids(self.invoke("findNotes", params))
         if not note_ids:
             raise AnkiConnectError("No recently added Anki note was found")
-        return max(note_ids)  # ids are timestamps, max() will return the newest id.
+        return max(note_ids)  # Note IDs are timestamps, so max() returns the newest note id.
 
     def note_field(self, note_id: int) -> str:
         """Return the configured note field's current HTML value after validation."""

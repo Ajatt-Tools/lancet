@@ -48,7 +48,7 @@ class AnkiAttachmentInProgressError(AnkiConnectError):
     pass
 
 
-class AnkiAttachmentCancelledError(AnkiConnectError):
+class AnkiAttachmentCanceledError(AnkiConnectError):
     """Raised when a dialog prevents an Anki attachment from opening selection."""
 
     @property

@@ -18,7 +18,7 @@ from lancet.anki.image import encode_image
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
 from lancet.config import Config, make_preview_opts
 from lancet.exceptions import (
-    AnkiAttachmentCancelledError,
+    AnkiAttachmentCanceledError,
     AnkiConnectUnavailableError,
     PixmapConversionError,
 )
@@ -96,7 +96,7 @@ class AnkiAttachmentJob:
         # earlier dialog check may no longer reflect the current UI state.
         if self._open_dialogs.is_locked():
             logger.info("Anki preflight finished while a dialog was open; skipping selection")
-            self._on_failure(AnkiAttachmentCancelledError("Anki attachment cancelled because a dialog is open"))
+            self._on_failure(AnkiAttachmentCanceledError("Anki attachment canceled because a dialog is open"))
             return
 
         # ZalaTakeScreenRegion owns screenshot-selection concurrency. Its lock
@@ -185,7 +185,7 @@ class AnkiWorkflow:
         # Keep transport diagnostics in logs, but make the expected missing-Anki
         # case immediately understandable in a short desktop notification.
         match error:
-            case AnkiConnectUnavailableError() | AnkiAttachmentCancelledError():
+            case AnkiConnectUnavailableError() | AnkiAttachmentCanceledError():
                 self._notify.notify(error.what)
             case _:
                 self._notify.notify(f"Anki attachment failed: {error}")

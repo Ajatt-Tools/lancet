@@ -44,7 +44,7 @@ def parse_anki_response(response: requests.Response) -> AnkiConnectResult:
 
 def parse_note_ids(result: AnkiConnectResult) -> Sequence[int]:
     """Validate a findNotes or guiBrowse result as strict integer IDs."""
-    # bool subclasses int, but true/false can never be valid Anki note IDs.
+    # Boolean values subclass integers, but true/false cannot be Anki note IDs.
     if not isinstance(result, list) or any(type(item) is not int for item in result):
         raise AnkiConnectError("AnkiConnect returned an invalid list of IDs")
     return result
