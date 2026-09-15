@@ -18,6 +18,7 @@ from lancet.consts import (
     ANKI_IMAGE_MAX_DIMENSION,
     ANKI_IMAGE_MAX_QUALITY,
     CFG_PATH,
+    CONFIG_FILE_MODE,
     DEFAULT_ANKICONNECT_URL,
     DEFAULT_MODEL_NAME,
 )
@@ -150,8 +151,12 @@ class Config:
         data["copy_to"] = data["copy_to"].name
         data["anki_image_format"] = data["anki_image_format"].name
         CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(CFG_PATH, "w", encoding="utf-8") as of:
-            json.dump(data, of, ensure_ascii=False, indent=4)
+        try:
+            with open(CFG_PATH, "w", encoding="utf-8") as of:
+                json.dump(data, of, ensure_ascii=False, indent=4)
+        finally:
+            if CFG_PATH.exists():
+                CFG_PATH.chmod(CONFIG_FILE_MODE)
 
     def get_pynput_shortcuts(self) -> ShortcutConversionResult:
         """Return a mapping of key combinations to their shortcut actions."""
