@@ -178,9 +178,11 @@ class Config:
         """Trim Anki target text and clamp image dimensions and quality to supported ranges."""
         self.anki_connect_url = self.anki_connect_url.strip()
         self.anki_image_field = self.anki_image_field.strip()
-        self.anki_image_width = clamp(0, self.anki_image_width, ANKI_IMAGE_MAX_DIMENSION)
-        self.anki_image_height = clamp(0, self.anki_image_height, ANKI_IMAGE_MAX_DIMENSION)
-        self.anki_image_quality = clamp(0, self.anki_image_quality, ANKI_IMAGE_MAX_QUALITY)
+        # beartype rejects invalid types at construction, but bool is an int subclass.
+        # Coercing here persists UI-compatible integer values.
+        self.anki_image_width = clamp(0, int(self.anki_image_width), ANKI_IMAGE_MAX_DIMENSION)
+        self.anki_image_height = clamp(0, int(self.anki_image_height), ANKI_IMAGE_MAX_DIMENSION)
+        self.anki_image_quality = clamp(0, int(self.anki_image_quality), ANKI_IMAGE_MAX_QUALITY)
 
     def anki_image_parameters(self) -> ImageParameters:
         """Return current Anki image dimensions and quality as one non-swappable value."""
