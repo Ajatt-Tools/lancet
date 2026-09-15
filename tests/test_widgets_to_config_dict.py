@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 from lancet.config import Config, OcrDestination
 from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
+from lancet.gui.exceptions import WidgetSetValueError
 from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.utils import DetectorInputSizeSpinBox
@@ -108,27 +109,52 @@ class UnsupportedWidgetScenario(typing.NamedTuple):
     operation: typing.Literal["set", "get"]
     factory: Callable[[], QWidget]
     value: CfgValueTypes
+    expected_error_type: type[Exception]
     expected_message: str
 
 
 UNSUPPORTED_WIDGET_SCENARIOS: dict[str, UnsupportedWidgetScenario] = {
     "set_wrong_value_type": UnsupportedWidgetScenario(
-        "set", QLineEdit, 7, "Can't handle widget of type QLineEdit and value of type int"
+        operation="set",
+        factory=QLineEdit,
+        value=7,
+        expected_error_type=WidgetSetValueError,
+        expected_message="Can't handle widget of type QLineEdit and value of type int",
     ),
     "set_unknown_widget": UnsupportedWidgetScenario(
-        "set", QWidget, 7, "Can't handle widget of type QWidget and value of type int"
+        operation="set",
+        factory=QWidget,
+        value=7,
+        expected_error_type=WidgetSetValueError,
+        expected_message="Can't handle widget of type QWidget and value of type int",
     ),
     "set_unknown_widget_with_string": UnsupportedWidgetScenario(
-        "set", QWidget, "value", "Can't handle widget of type QWidget and value of type str"
+        operation="set",
+        factory=QWidget,
+        value="value",
+        expected_error_type=WidgetSetValueError,
+        expected_message="Can't handle widget of type QWidget and value of type str",
     ),
     "set_bool_on_spin_box": UnsupportedWidgetScenario(
-        "set", QSpinBox, True, "Can't handle widget of type QSpinBox and value of type bool"
+        operation="set",
+        factory=QSpinBox,
+        value=True,
+        expected_error_type=WidgetSetValueError,
+        expected_message="Can't handle widget of type QSpinBox and value of type bool",
     ),
     "set_bool_on_double_spin_box": UnsupportedWidgetScenario(
-        "set", QDoubleSpinBox, True, "Can't handle widget of type QDoubleSpinBox and value of type bool"
+        operation="set",
+        factory=QDoubleSpinBox,
+        value=True,
+        expected_error_type=WidgetSetValueError,
+        expected_message="Can't handle widget of type QDoubleSpinBox and value of type bool",
     ),
     "get_unknown_widget": UnsupportedWidgetScenario(
-        "get", QWidget, 0, "Don't know how to handle widget of type QWidget."
+        operation="get",
+        factory=QWidget,
+        value=0,
+        expected_error_type=ValueError,
+        expected_message="Don't know how to handle widget of type QWidget.",
     ),
 }
 
@@ -140,7 +166,7 @@ class TestUnsupportedWidgets:
     def test_raises(self, scenario: UnsupportedWidgetScenario, qapp: QApplication) -> None:
         """Unsupported mappings raise a descriptive ValueError."""
         widget = scenario.factory()
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(scenario.expected_error_type) as exc_info:
             if scenario.operation == "set":
                 set_from_cfg(widget, scenario.value)
             else:

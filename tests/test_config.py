@@ -2,6 +2,7 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 import json
+import os
 import pathlib
 import stat
 import typing
@@ -365,6 +366,74 @@ class TestConfigSaveToFile:
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
         Config(anki_connect_api_key=api_key).save_to_file()
         assert stat.S_IMODE(cfg_path.stat().st_mode) == CONFIG_FILE_MODE
+
+    def test_new_file_is_restricted_during_write(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """A new config temporary file is owner-only before writing the API key."""
+        cfg_path = tmp_path / "lancet.json"
+        observed_paths: list[pathlib.Path] = []
+        observed_modes: list[int] = []
+
+        def record_dump(
+            _data: object,
+            output: typing.TextIO,
+            *,
+            ensure_ascii: bool,
+            indent: int,
+        ) -> None:
+            observed_paths.append(pathlib.Path(output.name))
+            observed_modes.append(stat.S_IMODE(os.fstat(output.fileno()).st_mode))
+            output.write("{}")
+
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        monkeypatch.setattr("lancet.config.json.dump", record_dump)
+        Config(anki_connect_api_key="secret").save_to_file()
+
+        assert len(observed_paths) == 1
+        assert observed_paths[0].parent == cfg_path.parent
+        assert observed_paths[0] != cfg_path
+        assert observed_modes == [CONFIG_FILE_MODE]
+        assert cfg_path.read_text(encoding="utf-8") == "{}"
+        assert observed_paths[0].exists() is False
+
+    def test_failed_save_does_not_chmod_directory(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """A directory at the config path keeps its mode when replacement fails."""
+        cfg_path = tmp_path / "lancet.json"
+        cfg_path.mkdir()
+        cfg_path.chmod(0o755)
+        mode_before = stat.S_IMODE(cfg_path.stat().st_mode)
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+
+        with pytest.raises(OSError):
+            Config().save_to_file()
+
+        assert stat.S_IMODE(cfg_path.stat().st_mode) == mode_before
+
+    def test_failed_serialization_preserves_existing_config(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """A failed temporary write leaves the previous config file untouched."""
+        cfg_path = tmp_path / "lancet.json"
+        original_content = '{"old": true}'
+        cfg_path.write_text(original_content, encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        monkeypatch.setattr(
+            "lancet.config.json.dump", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("write failed"))
+        )
+
+        with pytest.raises(OSError, match="write failed"):
+            Config().save_to_file()
+
+        assert cfg_path.read_text(encoding="utf-8") == original_content
 
 
 class TestConfigReadInvalidFile:

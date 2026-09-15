@@ -39,6 +39,7 @@ NOTE_ID = 42
 IMAGE_FIELD = "Image"
 IMAGE_DATA = b"image"
 IMAGE_FILENAME = "lancet_42_2026-09-12-12-30-45.webp"
+AVIF_IMAGE_FILENAME = "lancet_42_2026-09-12-12-30-45.avif"
 UPDATE_ERROR_MESSAGE = "update failed"
 THREAD_WAIT_TIMEOUT_SEC = 5
 
@@ -147,6 +148,7 @@ class FilenameScenario(typing.NamedTuple):
 
 FILENAME_SCENARIOS: dict[str, FilenameScenario] = {
     "webp": FilenameScenario(note_id=NOTE_ID, container="webp", expected_filename=IMAGE_FILENAME),
+    "avif": FilenameScenario(note_id=NOTE_ID, container="avif", expected_filename=AVIF_IMAGE_FILENAME),
 }
 
 

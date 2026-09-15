@@ -336,6 +336,12 @@ TRAY_CALLBACK_NAMES: typing.Final[Sequence[str]] = (
     "open_about",
     "quit",
 )
+EXPECTED_FEATURE_ACTIONS: typing.Final[Sequence[LancetAction]] = (
+    LancetAction.screenshot,
+    LancetAction.screenshot_to_anki,
+    LancetAction.ocr,
+    LancetAction.detect_and_ocr,
+)
 SYSTEM_ACTION_CALLBACK_NAMES: typing.Final[dict[str, str]] = {
     "Preferences…": "open_preferences",
     "Restart": "restart",
@@ -567,6 +573,7 @@ def assert_tray_menu(
     assert menu is not None
     assert [action.text() for action in menu.actions()] == list(expected_actions)
     assert menu.actions()[4].isSeparator() is True
+    assert tuple(action.data() for action in menu.actions()[:4]) == EXPECTED_FEATURE_ACTIONS
     assert [action.icon().pixmap(32, 32).toImage() for action in menu.actions()[:4]] == [
         QIcon(str(icon_path)).pixmap(32, 32).toImage() for icon_path in expected_feature_icons
     ]

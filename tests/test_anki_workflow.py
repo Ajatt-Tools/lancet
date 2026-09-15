@@ -148,7 +148,7 @@ ATTACHMENT_SCENARIOS: dict[str, AttachmentScenario] = {
     "configured_avif": AttachmentScenario(
         image_format=AnkiImageFormat.avif,
         image_parameters=ImageParameters(width=400, height=250, quality=33),
-        filename="lancet.webp",
+        filename="lancet.avif",
     ),
 }
 
@@ -414,7 +414,7 @@ class TestAnkiWorkflow:
             )
 
     @pytest.mark.parametrize("scenario", CANCELLATION_SCENARIOS.values(), ids=CANCELLATION_SCENARIOS.keys())
-    def test_cancelled_selection_notifies_without_submission(
+    def test_canceled_selection_notifies_without_submission(
         self, scenario: CancellationScenario, workflow_context: AnkiWorkflowContext
     ) -> None:
         """A conversion failure reports one error without submitting encoding or attachment work."""
