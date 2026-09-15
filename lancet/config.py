@@ -3,7 +3,12 @@
 import dataclasses
 import enum
 import json
+import os
+import pathlib
+import tempfile
 import typing
+from collections.abc import Mapping
+from contextlib import AbstractContextManager
 
 from beartype.roar import BeartypeCallHintParamViolation
 from loguru import logger
@@ -70,6 +75,36 @@ def read_config_dict() -> dict[str, typing.Any]:
     if not isinstance(data, dict):
         raise ConfigReadError("failed to parse config file: top-level JSON value must be an object")
     return data
+
+
+def make_temp_config_file() -> AbstractContextManager[typing.IO[str]]:
+    """Create an open text temporary file for atomic config replacement."""
+    return tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        prefix=f".{CFG_PATH.name}.",
+        suffix=".tmp",
+        dir=CFG_PATH.parent,
+        delete=False,
+    )
+
+
+def write_config_dict(data: Mapping[str, object]) -> None:
+    """Atomically write config through an owner-only sibling temporary file."""
+    CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: pathlib.Path | None = None
+    try:
+        with make_temp_config_file() as output:
+            temp_path: pathlib.Path = pathlib.Path(output.name)
+            temp_path.chmod(CONFIG_FILE_MODE)
+            json.dump(data, output, ensure_ascii=False, indent=4)
+            output.flush()
+            os.fsync(output.fileno())
+        assert temp_path is not None
+        temp_path.replace(CFG_PATH)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 @dataclasses.dataclass
@@ -152,13 +187,7 @@ class Config:
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
         data["anki_image_format"] = data["anki_image_format"].name
-        CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with open(CFG_PATH, "w", encoding="utf-8") as of:
-                json.dump(data, of, ensure_ascii=False, indent=4)
-        finally:
-            if CFG_PATH.exists():
-                CFG_PATH.chmod(CONFIG_FILE_MODE)
+        write_config_dict(data)
 
     def get_pynput_shortcuts(self) -> ShortcutConversionResult:
         """Return a mapping of key combinations to their shortcut actions."""

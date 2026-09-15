@@ -58,7 +58,8 @@ The shortcut can be changed on the **Main** tab with Lancet's other shortcuts.
 Width and height are maximum bounds.
 `0` leaves an axis unconstrained, and images are never enlarged.
 The API key is masked in Preferences
-but stored in Lancet's plaintext JSON configuration file with owner-only file permissions.
+but stored in Lancet's plaintext JSON configuration file.
+On POSIX systems, Lancet writes that file with owner-only permissions.
 The field separator controls the HTML placed before each appended image.
 It defaults to `<br>` and may be empty.
 
