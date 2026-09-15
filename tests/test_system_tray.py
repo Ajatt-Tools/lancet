@@ -19,6 +19,7 @@ from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 
 from lancet.actions import LancetAction
+from lancet.anki.workflow import AnkiWorkflow
 from lancet.config import Config, make_preview_opts
 from lancet.consts import (
     ANKI_SCREENSHOT_ICON_PATH,
@@ -286,6 +287,8 @@ class TrayDependencies(typing.NamedTuple):
     history: OcrHistory
     loader: BackgroundModelLoader
     hotkeys: LancetShortcutManager
+    anki_workflow: AnkiWorkflow
+    start_anki_screenshot: Mock
     ocr_service: OcrService
     executor: concurrent.futures.ThreadPoolExecutor
     load_all: Mock
@@ -350,6 +353,11 @@ def make_tray_dependencies() -> TrayDependencies:
     open_dialogs = create_autospec(OpenDialogs, instance=True)
     dialog_locked = Mock(return_value=False)
     open_dialogs.is_locked = dialog_locked
+    anki_workflow = create_autospec(AnkiWorkflow, instance=True)
+    start_listener = hotkeys.start_listener
+    start_anki_screenshot = anki_workflow.screenshot_and_add_to_anki
+    assert isinstance(start_listener, Mock)
+    assert isinstance(start_anki_screenshot, Mock)
     return TrayDependencies(
         notify=create_autospec(NotifySend, instance=True),
         screenshot=create_autospec(ZalaScreenshot, instance=True),
@@ -359,10 +367,12 @@ def make_tray_dependencies() -> TrayDependencies:
         history=create_autospec(OcrHistory, instance=True),
         loader=loader,
         hotkeys=hotkeys,
+        anki_workflow=anki_workflow,
+        start_anki_screenshot=start_anki_screenshot,
         ocr_service=create_autospec(OcrService, instance=True),
         executor=create_autospec(concurrent.futures.ThreadPoolExecutor, instance=True),
-        load_all=typing.cast(Mock, loader.load_all),
-        start_listener=typing.cast(Mock, hotkeys.start_listener),
+        load_all=loader.load_all,
+        start_listener=start_listener,
     )
 
 
@@ -396,7 +406,11 @@ def install_tray_constructor_patches(stack: ExitStack, dependencies: TrayDepende
     basic = install_basic_tray_patches(stack, dependencies)
     loader_new = enter_autospec_patch(stack, "lancet.system_tray.BackgroundModelLoader.new", dependencies.loader)
     workflow_type = stack.enter_context(patch("lancet.system_tray.OcrWorkflow", autospec=True))
-    anki_workflow_type = stack.enter_context(patch("lancet.system_tray.AnkiWorkflow", autospec=True))
+    anki_workflow_type = enter_autospec_patch(
+        stack,
+        "lancet.system_tray.AnkiWorkflow",
+        dependencies.anki_workflow,
+    )
     ocr_service_type = enter_autospec_patch(stack, "lancet.system_tray.OcrService", dependencies.ocr_service)
     hotkeys_type = enter_autospec_patch(stack, "lancet.system_tray.LancetShortcutManager", dependencies.hotkeys)
     return TrayConstructorPatches(
@@ -580,6 +594,15 @@ class TestLancetSystemTrayConstruction:
                 assert_tray_wiring(context, cfg, qapp)
                 assert_tray_constructor_dependencies(context, cfg, qapp)
                 assert_tray_callbacks(context)
+
+    def test_anki_screenshot_delegates_to_workflow(self, qapp: QApplication) -> None:
+        """The real tray action starts the constructed Anki workflow once."""
+        context = create_tray_test_context(qapp, Config())
+        with ExitStack() as stack:
+            stack.callback(context.tray._executor.shutdown, wait=True)
+            context.tray.make_anki_screenshot()
+
+        context.dependencies.start_anki_screenshot.assert_called_once_with()
 
 
 class TrayCommandScenario(typing.NamedTuple):
