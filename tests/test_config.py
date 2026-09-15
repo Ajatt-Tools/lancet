@@ -200,6 +200,24 @@ IMAGE_SETTINGS_SCENARIOS: dict[str, ImageSettingsScenario] = {
 }
 
 
+class BooleanImageSettingScenario(typing.NamedTuple):
+    """A persisted boolean image setting and its normalized integer value."""
+
+    key: str
+    serialized: bool
+    expected: int
+
+
+BOOLEAN_IMAGE_SETTING_SCENARIOS: dict[str, BooleanImageSettingScenario] = {
+    "width_true": BooleanImageSettingScenario(key="anki_image_width", serialized=True, expected=1),
+    "width_false": BooleanImageSettingScenario(key="anki_image_width", serialized=False, expected=0),
+    "height_true": BooleanImageSettingScenario(key="anki_image_height", serialized=True, expected=1),
+    "height_false": BooleanImageSettingScenario(key="anki_image_height", serialized=False, expected=0),
+    "quality_true": BooleanImageSettingScenario(key="anki_image_quality", serialized=True, expected=1),
+    "quality_false": BooleanImageSettingScenario(key="anki_image_quality", serialized=False, expected=0),
+}
+
+
 class TestConfigAnkiImageSettings:
     """Test Anki image dimension and quality normalization at configuration boundaries."""
 
@@ -227,6 +245,22 @@ class TestConfigAnkiImageSettings:
         assert cfg.anki_image_height == scenario.expected.height
         assert cfg.anki_image_quality == scenario.expected.quality
 
+    @pytest.mark.parametrize(
+        "scenario", BOOLEAN_IMAGE_SETTING_SCENARIOS.values(), ids=BOOLEAN_IMAGE_SETTING_SCENARIOS.keys()
+    )
+    def test_read_normalizes_boolean_values(
+        self, scenario: BooleanImageSettingScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        """Persisted booleans become UI-compatible integers despite bool subclassing int."""
+        cfg_path = tmp_path / "lancet.json"
+        cfg_path.write_text(json.dumps({scenario.key: scenario.serialized}), encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+
+        value = getattr(Config.read_from_file(), scenario.key)
+
+        assert type(value) is int
+        assert value == scenario.expected
+
     @pytest.mark.parametrize("scenario", IMAGE_SETTINGS_SCENARIOS.values(), ids=IMAGE_SETTINGS_SCENARIOS.keys())
     def test_save_clamps_dimensions(
         self, scenario: ImageSettingsScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
@@ -249,6 +283,13 @@ class TestConfigAnkiImageSettings:
         assert saved["anki_image_width"] == scenario.expected.width
         assert saved["anki_image_height"] == scenario.expected.height
         assert saved["anki_image_quality"] == scenario.expected.quality
+
+    @pytest.mark.parametrize("scenario", IMAGE_SETTINGS_SCENARIOS.values(), ids=IMAGE_SETTINGS_SCENARIOS.keys())
+    def test_image_parameter_accessors(self, scenario: ImageSettingsScenario) -> None:
+        """Grouped image parameters preserve all three values without swappable assignments."""
+        cfg = Config()
+        cfg.set_anki_image_parameters(scenario.source)
+        assert cfg.anki_image_parameters() == scenario.source
 
 
 class AnkiTextScenario(typing.NamedTuple):
@@ -504,6 +545,26 @@ class TestConfigSaveToFile:
 
         assert exc_info.value is write_error
         assert str(exc_info.value) == "write failed"
+        assert cfg_path.read_text(encoding="utf-8") == original_content
+        assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
+
+    def test_failed_fsync_preserves_existing_config(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """A failed durability flush leaves the previous config and no temporary sibling."""
+        cfg_path = tmp_path / "lancet.json"
+        original_content = '{"old": true}'
+        fsync_error = OSError("fsync failed")
+        cfg_path.write_text(original_content, encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        monkeypatch.setattr("lancet.config.os.fsync", create_autospec(os.fsync, side_effect=fsync_error))
+
+        with pytest.raises(OSError) as exc_info:
+            Config().save_to_file()
+
+        assert exc_info.value is fsync_error
         assert cfg_path.read_text(encoding="utf-8") == original_content
         assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
 

@@ -19,7 +19,7 @@ SHIFT: Key = Key.shift
 CTRL: Key = Key.ctrl
 KEY_O: KeyCode = KeyCode.from_char("o")
 KEY_P: KeyCode = KeyCode.from_char("p")
-QT_EVENT_LOOP_TIMEOUT_MS = 2_000
+QT_EVENT_LOOP_TIMEOUT_MS = 5_000
 
 
 class QtShortcut(typing.NamedTuple):

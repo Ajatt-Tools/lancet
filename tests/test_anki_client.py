@@ -16,6 +16,7 @@ from lancet.anki.client import (
     ANKI_CONNECT_TIMEOUT_SEC,
     AnkiConnectClient,
     AnkiConnectClientFactory,
+    is_http_redirect_status,
     join_html_content,
     make_image_filename,
 )
@@ -76,6 +77,34 @@ REQUEST_FAILURE_SCENARIOS: dict[str, RequestFailureScenario] = {
         error_message="request timed out",
         expected_error_type=AnkiConnectError,
     ),
+}
+
+
+class RedirectScenario(typing.NamedTuple):
+    """One redirect-like response status and its Requests redirect classification."""
+
+    status_code: int
+    is_redirect: bool
+
+
+REDIRECT_SCENARIOS: dict[str, RedirectScenario] = {
+    "redirect_with_location": RedirectScenario(status_code=302, is_redirect=True),
+    "redirect_without_location": RedirectScenario(status_code=302, is_redirect=False),
+}
+
+
+class RedirectStatusScenario(typing.NamedTuple):
+    """An HTTP status code and whether it belongs to the redirect range."""
+
+    status_code: int
+    expected: bool
+
+
+REDIRECT_STATUS_SCENARIOS: dict[str, RedirectStatusScenario] = {
+    "before_range": RedirectStatusScenario(status_code=299, expected=False),
+    "first_redirect": RedirectStatusScenario(status_code=300, expected=True),
+    "last_redirect": RedirectStatusScenario(status_code=399, expected=True),
+    "after_range": RedirectStatusScenario(status_code=400, expected=False),
 }
 
 
@@ -144,6 +173,21 @@ ATTACHMENT_SCENARIOS: dict[str, AttachmentScenario] = {
     "default_break": AttachmentScenario("<br>", '<p>existing</p><br><img src="lancet_actual.webp">'),
     "custom_rule": AttachmentScenario("<hr>", '<p>existing</p><hr><img src="lancet_actual.webp">'),
     "empty_separator": AttachmentScenario("", '<p>existing</p><img src="lancet_actual.webp">'),
+}
+
+
+class EscapedFilenameScenario(typing.NamedTuple):
+    """An Anki-assigned filename and the escaped image HTML expected in the field."""
+
+    filename: str
+    expected_html: str
+
+
+ESCAPED_FILENAME_SCENARIOS: dict[str, EscapedFilenameScenario] = {
+    "quote_in_filename": EscapedFilenameScenario(
+        filename='assigned" onerror="alert(1).webp',
+        expected_html='<p>existing</p><br><img src="assigned&quot; onerror=&quot;alert(1).webp">',
+    ),
 }
 
 
@@ -416,10 +460,11 @@ def make_client(cfg: Config) -> AnkiConnectClient:
     return AnkiConnectClientFactory(cfg).create()
 
 
-def make_response(*, payload: object, is_redirect: bool = False) -> Mock:
-    """Create an AnkiConnect HTTP response with a validated redirect flag."""
+def make_response(*, payload: object, status_code: int = 200, is_redirect: bool = False) -> Mock:
+    """Create an AnkiConnect HTTP response with status and redirect metadata."""
     response = create_autospec(requests.Response, instance=True)
     response.json.return_value = payload
+    response.status_code = status_code
     response.is_redirect = is_redirect
     return response
 
@@ -478,6 +523,11 @@ def expected_side_effect_params(scenario: SideEffectScenario) -> AnkiConnectPara
 class TestAnkiConnectInvoke:
     """Test protocol payload construction and response validation."""
 
+    @pytest.mark.parametrize("scenario", REDIRECT_STATUS_SCENARIOS.values(), ids=REDIRECT_STATUS_SCENARIOS.keys())
+    def test_redirect_status_range(self, scenario: RedirectStatusScenario) -> None:
+        """Only HTTP statuses from 300 through 399 are redirects."""
+        assert is_http_redirect_status(scenario.status_code) is scenario.expected
+
     @pytest.mark.parametrize("scenario", REQUEST_SCENARIOS.values(), ids=REQUEST_SCENARIOS.keys())
     def test_request_payload(self, scenario: RequestScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """Transport sends the configured endpoint, version-six payload, and timeout."""
@@ -520,9 +570,14 @@ class TestAnkiConnectInvoke:
         assert str(exc_info.value) == "Could not reach AnkiConnect: server error"
         assert exc_info.value.__cause__ is request_error
 
-    def test_redirect_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """AnkiConnect requests reject redirects instead of forwarding sensitive payloads."""
-        response = make_response(payload={"result": None, "error": None}, is_redirect=True)
+    @pytest.mark.parametrize("scenario", REDIRECT_SCENARIOS.values(), ids=REDIRECT_SCENARIOS.keys())
+    def test_redirect_status_is_rejected(self, scenario: RedirectScenario, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AnkiConnect rejects every 3xx response, including one without Location."""
+        response = make_response(
+            payload={"result": None, "error": None},
+            status_code=scenario.status_code,
+            is_redirect=scenario.is_redirect,
+        )
         monkeypatch.setattr("lancet.anki.client.requests.post", Mock(return_value=response))
 
         with pytest.raises(AnkiConnectError) as exc_info:
@@ -635,6 +690,20 @@ class TestAnkiNoteOperations:
             *attachment_commit_operations(scenario.expected_html),
             AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(NOTE_ID,)),
         )
+
+    @pytest.mark.parametrize("scenario", ESCAPED_FILENAME_SCENARIOS.values(), ids=ESCAPED_FILENAME_SCENARIOS.keys())
+    def test_attach_escapes_assigned_media_filename(
+        self, scenario: EscapedFilenameScenario, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Anki-assigned media filenames cannot inject markup into the target field."""
+        setup = create_attachment_setup(ATTACHMENT_SCENARIOS["default_break"], monkeypatch)
+        update = Mock()
+        monkeypatch.setattr(setup.client, "store_media", Mock(return_value=scenario.filename))
+        monkeypatch.setattr(setup.client, "update_note_field", update)
+
+        assert setup.client.attach_image(NOTE_ID, setup.image) == scenario.filename
+
+        assert update.call_args == call(NOTE_ID, scenario.expected_html)
 
     @pytest.mark.parametrize(
         "scenario", FINAL_BROWSE_FAILURE_SCENARIOS.values(), ids=FINAL_BROWSE_FAILURE_SCENARIOS.keys()

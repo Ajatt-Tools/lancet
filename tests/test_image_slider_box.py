@@ -141,6 +141,13 @@ class TestImageSliderBox:
             box.set_values(width=scenario.values.width, height=scenario.values.height, quality=scenario.values.quality)
         assert box.values() == scenario.values
 
+    @pytest.mark.parametrize("scenario", IMAGE_SLIDER_SCENARIOS.values(), ids=IMAGE_SLIDER_SCENARIOS.keys())
+    def test_set_image_parameters(self, scenario: ImageSliderScenario, qapp: QApplication) -> None:
+        """One ImageParameters value initializes all controls without swappable fields."""
+        box = ImageSliderBox()
+        box.set_image_parameters(scenario.values)
+        assert box.values() == scenario.values
+
     @pytest.mark.parametrize("scenario", LIMIT_SCENARIOS.values(), ids=LIMIT_SCENARIOS.keys())
     def test_limits(self, scenario: LimitScenario, qapp: QApplication) -> None:
         """Dimension limits clamp only values above their inclusive maximums."""
