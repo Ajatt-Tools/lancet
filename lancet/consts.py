@@ -3,11 +3,11 @@
 import os
 import pathlib
 import sys
-import typing
 
 type P = pathlib.Path
 type S = str
 type B = bool
+type Int = int
 
 APP_NAME: S = "Lancet"
 THIS_DIR: P = pathlib.Path(__file__).resolve().parent
@@ -30,10 +30,10 @@ HISTORY_FILE_PATH: P = CACHE_DIR_PATH / "ocr_history.json"
 GEOMETRY_FILE_PATH: P = CACHE_DIR_PATH / "geometry"
 
 # Default pane widths (px) for the preferences dialog splitter: settings on the left, OCR history on the right.
-PREFERENCES_SPLITTER_SETTINGS_WIDTH: typing.Final[int] = 400
-PREFERENCES_SPLITTER_HISTORY_WIDTH: typing.Final[int] = 300
-ANKI_IMAGE_MAX_DIMENSION: typing.Final[int] = 4096
-ANKI_IMAGE_MAX_QUALITY: typing.Final[int] = 100
+PREFERENCES_SPLITTER_SETTINGS_WIDTH: Int = 400
+PREFERENCES_SPLITTER_HISTORY_WIDTH: Int = 300
+ANKI_IMAGE_MAX_DIMENSION: Int = 4096
+ANKI_IMAGE_MAX_QUALITY: Int = 100
 
 IS_MAC: B = sys.platform.startswith("darwin")
 IS_WIN: B = sys.platform.startswith("win32")
