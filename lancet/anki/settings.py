@@ -6,7 +6,7 @@ import typing
 from lancet.config import Config
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class AnkiConnectSettings:
     """Connection and target-field settings for one Anki attachment operation."""
 
