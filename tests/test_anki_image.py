@@ -103,6 +103,31 @@ INVALID_PARAMETERS_SCENARIOS: dict[str, InvalidParametersScenario] = {
 }
 
 
+class EncodingFailureScenario(typing.NamedTuple):
+    """A Pillow save failure and the wrapped public image-encoding error."""
+
+    image_format: AnkiImageFormat
+    error_type: type[OSError] | type[ValueError]
+    error_message: str
+    expected_message: str
+
+
+ENCODING_FAILURE_SCENARIOS: dict[str, EncodingFailureScenario] = {
+    "webp_os_error": EncodingFailureScenario(
+        image_format=AnkiImageFormat.webp,
+        error_type=OSError,
+        error_message="encoder failed",
+        expected_message="Could not encode WEBP image: encoder failed",
+    ),
+    "avif_value_error": EncodingFailureScenario(
+        image_format=AnkiImageFormat.avif,
+        error_type=ValueError,
+        error_message="encoder failed",
+        expected_message="Could not encode AVIF image: encoder failed",
+    ),
+}
+
+
 class TestResizeImage:
     """Test Pillow resize behavior used for Anki attachments."""
 
@@ -148,3 +173,25 @@ class TestEncodeImage:
         with pytest.raises(AnkiImageEncodingError) as exc_info:
             encode_image(Image.new("RGB", (100, 100)), image_format=AnkiImageFormat.webp, settings=scenario.settings)
         assert str(exc_info.value) == scenario.expected_message
+
+    @pytest.mark.parametrize("scenario", ENCODING_FAILURE_SCENARIOS.values(), ids=ENCODING_FAILURE_SCENARIOS.keys())
+    def test_wraps_pillow_encoding_errors(
+        self, scenario: EncodingFailureScenario, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Pillow failures become exact public errors while retaining their cause identity."""
+        image = Image.new("RGB", (100, 100))
+        pillow_error = scenario.error_type(scenario.error_message)
+        resized = create_autospec(Image.Image, instance=True)
+        resized.save.side_effect = pillow_error
+        check = create_autospec(features.check, return_value=True)
+        resize = create_autospec(resize_image, return_value=resized)
+        monkeypatch.setattr("lancet.anki.image.features.check", check)
+        monkeypatch.setattr("lancet.anki.image.resize_image", resize)
+
+        with pytest.raises(AnkiImageEncodingError) as exc_info:
+            encode_image(image, image_format=scenario.image_format, settings=ENCODING_SETTINGS)
+
+        assert str(exc_info.value) == scenario.expected_message
+        assert exc_info.value.__cause__ is pillow_error
+        assert check.call_args == call(scenario.image_format.value)
+        assert resize.call_args == call(image, ENCODING_SETTINGS)
