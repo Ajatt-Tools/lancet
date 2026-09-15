@@ -127,11 +127,13 @@ class Config:
             self = cls(**data)
         except (TypeError, BeartypeCallHintParamViolation) as ex:
             raise ConfigReadError(f"failed to parse config file: {ex}") from ex
-        self.normalize_anki_image_settings()
+        self.normalize_anki_settings()
         return self
 
-    def normalize_anki_image_settings(self) -> None:
-        """Clamp Anki image dimensions and quality to the supported ranges."""
+    def normalize_anki_settings(self) -> None:
+        """Trim Anki target text and clamp image dimensions and quality to supported ranges."""
+        self.anki_connect_url = self.anki_connect_url.strip()
+        self.anki_image_field = self.anki_image_field.strip()
         self.anki_image_width = clamp(0, self.anki_image_width, ANKI_IMAGE_MAX_DIMENSION)
         self.anki_image_height = clamp(0, self.anki_image_height, ANKI_IMAGE_MAX_DIMENSION)
         self.anki_image_quality = clamp(0, self.anki_image_quality, ANKI_IMAGE_MAX_QUALITY)
@@ -143,7 +145,7 @@ class Config:
 
     def save_to_file(self) -> None:
         """Normalize and serialize the config to JSON."""
-        self.normalize_anki_image_settings()
+        self.normalize_anki_settings()
         data = dataclasses.asdict(self)
         data["copy_to"] = data["copy_to"].name
         data["anki_image_format"] = data["anki_image_format"].name
