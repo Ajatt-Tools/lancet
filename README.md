@@ -40,7 +40,7 @@ where you can change the OCR shortcut.
 ### Anki screenshots
 
 Lancet can attach a selected screen region to the `Image` field
-of the most recently added Anki note.
+of the newest Anki note added within the last day.
 This replaces a separate screenshot utility for image-card creation.
 
 1. Install and enable [AnkiConnect](https://ankiweb.net/shared/info/2055492159),
@@ -60,7 +60,8 @@ Width and height are maximum bounds.
 The API key is masked in Preferences
 but stored in Lancet's plaintext JSON configuration file.
 On POSIX systems, Lancet writes that file with owner-only permissions.
-Loopback AnkiConnect endpoints bypass `HTTP_PROXY` and `HTTPS_PROXY`.
+Literal `localhost` and numeric loopback AnkiConnect endpoints
+bypass `HTTP_PROXY` and `HTTPS_PROXY`.
 Custom remote endpoints retain normal proxy behavior.
 The field separator controls the HTML placed before each appended image.
 It defaults to `<br>` and may be empty.
