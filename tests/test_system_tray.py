@@ -14,6 +14,7 @@ from unittest.mock import Mock, create_autospec, patch
 import pytest
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
+from zala.exceptions import ZalaException
 from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 
@@ -279,6 +280,11 @@ EXPECTED_FEATURE_ACTIONS: typing.Final[Sequence[LancetAction]] = (
     LancetAction.ocr,
     LancetAction.detect_and_ocr,
 )
+SELECTION_ACTION_METHODS: typing.Final[dict[str, str]] = {
+    "screenshot": "make_screenshot_area",
+    "ocr": "make_ocr_screenshot",
+    "detect_and_ocr": "detect_and_make_ocr_screenshot",
+}
 SYSTEM_ACTION_CALLBACK_NAMES: typing.Final[dict[str, str]] = {
     "Preferences…": "open_preferences",
     "Restart": "restart",
@@ -632,6 +638,20 @@ class TestLancetSystemTrayConstruction:
             context.tray.make_anki_screenshot()
 
         context.dependencies.start_anki_screenshot.assert_called_once_with()
+
+    @pytest.mark.parametrize("method_name", SELECTION_ACTION_METHODS.values(), ids=SELECTION_ACTION_METHODS.keys())
+    def test_selection_failure_notifies(self, method_name: str, qapp: QApplication) -> None:
+        """Every screen-selection action reports a Zala startup failure once."""
+        context = create_tray_test_context(qapp, Config())
+        error = ZalaException("selection failed")
+        context.dependencies.take.select_area.side_effect = error
+        with ExitStack() as stack:
+            stack.callback(context.tray._executor.shutdown, wait=True)
+            log = stack.enter_context(patch("lancet.system_tray.logger.error"))
+            getattr(context.tray, method_name)()
+
+        log.assert_called_once_with("selection failed")
+        context.dependencies.notify.notify.assert_called_once_with("selection failed")
 
 
 class TrayCommandScenario(typing.NamedTuple):
