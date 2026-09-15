@@ -3,6 +3,7 @@
 
 import json
 import pathlib
+import stat
 import typing
 
 import pytest
@@ -14,6 +15,7 @@ from lancet.consts import (
     ANKI_FIELD_SEPARATOR,
     ANKI_IMAGE_MAX_DIMENSION,
     ANKI_IMAGE_MAX_QUALITY,
+    CONFIG_FILE_MODE,
 )
 from lancet.exceptions import ConfigReadError
 
@@ -200,6 +202,58 @@ class TestConfigAnkiImageSettings:
         assert saved["anki_image_quality"] == scenario.expected.quality
 
 
+class AnkiTextScenario(typing.NamedTuple):
+    """One persisted Anki text field and the value retained at both config boundaries."""
+
+    key: str
+    serialized: str
+    expected: str
+
+
+ANKI_TEXT_SCENARIOS: dict[str, AnkiTextScenario] = {
+    "connect_url_strips": AnkiTextScenario(
+        key="anki_connect_url",
+        serialized="  http://127.0.0.1:8765  ",
+        expected="http://127.0.0.1:8765",
+    ),
+    "image_field_strips": AnkiTextScenario(
+        key="anki_image_field",
+        serialized="  Image  ",
+        expected="Image",
+    ),
+    "api_key_preserves": AnkiTextScenario(
+        key="anki_connect_api_key",
+        serialized="  key  ",
+        expected="  key  ",
+    ),
+    "separator_preserves": AnkiTextScenario(
+        key="anki_field_separator",
+        serialized="  <hr>  ",
+        expected="  <hr>  ",
+    ),
+}
+
+
+class TestConfigAnkiTextSettings:
+    """Test Anki text normalization at persisted configuration boundaries."""
+
+    @pytest.mark.parametrize("scenario", ANKI_TEXT_SCENARIOS.values(), ids=ANKI_TEXT_SCENARIOS.keys())
+    def test_read_and_save(
+        self,
+        scenario: AnkiTextScenario,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """URL and field trim while API keys and HTML separators preserve significant whitespace."""
+        cfg_path = tmp_path / "lancet.json"
+        cfg_path.write_text(json.dumps({scenario.key: scenario.serialized}), encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        cfg = Config.read_from_file()
+        assert getattr(cfg, scenario.key) == scenario.expected
+        cfg.save_to_file()
+        assert json.loads(cfg_path.read_text(encoding="utf-8"))[scenario.key] == scenario.expected
+
+
 class AnkiDefaultsScenario(typing.NamedTuple):
     """The Anki defaults that must produce an enabled screenshot shortcut."""
 
@@ -291,6 +345,26 @@ class TestConfigSaveToFile:
         assert loaded.anki_image_format == scenario.image_format
         assert loaded.anki_field_separator == scenario.field_separator
         assert loaded.path_to_goldendict_executable == scenario.goldendict_path
+
+    CONFIG_PERMISSION_SCENARIOS: dict[str, str] = {"existing_permissive_file": "secret"}
+
+    @pytest.mark.parametrize(
+        "api_key",
+        CONFIG_PERMISSION_SCENARIOS.values(),
+        ids=CONFIG_PERMISSION_SCENARIOS.keys(),
+    )
+    def test_restricts_file_permissions(
+        self,
+        api_key: str,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """Saving a plaintext Anki API key restricts the configuration file mode."""
+        cfg_path = tmp_path / "lancet.json"
+        cfg_path.touch(mode=0o644)
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        Config(anki_connect_api_key=api_key).save_to_file()
+        assert stat.S_IMODE(cfg_path.stat().st_mode) == CONFIG_FILE_MODE
 
 
 class TestConfigReadInvalidFile:

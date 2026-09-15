@@ -336,6 +336,12 @@ TRAY_CALLBACK_NAMES: typing.Final[Sequence[str]] = (
     "open_about",
     "quit",
 )
+SYSTEM_ACTION_CALLBACK_NAMES: typing.Final[dict[str, str]] = {
+    "Preferences…": "open_preferences",
+    "Restart": "restart",
+    "About…": "open_about",
+    "Exit": "quit",
+}
 
 
 def make_shortcut_manager_mock() -> LancetShortcutManager:
@@ -566,17 +572,54 @@ def assert_tray_menu(
     ]
 
 
+def reset_tray_callback_mocks(context: TrayTestContext) -> None:
+    """Clear all observable action effects before triggering one menu action."""
+    anki_workflow = context.patches.constructors.anki_workflow_type.return_value
+    ocr_workflow = context.patches.constructors.workflow_type.return_value
+    for callback in context.patches.callbacks:
+        callback.reset_mock()
+    context.dependencies.take.select_area.reset_mock()
+    anki_workflow.screenshot_and_add_to_anki.reset_mock()
+    ocr_workflow.run_ocr.reset_mock()
+    ocr_workflow.run_speech_bubble_ocr.reset_mock()
+
+
+def assert_feature_action_effect(context: TrayTestContext, action: LancetAction) -> None:
+    """Assert the expected observable effect for one dispatched feature action."""
+    anki_workflow = context.patches.constructors.anki_workflow_type.return_value
+    ocr_workflow = context.patches.constructors.workflow_type.return_value
+    match action:
+        case LancetAction.screenshot:
+            expected_callback = context.tray.process_select_result
+        case LancetAction.screenshot_to_anki:
+            anki_workflow.screenshot_and_add_to_anki.assert_called_once_with()
+            return
+        case LancetAction.ocr:
+            expected_callback = ocr_workflow.run_ocr
+        case LancetAction.detect_and_ocr:
+            expected_callback = ocr_workflow.run_speech_bubble_ocr
+    context.dependencies.take.select_area.assert_called_once_with(
+        on_finish=expected_callback,
+        opts=make_preview_opts(context.tray._cfg),
+    )
+
+
 def assert_tray_callbacks(context: TrayTestContext) -> None:
     """Trigger every feature/system action and verify its exclusive callback."""
     menu = context.tray.contextMenu()
     assert menu is not None
-    actions = [action for action in menu.actions() if not action.isSeparator()]
-    for selected_action, selected_callback in zip(actions, context.patches.callbacks, strict=True):
-        for callback in context.patches.callbacks:
-            callback.reset_mock()
-        selected_action.trigger()
-        assert selected_callback.call_count == 1
-        assert sum(callback.call_count for callback in context.patches.callbacks) == 1
+    callbacks_by_name: dict[str, Mock] = dict(zip(TRAY_CALLBACK_NAMES, context.patches.callbacks, strict=True))
+    for action in menu.actions():
+        if action.isSeparator():
+            continue
+        reset_tray_callback_mocks(context)
+        action.trigger()
+        if isinstance(action.data(), LancetAction):
+            assert_feature_action_effect(context, action.data())
+            continue
+        callback = callbacks_by_name[SYSTEM_ACTION_CALLBACK_NAMES[action.text()]]
+        assert callback.call_count == 1
+        assert sum(item.call_count for item in context.patches.callbacks) == 1
 
 
 class TestLancetSystemTrayConstruction:

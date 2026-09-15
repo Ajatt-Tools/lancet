@@ -7,7 +7,7 @@ import enum
 import threading
 import typing
 from collections.abc import Sequence
-from unittest.mock import Mock, call, create_autospec
+from unittest.mock import Mock, call, create_autospec, patch
 
 import pytest
 import requests
@@ -123,6 +123,17 @@ ATTACHMENT_SCENARIOS: dict[str, AttachmentScenario] = {
     "default_break": AttachmentScenario("<br>", '<p>existing</p><br><img src="lancet_actual.webp">'),
     "custom_rule": AttachmentScenario("<hr>", '<p>existing</p><hr><img src="lancet_actual.webp">'),
     "empty_separator": AttachmentScenario("", '<p>existing</p><img src="lancet_actual.webp">'),
+}
+
+
+class FinalBrowseFailureScenario(typing.NamedTuple):
+    """A Browser-refresh transport error that must not change attachment success."""
+
+    error_message: str
+
+
+FINAL_BROWSE_FAILURE_SCENARIOS: dict[str, FinalBrowseFailureScenario] = {
+    "browser_exits_after_update": FinalBrowseFailureScenario(error_message="Anki exited"),
 }
 
 
@@ -254,6 +265,10 @@ class ConcurrentAttachmentContext:
             scenario.update_error_type(scenario.update_error_message) if scenario.update_error_type else None
         )
         self.second_invoke = create_autospec(self.second_client.invoke)
+        self._install_transaction_mocks(monkeypatch)
+
+    def _install_transaction_mocks(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Install the blocked first transaction and transport-free second-client spies."""
         monkeypatch.setattr(self.first_client, "browse_note", self._browse_note)
         monkeypatch.setattr(
             self.first_client, "note_field", create_autospec(self.first_client.note_field, return_value="")
@@ -543,14 +558,45 @@ class TestAnkiNoteOperations:
             AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(NOTE_ID,)),
         )
 
+    @pytest.mark.parametrize(
+        "scenario", FINAL_BROWSE_FAILURE_SCENARIOS.values(), ids=FINAL_BROWSE_FAILURE_SCENARIOS.keys()
+    )
+    def test_final_browser_refresh_failure_preserves_attachment_success(
+        self, scenario: FinalBrowseFailureScenario, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A post-update Browser refresh failure logs a warning without failing the committed attachment."""
+        setup = create_attachment_setup(ATTACHMENT_SCENARIOS["default_break"], monkeypatch)
+        refresh_error = AnkiConnectError(scenario.error_message)
+        browse = Mock(side_effect=[None, refresh_error])
+        monkeypatch.setattr(setup.client, "browse_note", browse)
+        with patch("lancet.anki.client.logger.warning") as warning:
+            assert setup.client.attach_image(NOTE_ID, setup.image) == "lancet_actual.webp"
+        assert browse.mock_calls == [call(0), call(NOTE_ID)]
+        assert setup.operations.calls == (
+            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID,)),
+            AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
+            AttachmentOperationCall(
+                name=AttachmentOperation.update_note_field,
+                args=(NOTE_ID, '<p>existing</p><br><img src="lancet_actual.webp">'),
+            ),
+        )
+        warning.assert_called_once_with(f"Anki attachment succeeded but Browser refresh failed: {refresh_error}")
+
     def test_failed_update_preserves_uploaded_media(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Ambiguous update failures leave uploaded media for Anki Check Media to reconcile."""
         attachment = create_attachment_setup(ATTACHMENT_SCENARIOS["default_break"], monkeypatch)
         expected_error = AnkiConnectError(UPDATE_ERROR_MESSAGE)
-        monkeypatch.setattr(attachment.client, "update_note_field", Mock(side_effect=expected_error))
+        update = Mock(side_effect=expected_error)
+        monkeypatch.setattr(attachment.client, "update_note_field", update)
         with pytest.raises(AnkiConnectError) as exc_info:
             attachment.client.attach_image(NOTE_ID, attachment.image)
         assert exc_info.value is expected_error
+        assert attachment.operations.calls == (
+            AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(0,)),
+            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID,)),
+            AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
+        )
+        assert update.call_args == call(NOTE_ID, '<p>existing</p><br><img src="lancet_actual.webp">')
 
     @pytest.mark.parametrize(
         "scenario", ATTACHMENT_TRANSACTION_SCENARIOS.values(), ids=ATTACHMENT_TRANSACTION_SCENARIOS.keys()

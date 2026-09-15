@@ -164,6 +164,27 @@ class ExplodingSuccess:
         raise RuntimeError(self._error_message)
 
 
+class ExplodingFailure:
+    """Exit the event loop and then raise from a failure callback."""
+
+    def __init__(self, loop: QEventLoop, error_message: str) -> None:
+        """Store the loop and callback error message for one logging scenario."""
+        self._loop = loop
+        self._error_message = error_message
+        self._was_called = False
+
+    @property
+    def was_called(self) -> bool:
+        """Return whether the exploding failure callback ran."""
+        return self._was_called
+
+    def __call__(self, _: Exception) -> None:
+        """Exit the loop and raise to verify failure callback errors are logged separately."""
+        self._was_called = True
+        self._loop.quit()
+        raise RuntimeError(self._error_message)
+
+
 class TrackingThreadOp(LancetThreadOp[int]):
     """Expose whether dispatched operations request deferred QObject deletion."""
 
@@ -254,6 +275,14 @@ class TestLancetThreadOp:
             operation.run_in_background()
         assert str(exc_info.value) == scenario.expected_error
 
+    def test_rejects_construction_without_application(self, executor: concurrent.futures.ThreadPoolExecutor) -> None:
+        """A queued callback operation requires a live Qt application owner."""
+        with patch("lancet.ocr.thread_op.QCoreApplication.instance", return_value=None):
+            with pytest.raises(MangaOCRException) as exc_info:
+                LancetThreadOp(op=WorkerThreadId(), executor=executor)
+
+        assert str(exc_info.value) == "LancetThreadOp requires an active Qt application"
+
     @pytest.mark.parametrize("scenario", CALLBACK_FAILURE_SCENARIOS.values(), ids=CALLBACK_FAILURE_SCENARIOS.keys())
     def test_callback_failure_is_logged_without_failure_rerouting(
         self, scenario: CallbackFailureScenario, executor: concurrent.futures.ThreadPoolExecutor
@@ -269,4 +298,23 @@ class TestLancetThreadOp:
             wait_for_qt_event_loop(loop)
         assert success.was_called
         assert recorder.failure is None
+        assert log.call_args == call(f"LancetThreadOp completion callback failed: {scenario.error_message}")
+
+    @pytest.mark.parametrize("scenario", CALLBACK_FAILURE_SCENARIOS.values(), ids=CALLBACK_FAILURE_SCENARIOS.keys())
+    def test_failure_callback_error_is_logged(
+        self, scenario: CallbackFailureScenario, executor: concurrent.futures.ThreadPoolExecutor
+    ) -> None:
+        """A failure callback bug is logged and does not invoke the success callback."""
+        loop = QEventLoop()
+        failure = ExplodingFailure(loop, scenario.error_message)
+        recorder = CallbackRecorder(loop)
+        error = RuntimeError("operation failed")
+        with patch("lancet.ocr.thread_op.logger.exception") as log:
+            TrackingThreadOp(op=FailingOperation(error), executor=executor).success(recorder.on_success).failure(
+                failure
+            ).run_in_background()
+            wait_for_qt_event_loop(loop)
+
+        assert failure.was_called
+        assert recorder.success_value is None
         assert log.call_args == call(f"LancetThreadOp completion callback failed: {scenario.error_message}")

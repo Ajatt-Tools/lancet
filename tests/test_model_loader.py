@@ -26,6 +26,8 @@ from lancet.text_detector_client.text_detector_base import (
 )
 from tests.helpers import wait_for_qt_event_loop
 
+MODEL_LOADER_WAIT_TIMEOUT_MS = 5_000
+
 
 class FakeMangaOcr(MangaOcrBase):
     """Minimal MangaOcrBase implementation used to verify reload behavior."""
@@ -95,7 +97,7 @@ class ModelLoaderSettler:
         qconnect(poll.timeout, self._quit_if_settled)
         poll.start(1)
         try:
-            wait_for_qt_event_loop(self._loop)
+            wait_for_qt_event_loop(self._loop, timeout_ms=MODEL_LOADER_WAIT_TIMEOUT_MS)
         finally:
             poll.stop()
 

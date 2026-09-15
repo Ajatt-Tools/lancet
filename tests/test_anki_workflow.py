@@ -220,10 +220,14 @@ class DialogLockScenario(typing.NamedTuple):
     """A preflight note ID whose delayed selector must be blocked by a dialog lock."""
 
     note_id: int
+    expected_notification: str
 
 
 DIALOG_LOCK_SCENARIOS: dict[str, DialogLockScenario] = {
-    "dialog_opens_during_preflight": DialogLockScenario(note_id=NOTE_ID),
+    "dialog_opens_during_preflight": DialogLockScenario(
+        note_id=NOTE_ID,
+        expected_notification="Anki attachment skipped because a dialog is open.",
+    ),
 }
 
 
@@ -481,6 +485,7 @@ class TestAnkiWorkflow:
         wait_for_qt_event_loop(loop)
         assert lock.check_count == 1
         workflow_context.take.select_area.assert_not_called()
+        workflow_context.notify.notify.assert_called_once_with(scenario.expected_notification)
 
     @pytest.mark.parametrize(
         "scenario", FAILURE_NOTIFICATION_SCENARIOS.values(), ids=FAILURE_NOTIFICATION_SCENARIOS.keys()
