@@ -374,6 +374,26 @@ def workflow_context() -> Iterator[AnkiWorkflowContext]:
 class TestAnkiWorkflow:
     """Test Anki workflow conversion, target stability, and notification behavior."""
 
+    def test_constructs_default_client_factory(self) -> None:
+        """Omitting the optional factory constructs and retains one factory from the live config."""
+        cfg = Config()
+        notify = create_autospec(NotifySend, instance=True)
+        take = create_autospec(ZalaTakeScreenRegion, instance=True)
+        open_dialogs = create_autospec(OpenDialogs, instance=True)
+        factory = create_autospec(AnkiConnectClientFactory, instance=True)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            with patch("lancet.anki.workflow.AnkiConnectClientFactory", return_value=factory) as factory_type:
+                workflow = AnkiWorkflow(
+                    cfg,
+                    executor=executor,
+                    notify=notify,
+                    take=take,
+                    open_dialogs=open_dialogs,
+                )
+
+        factory_type.assert_called_once_with(cfg)
+        assert workflow._client_factory is factory
+
     @pytest.mark.parametrize("scenario", ATTACHMENT_SCENARIOS.values(), ids=ATTACHMENT_SCENARIOS.keys())
     def test_attach_image_uses_current_config(self, scenario: AttachmentScenario) -> None:
         """A job uses the format and non-swappable image parameters captured at construction."""

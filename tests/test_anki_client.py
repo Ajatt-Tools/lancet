@@ -17,8 +17,10 @@ from lancet.anki.client import (
     AnkiConnectClient,
     AnkiConnectClientFactory,
     is_http_redirect_status,
+    is_loopback_url,
     join_html_content,
     make_image_filename,
+    post_anki_request,
 )
 from lancet.anki.client_types import (
     AnkiConnectParams,
@@ -58,6 +60,42 @@ REQUEST_SCENARIOS: dict[str, RequestScenario] = {
 }
 
 
+class ProxyEnvironmentScenario(typing.NamedTuple):
+    """An AnkiConnect endpoint and its required Requests environment policy."""
+
+    url: str
+    proxies: dict[str, str] | None
+
+
+PROXY_ENVIRONMENT_SCENARIOS: dict[str, ProxyEnvironmentScenario] = {
+    "localhost": ProxyEnvironmentScenario(url="http://localhost:8765", proxies={"no_proxy": "*"}),
+    "localhost_trailing_dot": ProxyEnvironmentScenario(url="http://localhost.:8765", proxies={"no_proxy": "*"}),
+    "localhost_mixed_case": ProxyEnvironmentScenario(url="http://LOCALHOST:8765", proxies={"no_proxy": "*"}),
+    "ipv4_loopback": ProxyEnvironmentScenario(url="http://127.0.0.1:8765", proxies={"no_proxy": "*"}),
+    "ipv4_loopback_range": ProxyEnvironmentScenario(url="http://127.1.2.3:8765", proxies={"no_proxy": "*"}),
+    "legacy_short_ipv4_loopback": ProxyEnvironmentScenario(url="http://127.1:8765", proxies={"no_proxy": "*"}),
+    "legacy_integer_ipv4_loopback": ProxyEnvironmentScenario(
+        url="http://2130706433:8765",
+        proxies={"no_proxy": "*"},
+    ),
+    "legacy_hex_ipv4_loopback": ProxyEnvironmentScenario(
+        url="http://0x7f000001:8765",
+        proxies={"no_proxy": "*"},
+    ),
+    "legacy_octal_ipv4_loopback": ProxyEnvironmentScenario(
+        url="http://0177.0.0.1:8765",
+        proxies={"no_proxy": "*"},
+    ),
+    "ipv6_loopback": ProxyEnvironmentScenario(url="http://[::1]:8765", proxies={"no_proxy": "*"}),
+    "ipv4_mapped_ipv6_loopback": ProxyEnvironmentScenario(
+        url="http://[::ffff:127.0.0.1]:8765",
+        proxies={"no_proxy": "*"},
+    ),
+    "remote_hostname": ProxyEnvironmentScenario(url="https://anki.example.com", proxies=None),
+    "remote_ip": ProxyEnvironmentScenario(url="https://192.0.2.1:8765", proxies=None),
+}
+
+
 class RequestFailureScenario(typing.NamedTuple):
     """A request failure and the public exception type expected from the client."""
 
@@ -75,6 +113,21 @@ REQUEST_FAILURE_SCENARIOS: dict[str, RequestFailureScenario] = {
     "timeout": RequestFailureScenario(
         error_type=requests.Timeout,
         error_message="request timed out",
+        expected_error_type=AnkiConnectError,
+    ),
+    "proxy_error": RequestFailureScenario(
+        error_type=requests.exceptions.ProxyError,
+        error_message="proxy unavailable",
+        expected_error_type=AnkiConnectError,
+    ),
+    "ssl_error": RequestFailureScenario(
+        error_type=requests.exceptions.SSLError,
+        error_message="certificate verify failed",
+        expected_error_type=AnkiConnectError,
+    ),
+    "connect_timeout": RequestFailureScenario(
+        error_type=requests.exceptions.ConnectTimeout,
+        error_message="connection timed out",
         expected_error_type=AnkiConnectError,
     ),
 }
@@ -469,6 +522,15 @@ def make_response(*, payload: object, status_code: int = 200, is_redirect: bool 
     return response
 
 
+def make_session(response: Mock) -> Mock:
+    """Create one context-managed Requests session returning the supplied response."""
+    session = create_autospec(requests.Session, instance=True)
+    session.__enter__.return_value = session
+    session.post.return_value = response
+    session.trust_env = True
+    return session
+
+
 def construct_settings_positionally(scenario: SettingsArgumentsScenario) -> AnkiConnectSettings:
     """Invoke the keyword-only settings constructor through its runtime call boundary."""
     constructor = typing.cast(
@@ -523,6 +585,33 @@ def expected_side_effect_params(scenario: SideEffectScenario) -> AnkiConnectPara
 class TestAnkiConnectInvoke:
     """Test protocol payload construction and response validation."""
 
+    @pytest.mark.parametrize("scenario", PROXY_ENVIRONMENT_SCENARIOS.values(), ids=PROXY_ENVIRONMENT_SCENARIOS.keys())
+    def test_loopback_url_detection(self, scenario: ProxyEnvironmentScenario) -> None:
+        """Only localhost and loopback addresses bypass Requests environment settings."""
+        assert is_loopback_url(scenario.url) is (scenario.proxies is not None)
+
+    @pytest.mark.parametrize("scenario", PROXY_ENVIRONMENT_SCENARIOS.values(), ids=PROXY_ENVIRONMENT_SCENARIOS.keys())
+    def test_post_uses_expected_proxy_policy(
+        self, scenario: ProxyEnvironmentScenario, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Loopback posts bypass proxies without disabling other Requests environment settings."""
+        response = make_response(payload={"result": [], "error": None})
+        session = make_session(response)
+        session_factory = Mock(return_value=session)
+        monkeypatch.setattr("lancet.anki.client.requests.Session", session_factory)
+
+        assert post_anki_request(scenario.url, expected_request("key")) is response
+
+        assert session.trust_env is True
+        session.post.assert_called_once_with(
+            scenario.url,
+            json=expected_request("key"),
+            timeout=ANKI_CONNECT_TIMEOUT_SEC,
+            allow_redirects=False,
+            proxies=scenario.proxies,
+        )
+        session.__exit__.assert_called_once_with(None, None, None)
+
     @pytest.mark.parametrize("scenario", REDIRECT_STATUS_SCENARIOS.values(), ids=REDIRECT_STATUS_SCENARIOS.keys())
     def test_redirect_status_range(self, scenario: RedirectStatusScenario) -> None:
         """Only HTTP statuses from 300 through 399 are redirects."""
@@ -533,15 +622,10 @@ class TestAnkiConnectInvoke:
         """Transport sends the configured endpoint, version-six payload, and timeout."""
         response = make_response(payload={"result": [1], "error": None})
         post = Mock(return_value=response)
-        monkeypatch.setattr("lancet.anki.client.requests.post", post)
+        monkeypatch.setattr("lancet.anki.client.post_anki_request", post)
         client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_connect_api_key=scenario.api_key))
         assert client.invoke("findNotes", {"query": "added:1"}) == [1]
-        assert post.call_args == call(
-            DEFAULT_ANKICONNECT_URL,
-            json=expected_request(scenario.api_key),
-            timeout=ANKI_CONNECT_TIMEOUT_SEC,
-            allow_redirects=False,
-        )
+        assert post.call_args == call(DEFAULT_ANKICONNECT_URL, expected_request(scenario.api_key))
         response.raise_for_status.assert_called_once_with()
 
     @pytest.mark.parametrize("scenario", REQUEST_FAILURE_SCENARIOS.values(), ids=REQUEST_FAILURE_SCENARIOS.keys())
@@ -550,7 +634,7 @@ class TestAnkiConnectInvoke:
     ) -> None:
         """Transport failures retain their details in the appropriate public exception type."""
         request_error = scenario.error_type(scenario.error_message)
-        monkeypatch.setattr("lancet.anki.client.requests.post", Mock(side_effect=request_error))
+        monkeypatch.setattr("lancet.anki.client.post_anki_request", Mock(side_effect=request_error))
         client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL))
         with pytest.raises(scenario.expected_error_type) as exc_info:
             client.invoke("findNotes", {"query": "added:1"})
@@ -562,7 +646,7 @@ class TestAnkiConnectInvoke:
         request_error = requests.HTTPError("server error")
         response = make_response(payload={"result": None, "error": None})
         response.raise_for_status.side_effect = request_error
-        monkeypatch.setattr("lancet.anki.client.requests.post", Mock(return_value=response))
+        monkeypatch.setattr("lancet.anki.client.post_anki_request", Mock(return_value=response))
 
         with pytest.raises(AnkiConnectError) as exc_info:
             make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL)).invoke("findNotes", {"query": "added:1"})
@@ -578,7 +662,7 @@ class TestAnkiConnectInvoke:
             status_code=scenario.status_code,
             is_redirect=scenario.is_redirect,
         )
-        monkeypatch.setattr("lancet.anki.client.requests.post", Mock(return_value=response))
+        monkeypatch.setattr("lancet.anki.client.post_anki_request", Mock(return_value=response))
 
         with pytest.raises(AnkiConnectError) as exc_info:
             make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL)).invoke("findNotes", {"query": "added:1"})
@@ -599,16 +683,11 @@ class TestAnkiConnectInvoke:
         cfg.anki_connect_api_key = "changed-key"
         response = make_response(payload={"result": [], "error": None})
         post = Mock(return_value=response)
-        monkeypatch.setattr("lancet.anki.client.requests.post", post)
+        monkeypatch.setattr("lancet.anki.client.post_anki_request", post)
 
         client.invoke("findNotes", {"query": "added:1"})
 
-        assert post.call_args == call(
-            "http://original:8765",
-            json=expected_request("original-key"),
-            timeout=ANKI_CONNECT_TIMEOUT_SEC,
-            allow_redirects=False,
-        )
+        assert post.call_args == call("http://original:8765", expected_request("original-key"))
 
     def test_factory_client_snapshots_attachment_target(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A client retains captured field and separator settings after later config changes."""
