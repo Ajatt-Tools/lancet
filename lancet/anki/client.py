@@ -77,12 +77,19 @@ class AnkiConnectClient:
         if self._opts.api_key:
             payload["key"] = self._opts.api_key
         try:
-            response = requests.post(self._opts.url, json=payload, timeout=ANKI_CONNECT_TIMEOUT_SEC)
+            response = requests.post(
+                self._opts.url,
+                json=payload,
+                timeout=ANKI_CONNECT_TIMEOUT_SEC,
+                allow_redirects=False,
+            )
             response.raise_for_status()
         except requests.ConnectionError as ex:
             raise AnkiConnectUnavailableError(f"Could not reach AnkiConnect: {ex}") from ex
         except requests.RequestException as ex:
             raise AnkiConnectError(f"Could not reach AnkiConnect: {ex}") from ex
+        if response.is_redirect:
+            raise AnkiConnectError("AnkiConnect endpoint returned an HTTP redirect")
         # Response validation belongs to the parser so this client stays focused
         # on transport and composing Anki operations.
         return parse_anki_response(response)
