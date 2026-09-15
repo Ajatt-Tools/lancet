@@ -48,6 +48,15 @@ class AnkiAttachmentInProgressError(AnkiConnectError):
     pass
 
 
+class AnkiAttachmentCancelledError(AnkiConnectError):
+    """Raised when a dialog prevents an Anki attachment from opening selection."""
+
+    @property
+    def what(self) -> str:
+        """Return a concise user-facing cancellation explanation."""
+        return "Anki attachment skipped because a dialog is open."
+
+
 class AnkiImageEncodingError(LancetException, RuntimeError):
     """Raised when Pillow cannot encode the configured Anki image format."""
 
