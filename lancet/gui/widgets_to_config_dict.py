@@ -28,7 +28,11 @@ def is_bool_for_numeric(old_value: CfgValueTypes, new_value: CfgValueTypes) -> b
 
 
 def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
-    """Set a widget's value from a configuration value based on the widget type."""
+    """Set a widget's value from config using one exhaustive ordered type dispatch.
+
+    This intentionally keeps every supported widget mapping visible in one match
+    statement, so transformed subclasses remain before their Qt parent classes.
+    """
     match widget:
         case LancetFilePicker() if isinstance(value, str):
             widget.set_file_path(value)
@@ -36,9 +40,9 @@ def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
             widget.set_keyboard_shortcut(value)
         case ColorEditPicker() if isinstance(value, str):
             widget.set_color(value)
-        case QDoubleSpinBox() if isinstance(value, (int, float)) and not is_bool_for_numeric(widget.value(), value):
+        case QDoubleSpinBox() if isinstance(value, (int, float)) and not isinstance(value, bool):
             widget.setValue(value)
-        case QSpinBox() if isinstance(value, int) and not is_bool_for_numeric(widget.value(), value):
+        case QSpinBox() if isinstance(value, int) and not isinstance(value, bool):
             widget.setValue(value)
         case QLineEdit() if isinstance(value, str):
             widget.setText(value)
