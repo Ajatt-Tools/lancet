@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 from lancet.config import CfgValueTypes, Config
-from lancet.exceptions import WidgetSetValueError
+from lancet.gui.exceptions import WidgetSetValueError
 from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.file_picker import LancetFilePicker
