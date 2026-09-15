@@ -139,6 +139,12 @@ RESULT_SCENARIOS: dict[str, ResultScenario] = {
         expected_json=None,
         expected_error="AnkiConnect returned an invalid media filename",
     ),
+    "media_filename_empty": ResultScenario(
+        parser=parse_media_filename,
+        value_json='""',
+        expected_json=None,
+        expected_error="AnkiConnect returned an invalid media filename",
+    ),
 }
 
 
