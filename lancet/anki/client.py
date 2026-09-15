@@ -161,8 +161,8 @@ class AnkiConnectClient:
 
         previous_html = self.note_field(note_id)
         filename = self.store_media(make_image_filename(note_id, image.image_format.value), image.data)
-        # AnkiConnect returns this filename across an HTTP boundary. Escape it
-        # before embedding it in note HTML even though the normal client is local.
+        # AnkiConnect returns this filename across an HTTP boundary.
+        # Escape it before embedding it in note HTML even though the normal client is local.
         new_html = join_html_content(
             old_content=previous_html,
             new_content=f'<img src="{html.escape(filename, quote=True)}">',

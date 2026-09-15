@@ -7,7 +7,7 @@ import typing
 
 class LancetAction(enum.Enum):
     """
-    Enum identifying the all actions Lancet can perform and all available keyboard shortcut actions.
+    Enum identifying all actions Lancet can perform and all available keyboard shortcut actions.
 
     Used both by the keyboard-shortcut dispatcher and the IPC command channel,
     so that CLI commands and hotkeys share one authoritative action vocabulary.
