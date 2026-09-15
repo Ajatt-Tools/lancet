@@ -2,10 +2,12 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 import base64
 import datetime
+import html
 import threading
 import typing
 from collections.abc import Generator
 from contextlib import contextmanager
+from http import HTTPStatus
 
 import requests
 from loguru import logger
@@ -38,6 +40,11 @@ from lancet.exceptions import (
 
 ANKI_CONNECT_VERSION: typing.Final[int] = 6
 ANKI_CONNECT_TIMEOUT_SEC: typing.Final[int] = 10
+
+
+def is_http_redirect_status(status_code: int) -> bool:
+    """Return whether an HTTP status code represents a redirect response."""
+    return HTTPStatus.MULTIPLE_CHOICES <= status_code < HTTPStatus.BAD_REQUEST
 
 
 def join_html_content(old_content: str, new_content: str, *, sep: str) -> str:
@@ -88,7 +95,7 @@ class AnkiConnectClient:
             raise AnkiConnectUnavailableError(f"Could not reach AnkiConnect: {ex}") from ex
         except requests.RequestException as ex:
             raise AnkiConnectError(f"Could not reach AnkiConnect: {ex}") from ex
-        if response.is_redirect:
+        if is_http_redirect_status(response.status_code):
             raise AnkiConnectError("AnkiConnect endpoint returned an HTTP redirect")
         # Response validation belongs to the parser so this client stays focused
         # on transport and composing Anki operations.
