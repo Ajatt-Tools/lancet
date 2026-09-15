@@ -3,14 +3,18 @@
 import base64
 import datetime
 import html
+import ipaddress
+import socket
 import threading
 import typing
+import urllib.parse
 from collections.abc import Generator
 from contextlib import contextmanager
 from http import HTTPStatus
 
 import requests
 from loguru import logger
+from requests.exceptions import ConnectTimeout, ProxyError, SSLError
 
 from lancet.anki.client_types import (
     AnkiConnectParams,
@@ -45,6 +49,50 @@ ANKI_CONNECT_TIMEOUT_SEC: typing.Final[int] = 10
 def is_http_redirect_status(status_code: int) -> bool:
     """Return whether an HTTP status code represents a redirect response."""
     return HTTPStatus.MULTIPLE_CHOICES <= status_code < HTTPStatus.BAD_REQUEST
+
+
+def is_legacy_ipv4_loopback(hostname: str) -> bool:
+    """Return whether a legacy numeric IPv4 spelling represents a loopback address."""
+    try:
+        return ipaddress.IPv4Address(socket.inet_aton(hostname)).is_loopback
+    except OSError:
+        return False
+
+
+def is_loopback_url(url: str) -> bool:
+    """Return whether a URL targets localhost or an IP loopback address."""
+    hostname = urllib.parse.urlsplit(url).hostname
+    if hostname is None:
+        return False
+    hostname = hostname.removesuffix(".").casefold()
+    if hostname == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return is_legacy_ipv4_loopback(hostname)
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        return address.ipv4_mapped.is_loopback
+    return address.is_loopback
+
+
+def anki_request_proxies(url: str) -> dict[str, str] | None:
+    """Return a no-proxy override for loopback AnkiConnect endpoints only."""
+    if is_loopback_url(url):
+        return {"no_proxy": "*"}
+    return None
+
+
+def post_anki_request(url: str, payload: AnkiConnectRequest) -> requests.Response:
+    """POST to AnkiConnect, bypassing environment proxies only for loopback URLs."""
+    with requests.Session() as session:
+        return session.post(
+            url,
+            json=payload,
+            timeout=ANKI_CONNECT_TIMEOUT_SEC,
+            allow_redirects=False,
+            proxies=anki_request_proxies(url),
+        )
 
 
 def join_html_content(old_content: str, new_content: str, *, sep: str) -> str:
@@ -84,13 +132,10 @@ class AnkiConnectClient:
         if self._opts.api_key:
             payload["key"] = self._opts.api_key
         try:
-            response = requests.post(
-                self._opts.url,
-                json=payload,
-                timeout=ANKI_CONNECT_TIMEOUT_SEC,
-                allow_redirects=False,
-            )
+            response = post_anki_request(self._opts.url, payload)
             response.raise_for_status()
+        except (SSLError, ProxyError, ConnectTimeout) as ex:
+            raise AnkiConnectError(f"Could not reach AnkiConnect: {ex}") from ex
         except requests.ConnectionError as ex:
             raise AnkiConnectUnavailableError(f"Could not reach AnkiConnect: {ex}") from ex
         except requests.RequestException as ex:
