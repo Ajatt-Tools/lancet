@@ -59,7 +59,11 @@ def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
 
 
 def get_from_widget(widget: QWidget) -> CfgValueTypes:
-    """Extract the current value from a widget based on its type."""
+    """Extract a supported widget value using exhaustive ordered type dispatch.
+
+    This intentionally keeps every supported widget mapping visible in one match
+    statement, so transformed subclasses remain before their Qt parent classes.
+    """
     match widget:
         case LancetFilePicker():
             return widget.get_file_path()
