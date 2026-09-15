@@ -16,13 +16,14 @@ from zala.utils import ensure_cursor_restored
 from lancet.anki.client import AnkiConnectClient, AnkiConnectClientFactory
 from lancet.anki.image import encode_image
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
-from lancet.config import Config, make_preview_opts
+from lancet.config import Config
 from lancet.exceptions import (
     AnkiAttachmentCanceledError,
     AnkiConnectUnavailableError,
     PixmapConversionError,
 )
 from lancet.gui.open_dialogs import OpenDialogs
+from lancet.gui.preview_options import make_preview_opts
 from lancet.model_utils.ocr_workflow import prepare_pillow_image
 from lancet.notifications import NotifySend
 from lancet.ocr.thread_op import LancetThreadOp

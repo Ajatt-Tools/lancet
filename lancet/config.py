@@ -12,8 +12,6 @@ from contextlib import AbstractContextManager
 
 from beartype.roar import BeartypeCallHintParamViolation
 from loguru import logger
-from PyQt6.QtGui import QColor
-from zala.config import ScreenshotPreviewOpts
 from zala.utils import clamp
 
 from lancet.actions import LancetAction
@@ -232,15 +230,3 @@ def read_config_file() -> ConfigFileReadResult:
         logger.error(str(ex))
         try_backup_config_file()
         return ConfigFileReadResult(Config(), error=str(ex))
-
-
-def make_preview_opts(cfg: Config) -> ScreenshotPreviewOpts:
-    """Build screenshot overlay options from the current config."""
-    return ScreenshotPreviewOpts(
-        border_thickness=cfg.border_thickness,
-        border_color=QColor.fromString(cfg.border_color),
-        fill_color=QColor.fromString(cfg.fill_color),
-        outline_color=QColor.fromString(cfg.outline_color),
-        fill_brush_color=QColor.fromString(cfg.fill_brush_color),
-        show_help=cfg.show_help_bar,
-    )

@@ -22,7 +22,7 @@ from zala.utils import qconnect
 
 from lancet.actions import LancetAction, LancetActionSpec
 from lancet.anki.workflow import AnkiWorkflow
-from lancet.config import Config, make_preview_opts
+from lancet.config import Config
 from lancet.consts import (
     ANKI_SCREENSHOT_ICON_PATH,
     APP_LOGO_PATH,
@@ -37,6 +37,7 @@ from lancet.consts import (
 from lancet.gui.about_dialog import AboutDialog
 from lancet.gui.open_dialogs import OpenDialogs
 from lancet.gui.preferences import PreferencesDialog, SettingsApplyResult
+from lancet.gui.preview_options import make_preview_opts
 from lancet.keyboard_shortcuts.listener import LancetShortcutManager
 from lancet.keyboard_shortcuts.types import PyShortcutStr
 from lancet.model_utils.model_loader import BackgroundModelLoader
