@@ -195,7 +195,7 @@ class AttachmentOperationRecorder:
         self._calls: list[AttachmentOperationCall] = []
 
     @property
-    def calls(self) -> tuple[AttachmentOperationCall, ...]:
+    def calls(self) -> Sequence[AttachmentOperationCall]:
         """Return an immutable snapshot of the recorded attachment operations."""
         return tuple(self._calls)
 
