@@ -9,7 +9,7 @@ import pathlib
 import signal
 import sys
 import typing
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from loguru import logger
 from PyQt6.QtGui import QIcon
@@ -243,13 +243,17 @@ class LancetSystemTray(QSystemTrayIcon):
         self._executor.shutdown(wait=True)
         self._app.quit()
 
-    def make_screenshot_area(self) -> None:
-        """Open the full-screen selection overlay for taking an area screenshot."""
+    def _select_area(self, on_finish: Callable[[UserSelectionResult], None]) -> None:
+        """Open area selection and notify the user when Zala cannot start it."""
         try:
-            self._take.select_area(on_finish=self.process_select_result, opts=make_preview_opts(self._cfg))
+            self._take.select_area(on_finish=on_finish, opts=make_preview_opts(self._cfg))
         except ZalaException as ex:
             logger.error(str(ex))
             self._notify.notify(str(ex))
+
+    def make_screenshot_area(self) -> None:
+        """Open the full-screen selection overlay for taking an area screenshot."""
+        self._select_area(self.process_select_result)
 
     def make_anki_screenshot(self) -> None:
         """Resolve the last-added Anki note before opening the area selection overlay."""
@@ -257,22 +261,11 @@ class LancetSystemTray(QSystemTrayIcon):
 
     def make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for OCR recognition of the selected area."""
-        try:
-            self._take.select_area(on_finish=self._ocr_workflow.run_ocr, opts=make_preview_opts(self._cfg))
-        except ZalaException as ex:
-            logger.error(str(ex))
-            self._notify.notify(str(ex))
+        self._select_area(self._ocr_workflow.run_ocr)
 
     def detect_and_make_ocr_screenshot(self) -> None:
         """Open the full-screen selection overlay for speech bubble detection and OCR."""
-        try:
-            self._take.select_area(
-                on_finish=self._ocr_workflow.run_speech_bubble_ocr,
-                opts=make_preview_opts(self._cfg),
-            )
-        except ZalaException as ex:
-            logger.error(str(ex))
-            self._notify.notify(str(ex))
+        self._select_area(self._ocr_workflow.run_speech_bubble_ocr)
 
     def process_select_result(self, user_selection: UserSelectionResult) -> None:
         """Save the user's screenshot selection to a file."""
