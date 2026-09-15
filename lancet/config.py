@@ -89,6 +89,14 @@ def make_temp_config_file() -> AbstractContextManager[typing.IO[str]]:
     )
 
 
+def remove_temp_config_file(temp_path: pathlib.Path) -> None:
+    """Best-effort remove a temporary config file after replacement or failure."""
+    try:
+        temp_path.unlink(missing_ok=True)
+    except OSError as ex:
+        logger.warning(f"Failed to remove temporary config file: {ex}")
+
+
 def write_config_dict(data: Mapping[str, object]) -> None:
     """Atomically write config through an owner-only sibling temporary file."""
     CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -104,7 +112,7 @@ def write_config_dict(data: Mapping[str, object]) -> None:
         temp_path.replace(CFG_PATH)
     finally:
         if temp_path is not None:
-            temp_path.unlink(missing_ok=True)
+            remove_temp_config_file(temp_path)
 
 
 @dataclasses.dataclass
