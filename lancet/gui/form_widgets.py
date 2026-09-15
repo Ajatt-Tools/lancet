@@ -131,11 +131,7 @@ class FormWidgetsBuilder:
         self._widgets.anki_field_separator = MonoSpaceLineEdit(self._cfg.anki_field_separator)
         self._widgets.anki_image_format = EnumSelectCombo(initial_value=self._cfg.anki_image_format)
         self._widgets.anki_image_settings = ImageSliderBox()
-        self._widgets.anki_image_settings.set_values(
-            width=self._cfg.anki_image_width,
-            height=self._cfg.anki_image_height,
-            quality=self._cfg.anki_image_quality,
-        )
+        self._widgets.anki_image_settings.set_image_parameters(self._cfg.anki_image_parameters())
         return self
 
     def create_file_picker_widgets(self) -> typing.Self:

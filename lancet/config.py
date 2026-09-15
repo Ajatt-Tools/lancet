@@ -15,7 +15,7 @@ from loguru import logger
 from zala.utils import clamp
 
 from lancet.actions import LancetAction
-from lancet.anki.image_types import AnkiImageFormat
+from lancet.anki.image_types import AnkiImageFormat, ImageParameters
 from lancet.consts import (
     ANKI_FIELD_SEPARATOR,
     ANKI_IMAGE_MAX_DIMENSION,
@@ -181,6 +181,20 @@ class Config:
         self.anki_image_width = clamp(0, self.anki_image_width, ANKI_IMAGE_MAX_DIMENSION)
         self.anki_image_height = clamp(0, self.anki_image_height, ANKI_IMAGE_MAX_DIMENSION)
         self.anki_image_quality = clamp(0, self.anki_image_quality, ANKI_IMAGE_MAX_QUALITY)
+
+    def anki_image_parameters(self) -> ImageParameters:
+        """Return current Anki image dimensions and quality as one non-swappable value."""
+        return ImageParameters(
+            width=self.anki_image_width,
+            height=self.anki_image_height,
+            quality=self.anki_image_quality,
+        )
+
+    def set_anki_image_parameters(self, parameters: ImageParameters) -> None:
+        """Replace current Anki image dimensions and quality from one grouped value."""
+        self.anki_image_width = parameters.width
+        self.anki_image_height = parameters.height
+        self.anki_image_quality = parameters.quality
 
     @staticmethod
     def file_exists() -> bool:

@@ -107,10 +107,7 @@ class CopySettingsFromWidgetsToConfig:
         # Special case: huggingface_model maps to two config fields.
         self._cfg.huggingface_model_name = self._widgets.huggingface_model.current_text()
         self._cfg.huggingface_models = self._widgets.huggingface_model.models_as_list()
-        anki_settings = self._widgets.anki_image_settings.values()
-        self._cfg.anki_image_width = anki_settings.width
-        self._cfg.anki_image_height = anki_settings.height
-        self._cfg.anki_image_quality = anki_settings.quality
+        self._cfg.set_anki_image_parameters(self._widgets.anki_image_settings.values())
         return self
 
 
@@ -206,11 +203,7 @@ class FormWidgetValues:
         # Special case: huggingface_model maps to two config fields.
         self._widgets.huggingface_model.set_items(self._cfg.huggingface_models)
         self._widgets.huggingface_model.set_current(self._cfg.huggingface_model_name)
-        self._widgets.anki_image_settings.set_values(
-            width=self._cfg.anki_image_width,
-            height=self._cfg.anki_image_height,
-            quality=self._cfg.anki_image_quality,
-        )
+        self._widgets.anki_image_settings.set_image_parameters(self._cfg.anki_image_parameters())
         return self
 
 

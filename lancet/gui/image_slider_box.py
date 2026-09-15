@@ -79,6 +79,14 @@ class ImageSliderBox(QWidget):
         self.image_height = height
         self.image_quality = quality
 
+    def set_image_parameters(self, parameters: ImageParameters) -> None:
+        """Set all controls from one non-swappable image-encoding value."""
+        self.set_values(
+            width=parameters.width,
+            height=parameters.height,
+            quality=parameters.quality,
+        )
+
     @property
     def image_width(self) -> int:
         """Return the configured maximum image width, or zero when unconstrained."""

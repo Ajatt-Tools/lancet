@@ -174,7 +174,7 @@ class AnkiWorkflow:
             open_dialogs=self._open_dialogs,
             preview_opts=make_preview_opts(self._cfg),
             image_format=self._cfg.anki_image_format,
-            image_parameters=self._image_parameters(),
+            image_parameters=self._cfg.anki_image_parameters(),
         )
         # ThreadOp and Zala retain the job through its bound callbacks for the
         # complete asynchronous lifecycle, so no workflow-owned job registry is needed.
@@ -196,12 +196,4 @@ class AnkiWorkflow:
         self._notify.notify(
             f"Added {result.encoded.image_format.name} image to Anki note {result.note_id}: "
             f"{result.filename} ({result.encoded.size_kib():.2f} KiB)"
-        )
-
-    def _image_parameters(self) -> ImageParameters:
-        """Return current Anki image dimensions and quality as one non-swappable value."""
-        return ImageParameters(
-            width=self._cfg.anki_image_width,
-            height=self._cfg.anki_image_height,
-            quality=self._cfg.anki_image_quality,
         )
