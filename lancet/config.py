@@ -103,12 +103,12 @@ def write_config_dict(data: Mapping[str, object]) -> None:
     temp_path: pathlib.Path | None = None
     try:
         with make_temp_config_file() as output:
-            temp_path: pathlib.Path = pathlib.Path(output.name)
+            temp_path = pathlib.Path(output.name)
+            assert temp_path is not None
             temp_path.chmod(CONFIG_FILE_MODE)
             json.dump(data, output, ensure_ascii=False, indent=4)
             output.flush()
             os.fsync(output.fileno())
-        assert temp_path is not None
         temp_path.replace(CFG_PATH)
     finally:
         if temp_path is not None:
