@@ -35,15 +35,21 @@ class ImageSliderBox(QWidget):
     def __init__(
         self,
         parent: QWidget | None = None,
+        *,
         max_width: int = ANKI_IMAGE_MAX_DIMENSION,
         max_height: int = ANKI_IMAGE_MAX_DIMENSION,
     ) -> None:
         """Create image width, height, and quality controls with zero-capable bounds."""
         super().__init__(parent=parent)
         self._sliders = Sliders(
-            image_width=RichSlider("Width", "px", upper_limit=max_width),
-            image_height=RichSlider("Height", "px", upper_limit=max_height),
-            image_quality=RichSlider("Quality", "%", upper_limit=ANKI_IMAGE_MAX_QUALITY, step=1),
+            image_width=RichSlider("Width", unit="px", upper_limit=max_width),
+            image_height=RichSlider("Height", unit="px", upper_limit=max_height),
+            image_quality=RichSlider(
+                "Quality",
+                unit="%",
+                upper_limit=ANKI_IMAGE_MAX_QUALITY,
+                step=1,
+            ),
         )
         self._setup_ui()
         self.set_tooltips()
