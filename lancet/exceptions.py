@@ -2,6 +2,9 @@
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 from http import HTTPStatus
 
+from PyQt6.QtWidgets import QWidget
+
+from lancet.config import CfgValueTypes
 from lancet.ipc.types import IpcStatusCode
 
 
@@ -99,3 +102,10 @@ class IpcRequestError(LancetException, ValueError):
     @property
     def status(self) -> IpcStatusCode:
         return self._status
+
+
+class WidgetSetValueError(ValueError):
+    def __init__(self, widget: QWidget, value: CfgValueTypes) -> None:
+        super().__init__(
+            f"Can't handle widget of type {type(widget).__name__} and value of type {type(value).__name__}"
+        )

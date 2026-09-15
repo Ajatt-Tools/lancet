@@ -29,6 +29,8 @@ from lancet.keyboard_shortcuts.types import (
     ShortcutConversionResult,
 )
 
+type CfgValueTypes = bool | str | int | float | enum.Enum
+
 
 class OcrDestination(enum.Enum):
     """Enum for selecting where OCR results are sent."""

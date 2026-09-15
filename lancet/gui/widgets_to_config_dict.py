@@ -12,15 +12,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from lancet.config import Config
+from lancet.config import CfgValueTypes, Config
+from lancet.exceptions import WidgetSetValueError
 from lancet.gui.color_picker import ColorEditPicker
 from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
 from lancet.gui.line_edit import StripLineEdit
 from lancet.gui.utils import DetectorInputSizeSpinBox
-
-type CfgValueTypes = bool | str | int | float | enum.Enum
 
 
 def is_bool_for_numeric(old_value: CfgValueTypes, new_value: CfgValueTypes) -> bool:
@@ -52,9 +51,7 @@ def set_from_cfg(widget: QWidget, value: CfgValueTypes) -> None:
         case QPlainTextEdit() if isinstance(value, str):
             widget.setPlainText(value)
         case _:
-            raise ValueError(
-                f"Can't handle widget of type {type(widget).__name__} and value of type {type(value).__name__}"
-            )
+            raise WidgetSetValueError(widget, value)
 
 
 def get_from_widget(widget: QWidget) -> CfgValueTypes:
