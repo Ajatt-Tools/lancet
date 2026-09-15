@@ -4,9 +4,10 @@
 
 import concurrent.futures
 import functools
+import types
 import typing
 from collections.abc import Callable, Iterator
-from unittest.mock import Mock, call, create_autospec, patch
+from unittest.mock import MagicMock, call, create_autospec, patch
 
 import pytest
 from PIL import Image
@@ -16,11 +17,12 @@ from zala.exceptions import ZalaException
 from zala.main_window import UserSelectionResult
 from zala.take_region import ZalaTakeScreenRegion
 
-from lancet.anki.client import AnkiConnectClient
+from lancet.anki.client import AnkiConnectClient, AnkiConnectClientFactory
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
-from lancet.anki.workflow import AnkiWorkflow
+from lancet.anki.workflow import AnkiAttachmentJob, AnkiWorkflow, AttachedImage
 from lancet.config import Config, make_preview_opts
 from lancet.exceptions import AnkiConnectUnavailableError, PixmapConversionError
+from lancet.gui.open_dialogs import OpenDialogs
 from lancet.notifications import NotifySend
 from tests.helpers import wait_for_qt_event_loop
 
@@ -41,10 +43,19 @@ class AnkiWorkflowContext:
         self.cfg = cfg
         self.notify = create_autospec(NotifySend, instance=True)
         self.take = create_autospec(ZalaTakeScreenRegion, instance=True)
-        self.client = typing.cast(Mock, create_autospec(AnkiConnectClient, instance=True))
+        self.open_dialogs = create_autospec(OpenDialogs, instance=True)
+        self.open_dialogs.is_locked.return_value = False
+        self.client = create_autospec(AnkiConnectClient, instance=True)
+        self.client_factory = create_autospec(AnkiConnectClientFactory, instance=True)
+        self.client_factory.create.return_value = self.client
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.workflow = AnkiWorkflow(
-            cfg, executor=self.executor, notify=self.notify, take=self.take, client=self.client
+            cfg,
+            executor=self.executor,
+            notify=self.notify,
+            take=self.take,
+            open_dialogs=self.open_dialogs,
+            client_factory=self.client_factory,
         )
 
     def __enter__(self) -> typing.Self:
@@ -54,6 +65,30 @@ class AnkiWorkflowContext:
     def __exit__(self, *args: object) -> None:
         """Wait for and release the workflow executor."""
         self.executor.shutdown(wait=True)
+
+    def create_job(self) -> AnkiAttachmentJob:
+        """Create one job using this context's stable client and workflow callbacks."""
+        return (
+            self.create_unconfigured_job()
+            .success(self.workflow._notify_success)
+            .failure(self.workflow._notify_anki_failure)
+        )
+
+    def create_unconfigured_job(self) -> AnkiAttachmentJob:
+        """Create one job before its fluent terminal callbacks are configured."""
+        return AnkiAttachmentJob(
+            client=self.client,
+            executor=self.executor,
+            take=self.take,
+            open_dialogs=self.open_dialogs,
+            preview_opts=make_preview_opts(self.cfg),
+            image_format=self.cfg.anki_image_format,
+            image_parameters=ImageParameters(
+                width=self.cfg.anki_image_width,
+                height=self.cfg.anki_image_height,
+                quality=self.cfg.anki_image_quality,
+            ),
+        )
 
 
 class SelectionRecorder:
@@ -86,25 +121,71 @@ class NotificationRecorder:
         self._loop.quit()
 
 
+class DialogLockRecorder:
+    """Report a locked dialog and exit after the delayed preflight check runs."""
+
+    def __init__(self, loop: QEventLoop) -> None:
+        """Store the event loop that post-preflight lock checking should exit."""
+        self._loop = loop
+        self.check_count = 0
+
+    def __call__(self) -> bool:
+        """Record the delayed dialog check, exit the loop, and report a locked dialog."""
+        self.check_count += 1
+        self._loop.quit()
+        return True
+
+
 class AttachmentScenario(typing.NamedTuple):
     """Configuration and attachment result used for encoding propagation tests."""
 
-    cfg: Config
+    image_format: AnkiImageFormat
+    image_parameters: ImageParameters
     filename: str
 
 
 ATTACHMENT_SCENARIOS: dict[str, AttachmentScenario] = {
     "configured_avif": AttachmentScenario(
-        cfg=Config(
-            anki_image_field=IMAGE_FIELD,
-            anki_image_width=400,
-            anki_image_height=250,
-            anki_image_quality=33,
-            anki_image_format=AnkiImageFormat.avif,
-        ),
+        image_format=AnkiImageFormat.avif,
+        image_parameters=ImageParameters(width=400, height=250, quality=33),
         filename="lancet.webp",
     ),
 }
+
+
+def config_from_attachment_scenario(scenario: AttachmentScenario) -> Config:
+    """Create fresh workflow configuration for one immutable attachment scenario."""
+    return Config(
+        anki_image_field=IMAGE_FIELD,
+        anki_image_width=scenario.image_parameters.width,
+        anki_image_height=scenario.image_parameters.height,
+        anki_image_quality=scenario.image_parameters.quality,
+        anki_image_format=scenario.image_format,
+    )
+
+
+def assert_public_attachment_delivery(
+    context: AnkiWorkflowContext,
+    scenario: AttachmentScenario,
+    selection: SelectionRecorder,
+    selection_result: UserSelectionResult,
+    prepared_image: Image.Image,
+    notification: NotificationRecorder,
+    *,
+    prepare: MagicMock,
+    encode: MagicMock,
+) -> None:
+    """Assert public workflow composition preserves the operation's captured dependencies and settings."""
+    assert context.client_factory.create.call_count == 1
+    assert selection.options == make_preview_opts(context.cfg)
+    assert prepare.call_args == call(selection_result)
+    assert encode.call_args == call(
+        prepared_image,
+        image_format=scenario.image_format,
+        settings=scenario.image_parameters,
+    )
+    assert context.client.attach_image.call_args.args == (NOTE_ID, ATTACHMENT_IMAGE)
+    assert notification.messages == [f"Added avif image to Anki note 42: {scenario.filename} (0.00 KiB)"]
 
 
 class CancellationScenario(typing.NamedTuple):
@@ -132,6 +213,17 @@ class PreflightSelectionScenario(typing.NamedTuple):
 
 PREFLIGHT_SELECTION_SCENARIOS: dict[str, PreflightSelectionScenario] = {
     "stable_target": PreflightSelectionScenario(note_id=NOTE_ID),
+}
+
+
+class DialogLockScenario(typing.NamedTuple):
+    """A preflight note ID whose delayed selector must be blocked by a dialog lock."""
+
+    note_id: int
+
+
+DIALOG_LOCK_SCENARIOS: dict[str, DialogLockScenario] = {
+    "dialog_opens_during_preflight": DialogLockScenario(note_id=NOTE_ID),
 }
 
 
@@ -191,6 +283,41 @@ FAILURE_NOTIFICATION_SCENARIOS: dict[str, FailureNotificationScenario] = {
 }
 
 
+def on_job_success(_: AttachedImage) -> None:
+    """Provide a no-op success callback for job-validation tests."""
+
+
+def on_job_failure(_: Exception) -> None:
+    """Provide a no-op failure callback for job-validation tests."""
+
+
+def configure_job_success(job: AnkiAttachmentJob) -> AnkiAttachmentJob:
+    """Configure only the job success callback."""
+    return job.success(on_job_success)
+
+
+def configure_job_failure(job: AnkiAttachmentJob) -> AnkiAttachmentJob:
+    """Configure only the job failure callback."""
+    return job.failure(on_job_failure)
+
+
+class JobCallbackScenario(typing.NamedTuple):
+    """One incomplete callback configuration and its validation message."""
+
+    configure: Callable[[AnkiAttachmentJob], AnkiAttachmentJob]
+    expected_message: str
+
+
+JOB_CALLBACK_SCENARIOS: dict[str, JobCallbackScenario] = {
+    "missing_success": JobCallbackScenario(
+        configure=configure_job_failure, expected_message="success handler is not set"
+    ),
+    "missing_failure": JobCallbackScenario(
+        configure=configure_job_success, expected_message="failure handler is not set"
+    ),
+}
+
+
 @pytest.fixture
 def workflow_context() -> Iterator[AnkiWorkflowContext]:
     """Provide an Anki workflow and shut down its executor after the test."""
@@ -203,18 +330,27 @@ class TestAnkiWorkflow:
 
     @pytest.mark.parametrize("scenario", ATTACHMENT_SCENARIOS.values(), ids=ATTACHMENT_SCENARIOS.keys())
     def test_attach_image_uses_current_config(self, scenario: AttachmentScenario) -> None:
-        """The worker receives the configured field, format, and non-swappable image parameters."""
-        with AnkiWorkflowContext(scenario.cfg) as context:
+        """A job uses the format and non-swappable image parameters captured at construction."""
+        with AnkiWorkflowContext(config_from_attachment_scenario(scenario)) as context:
             context.client.attach_image.return_value = scenario.filename
             with patch("lancet.anki.workflow.encode_image", return_value=ATTACHMENT_IMAGE) as encode:
-                result = context.workflow._attach_image(NOTE_ID, Image.new("RGB", (800, 600)))
+                result = context.create_job()._attach_image(NOTE_ID, Image.new("RGB", (800, 600)))
         assert encode.call_args.kwargs == {
-            "image_format": AnkiImageFormat.avif,
+            "image_format": scenario.image_format,
             "settings": ImageParameters(width=400, height=250, quality=33),
         }
-        assert context.client.attach_image.call_args.args == (NOTE_ID, IMAGE_FIELD, ATTACHMENT_IMAGE)
+        assert context.client.attach_image.call_args.args == (NOTE_ID, ATTACHMENT_IMAGE)
         assert result.note_id == NOTE_ID
         assert result.filename == scenario.filename
+
+    @pytest.mark.parametrize("scenario", JOB_CALLBACK_SCENARIOS.values(), ids=JOB_CALLBACK_SCENARIOS.keys())
+    def test_job_start_requires_both_callbacks(
+        self, scenario: JobCallbackScenario, workflow_context: AnkiWorkflowContext
+    ) -> None:
+        """The fluent job API rejects starting without both terminal callbacks."""
+        with pytest.raises(ValueError) as exc_info:
+            scenario.configure(workflow_context.create_unconfigured_job()).start()
+        assert str(exc_info.value) == scenario.expected_message
 
     @pytest.mark.parametrize(
         "scenario", PREFLIGHT_SELECTION_SCENARIOS.values(), ids=PREFLIGHT_SELECTION_SCENARIOS.keys()
@@ -229,11 +365,49 @@ class TestAnkiWorkflow:
         workflow_context.take.select_area.side_effect = selection
         workflow_context.workflow.screenshot_and_add_to_anki()
         wait_for_qt_event_loop(loop)
+        workflow_context.client_factory.create.assert_called_once_with()
         assert workflow_context.client.last_added_note_id.call_count == 1
         assert isinstance(selection.callback, functools.partial)
-        assert selection.callback.func == workflow_context.workflow._attach_selection
+        callback_method = selection.callback.func
+        assert isinstance(callback_method, types.MethodType)
+        assert isinstance(callback_method.__self__, AnkiAttachmentJob)
+        assert callback_method.__func__ is AnkiAttachmentJob._attach_selection
         assert selection.callback.args == (scenario.note_id,)
         assert selection.options == make_preview_opts(workflow_context.cfg)
+
+    @pytest.mark.parametrize("scenario", ATTACHMENT_SCENARIOS.values(), ids=ATTACHMENT_SCENARIOS.keys())
+    def test_public_operation_survives_through_attachment_delivery(self, scenario: AttachmentScenario) -> None:
+        """The public workflow composes captured settings through attachment delivery and notification."""
+        selection_loop = QEventLoop()
+        selection = SelectionRecorder(selection_loop)
+        notification_loop = QEventLoop()
+        notification = NotificationRecorder(notification_loop)
+        selection_result = create_autospec(UserSelectionResult, instance=True)
+        prepared_image = Image.new("RGB", (800, 600))
+        with AnkiWorkflowContext(config_from_attachment_scenario(scenario)) as context:
+            context.client.last_added_note_id.return_value = NOTE_ID
+            context.client.attach_image.return_value = scenario.filename
+            context.take.select_area.side_effect = selection
+            context.notify.notify.side_effect = notification
+            with (
+                patch("lancet.anki.workflow.prepare_pillow_image", return_value=prepared_image) as prepare,
+                patch("lancet.anki.workflow.encode_image", return_value=ATTACHMENT_IMAGE) as encode,
+            ):
+                context.workflow.screenshot_and_add_to_anki()
+                wait_for_qt_event_loop(selection_loop)
+                assert selection.callback is not None
+                selection.callback(selection_result)
+                wait_for_qt_event_loop(notification_loop)
+            assert_public_attachment_delivery(
+                context,
+                scenario,
+                selection,
+                selection_result,
+                prepared_image,
+                notification,
+                prepare=prepare,
+                encode=encode,
+            )
 
     @pytest.mark.parametrize("scenario", CANCELLATION_SCENARIOS.values(), ids=CANCELLATION_SCENARIOS.keys())
     def test_cancelled_selection_notifies_without_submission(
@@ -245,7 +419,10 @@ class TestAnkiWorkflow:
             patch("lancet.anki.workflow.prepare_pillow_image", side_effect=conversion_error) as prepare,
             patch.object(workflow_context.executor, "submit", wraps=workflow_context.executor.submit) as submit,
         ):
-            workflow_context.workflow._attach_selection(NOTE_ID, create_autospec(UserSelectionResult, instance=True))
+            workflow_context.create_job()._attach_selection(
+                NOTE_ID,
+                create_autospec(UserSelectionResult, instance=True),
+            )
         prepare.assert_called_once()
         submit.assert_not_called()
         workflow_context.client.attach_image.assert_not_called()
@@ -263,9 +440,9 @@ class TestAnkiWorkflow:
         workflow_context.notify.notify.side_effect = notification
         with patch("lancet.anki.workflow.prepare_pillow_image", return_value=Image.new("RGB", (800, 600))):
             with patch("lancet.anki.workflow.encode_image", return_value=ATTACHMENT_IMAGE):
-                workflow_context.workflow._attach_selection(NOTE_ID, selection)
+                workflow_context.create_job()._attach_selection(NOTE_ID, selection)
                 wait_for_qt_event_loop(loop)
-        assert workflow_context.client.attach_image.call_args.args == (NOTE_ID, "Image", ATTACHMENT_IMAGE)
+        assert workflow_context.client.attach_image.call_args.args == (NOTE_ID, ATTACHMENT_IMAGE)
         assert notification.messages == [f"Added avif image to Anki note 42: {scenario.filename} (0.00 KiB)"]
 
     @pytest.mark.parametrize("scenario", PREFLIGHT_FAILURE_SCENARIOS.values(), ids=PREFLIGHT_FAILURE_SCENARIOS.keys())
@@ -288,8 +465,22 @@ class TestAnkiWorkflow:
     ) -> None:
         """A Zala selection startup failure is converted to one public notification."""
         workflow_context.take.select_area.side_effect = scenario.error_type(scenario.error_message)
-        workflow_context.workflow._start_anki_selection(NOTE_ID)
+        workflow_context.create_job()._start_anki_selection(NOTE_ID)
         workflow_context.notify.notify.assert_called_once_with(scenario.expected_notification)
+
+    @pytest.mark.parametrize("scenario", DIALOG_LOCK_SCENARIOS.values(), ids=DIALOG_LOCK_SCENARIOS.keys())
+    def test_dialog_opened_during_preflight_blocks_selection(
+        self, scenario: DialogLockScenario, workflow_context: AnkiWorkflowContext
+    ) -> None:
+        """The public queued preflight rechecks a newly opened dialog before opening selection."""
+        loop = QEventLoop()
+        lock = DialogLockRecorder(loop)
+        workflow_context.client.last_added_note_id.return_value = scenario.note_id
+        workflow_context.open_dialogs.is_locked.side_effect = lock
+        workflow_context.workflow.screenshot_and_add_to_anki()
+        wait_for_qt_event_loop(loop)
+        assert lock.check_count == 1
+        workflow_context.take.select_area.assert_not_called()
 
     @pytest.mark.parametrize(
         "scenario", FAILURE_NOTIFICATION_SCENARIOS.values(), ids=FAILURE_NOTIFICATION_SCENARIOS.keys()
