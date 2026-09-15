@@ -20,13 +20,14 @@ from zala.take_region import ZalaTakeScreenRegion
 from lancet.anki.client import AnkiConnectClient, AnkiConnectClientFactory
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
 from lancet.anki.workflow import AnkiAttachmentJob, AnkiWorkflow, AttachedImage
-from lancet.config import Config, make_preview_opts
+from lancet.config import Config
 from lancet.exceptions import (
     AnkiConnectError,
     AnkiConnectUnavailableError,
     PixmapConversionError,
 )
 from lancet.gui.open_dialogs import OpenDialogs
+from lancet.gui.preview_options import make_preview_opts
 from lancet.notifications import NotifySend
 from tests.helpers import wait_for_qt_event_loop
 
@@ -110,6 +111,10 @@ class SelectionRecorder:
         self.options = opts
         self._loop.quit()
 
+    def wait(self) -> None:
+        """Wait until Zala selection starts."""
+        wait_for_qt_event_loop(self._loop)
+
 
 class NotificationRecorder:
     """Record one notification and exit after a queued workflow callback runs."""
@@ -123,6 +128,10 @@ class NotificationRecorder:
         """Record a notification message and exit the nested event loop."""
         self.messages.append(message)
         self._loop.quit()
+
+    def wait(self) -> None:
+        """Wait until one notification is delivered."""
+        wait_for_qt_event_loop(self._loop)
 
 
 class DialogLockRecorder:
@@ -190,6 +199,35 @@ def assert_public_attachment_delivery(
     )
     assert context.client.attach_image.call_args.args == (NOTE_ID, ATTACHMENT_IMAGE)
     assert notification.messages == [f"Added avif image to Anki note 42: {scenario.filename} (0.00 KiB)"]
+
+
+class PublicAttachmentExecution(typing.NamedTuple):
+    """Values and mocks produced by one public Anki attachment execution."""
+
+    selection_result: UserSelectionResult
+    prepared_image: Image.Image
+    prepare: MagicMock
+    encode: MagicMock
+
+
+def execute_public_attachment(
+    context: AnkiWorkflowContext,
+    selection: SelectionRecorder,
+    notification: NotificationRecorder,
+) -> PublicAttachmentExecution:
+    """Run public attachment dispatch through its terminal notification."""
+    selection_result = create_autospec(UserSelectionResult, instance=True)
+    prepared_image = Image.new("RGB", (800, 600))
+    with (
+        patch("lancet.anki.workflow.prepare_pillow_image", return_value=prepared_image) as prepare,
+        patch("lancet.anki.workflow.encode_image", return_value=ATTACHMENT_IMAGE) as encode,
+    ):
+        context.workflow.screenshot_and_add_to_anki()
+        selection.wait()
+        assert selection.callback is not None
+        selection.callback(selection_result)
+        notification.wait()
+    return PublicAttachmentExecution(selection_result, prepared_image, prepare, encode)
 
 
 class CancellationScenario(typing.NamedTuple):
@@ -390,31 +428,21 @@ class TestAnkiWorkflow:
         selection = SelectionRecorder(selection_loop)
         notification_loop = QEventLoop()
         notification = NotificationRecorder(notification_loop)
-        selection_result = create_autospec(UserSelectionResult, instance=True)
-        prepared_image = Image.new("RGB", (800, 600))
         with AnkiWorkflowContext(config_from_attachment_scenario(scenario)) as context:
             context.client.last_added_note_id.return_value = NOTE_ID
             context.client.attach_image.return_value = scenario.filename
             context.take.select_area.side_effect = selection
             context.notify.notify.side_effect = notification
-            with (
-                patch("lancet.anki.workflow.prepare_pillow_image", return_value=prepared_image) as prepare,
-                patch("lancet.anki.workflow.encode_image", return_value=ATTACHMENT_IMAGE) as encode,
-            ):
-                context.workflow.screenshot_and_add_to_anki()
-                wait_for_qt_event_loop(selection_loop)
-                assert selection.callback is not None
-                selection.callback(selection_result)
-                wait_for_qt_event_loop(notification_loop)
+            execution = execute_public_attachment(context, selection, notification)
             assert_public_attachment_delivery(
                 context,
                 scenario,
                 selection,
-                selection_result,
-                prepared_image,
+                execution.selection_result,
+                execution.prepared_image,
                 notification,
-                prepare=prepare,
-                encode=encode,
+                prepare=execution.prepare,
+                encode=execution.encode,
             )
 
     @pytest.mark.parametrize("scenario", CANCELLATION_SCENARIOS.values(), ids=CANCELLATION_SCENARIOS.keys())

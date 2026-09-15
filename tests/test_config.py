@@ -6,6 +6,7 @@ import os
 import pathlib
 import stat
 import typing
+from unittest.mock import create_autospec, patch
 
 import pytest
 
@@ -53,6 +54,18 @@ class ReplaceFailure:
 
     def __call__(self, *_paths: pathlib.Path) -> pathlib.Path:
         """Raise the stored replacement error without altering either path."""
+        raise self._error
+
+
+class UnlinkFailure:
+    """Raise one caller-owned error when temporary cleanup is attempted."""
+
+    def __init__(self, error: OSError) -> None:
+        """Store the exact cleanup error expected by the test."""
+        self._error = error
+
+    def __call__(self, *, missing_ok: bool) -> None:
+        """Raise the stored cleanup error without removing the temporary file."""
         raise self._error
 
 
@@ -350,6 +363,45 @@ ROUND_TRIP_SCENARIOS: dict[str, ConfigRoundTripScenario] = {
 }
 
 
+class ConfigRoundTripValues(typing.NamedTuple):
+    """Configuration values compared across JSON persistence boundaries."""
+
+    copy_to: OcrDestination
+    goldendict_path: str
+    image_format: AnkiImageFormat
+    field_separator: str
+
+
+def config_from_round_trip_scenario(scenario: ConfigRoundTripScenario) -> Config:
+    """Build a Config with the persisted values covered by one scenario."""
+    return Config(
+        copy_to=scenario.copy_to,
+        path_to_goldendict_executable=scenario.goldendict_path,
+        anki_image_format=scenario.image_format,
+        anki_field_separator=scenario.field_separator,
+    )
+
+
+def round_trip_values(cfg: Config) -> ConfigRoundTripValues:
+    """Project Config onto the values covered by round-trip persistence tests."""
+    return ConfigRoundTripValues(
+        copy_to=cfg.copy_to,
+        goldendict_path=cfg.path_to_goldendict_executable,
+        image_format=cfg.anki_image_format,
+        field_separator=cfg.anki_field_separator,
+    )
+
+
+def serialized_round_trip_values(data: dict[str, object]) -> dict[str, object]:
+    """Project serialized JSON onto fields checked by round-trip persistence tests."""
+    return {
+        "copy_to": data["copy_to"],
+        "path_to_goldendict_executable": data["path_to_goldendict_executable"],
+        "anki_image_format": data["anki_image_format"],
+        "anki_field_separator": data["anki_field_separator"],
+    }
+
+
 class TestConfigSaveToFile:
     """Test Config.save_to_file serialization."""
 
@@ -363,24 +415,16 @@ class TestConfigSaveToFile:
         """Test that saving and reading a config produces the same values."""
         cfg_path = tmp_path / scenario.config_relpath
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
-        cfg = Config(
-            copy_to=scenario.copy_to,
-            path_to_goldendict_executable=scenario.goldendict_path,
-            anki_image_format=scenario.image_format,
-            anki_field_separator=scenario.field_separator,
-        )
+        cfg = config_from_round_trip_scenario(scenario)
         cfg.save_to_file()
         assert cfg_path.is_file()
-        data = json.loads(cfg_path.read_text(encoding="utf-8"))
-        assert data["copy_to"] == scenario.copy_to.name
-        assert data["anki_image_format"] == scenario.image_format.name
-        assert data["anki_field_separator"] == scenario.field_separator
-        assert data["path_to_goldendict_executable"] == scenario.goldendict_path
-        loaded = Config.read_from_file()
-        assert loaded.copy_to == scenario.copy_to
-        assert loaded.anki_image_format == scenario.image_format
-        assert loaded.anki_field_separator == scenario.field_separator
-        assert loaded.path_to_goldendict_executable == scenario.goldendict_path
+        assert serialized_round_trip_values(json.loads(cfg_path.read_text(encoding="utf-8"))) == {
+            "copy_to": scenario.copy_to.name,
+            "path_to_goldendict_executable": scenario.goldendict_path,
+            "anki_image_format": scenario.image_format.name,
+            "anki_field_separator": scenario.field_separator,
+        }
+        assert round_trip_values(Config.read_from_file()) == round_trip_values(cfg)
 
     CONFIG_PERMISSION_SCENARIOS: dict[str, str] = {"existing_permissive_file": "secret"}
 
@@ -398,7 +442,9 @@ class TestConfigSaveToFile:
     ) -> None:
         """Saving a plaintext Anki API key restricts the configuration file mode."""
         cfg_path = tmp_path / "lancet.json"
-        cfg_path.touch(mode=0o644)
+        cfg_path.touch()
+        cfg_path.chmod(0o644)
+        assert stat.S_IMODE(cfg_path.stat().st_mode) == 0o644
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
         Config(anki_connect_api_key=api_key).save_to_file()
         assert stat.S_IMODE(cfg_path.stat().st_mode) == CONFIG_FILE_MODE
@@ -450,14 +496,16 @@ class TestConfigSaveToFile:
         original_content = '{"old": true}'
         cfg_path.write_text(original_content, encoding="utf-8")
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
-        monkeypatch.setattr(
-            "lancet.config.json.dump", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("write failed"))
-        )
+        write_error = OSError("write failed")
+        monkeypatch.setattr("lancet.config.json.dump", create_autospec(json.dump, side_effect=write_error))
 
-        with pytest.raises(OSError, match="write failed"):
+        with pytest.raises(OSError) as exc_info:
             Config().save_to_file()
 
+        assert exc_info.value is write_error
+        assert str(exc_info.value) == "write failed"
         assert cfg_path.read_text(encoding="utf-8") == original_content
+        assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
 
     def test_failed_replacement_preserves_existing_config(
         self,
@@ -478,7 +526,29 @@ class TestConfigSaveToFile:
         assert exc_info.value is replace_error
         assert cfg_path.read_text(encoding="utf-8") == original_content
         assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
-        assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
+
+    def test_cleanup_failure_does_not_mask_replacement_failure(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """Temporary cleanup errors are logged without replacing the write failure."""
+        cfg_path = tmp_path / "lancet.json"
+        original_content = '{"old": true}'
+        replace_error = OSError("replace failed")
+        cleanup_error = OSError("cleanup failed")
+        cfg_path.write_text(original_content, encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        monkeypatch.setattr(pathlib.Path, "replace", ReplaceFailure(replace_error))
+        monkeypatch.setattr(pathlib.Path, "unlink", UnlinkFailure(cleanup_error))
+
+        with patch("lancet.config.logger.warning") as warning:
+            with pytest.raises(OSError) as exc_info:
+                Config().save_to_file()
+
+        assert exc_info.value is replace_error
+        assert cfg_path.read_text(encoding="utf-8") == original_content
+        warning.assert_called_once_with("Failed to remove temporary config file: cleanup failed")
 
     @pytest.mark.skipif(IS_WIN, reason="Windows symlink behavior differs from POSIX replacement semantics")
     def test_replaces_config_symlink_without_modifying_target(

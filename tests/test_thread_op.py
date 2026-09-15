@@ -12,6 +12,7 @@ from unittest.mock import call, patch
 import pytest
 from PyQt6.QtCore import QEventLoop, QThread
 from PyQt6.QtWidgets import QApplication
+from zala.utils import qconnect
 
 from lancet.ocr.manga_ocr_base import MangaOCRException
 from lancet.ocr.thread_op import LancetThreadOp
@@ -88,9 +89,10 @@ CALLBACK_FAILURE_SCENARIOS: dict[str, CallbackFailureScenario] = {
 class CallbackRecorder:
     """Record one completion callback and exit its nested Qt event loop."""
 
-    def __init__(self, loop: QEventLoop) -> None:
+    def __init__(self, loop: QEventLoop, *, quit_on_callback: bool = True) -> None:
         """Store the event loop that callback completion should exit."""
         self._loop = loop
+        self._quit_on_callback = quit_on_callback
         self._success_value: int | None = None
         self._failure: Exception | None = None
         self._callback_thread: QThread | None = None
@@ -114,13 +116,15 @@ class CallbackRecorder:
         """Record a successful value and the callback's Qt thread."""
         self._success_value = value
         self._callback_thread = QThread.currentThread()
-        self._loop.quit()
+        if self._quit_on_callback:
+            self._loop.quit()
 
     def on_failure(self, error: Exception) -> None:
         """Record a failed operation and the callback's Qt thread."""
         self._failure = error
         self._callback_thread = QThread.currentThread()
-        self._loop.quit()
+        if self._quit_on_callback:
+            self._loop.quit()
 
 
 class WorkerThreadId:
@@ -143,8 +147,8 @@ class FailingOperation:
         raise self._error
 
 
-class ExplodingSuccess:
-    """Exit the event loop and then raise from a success callback."""
+class ExplodingCallback[T]:
+    """Exit an event loop and then raise from a completion callback."""
 
     def __init__(self, loop: QEventLoop, error_message: str) -> None:
         """Store the loop and callback error message for one logging scenario."""
@@ -154,32 +158,11 @@ class ExplodingSuccess:
 
     @property
     def was_called(self) -> bool:
-        """Return whether the exploding success callback ran."""
+        """Return whether the exploding completion callback ran."""
         return self._was_called
 
-    def __call__(self, value: int) -> None:
+    def __call__(self, _: T) -> None:
         """Exit the loop and raise to verify callback failures are logged separately."""
-        self._was_called = True
-        self._loop.quit()
-        raise RuntimeError(self._error_message)
-
-
-class ExplodingFailure:
-    """Exit the event loop and then raise from a failure callback."""
-
-    def __init__(self, loop: QEventLoop, error_message: str) -> None:
-        """Store the loop and callback error message for one logging scenario."""
-        self._loop = loop
-        self._error_message = error_message
-        self._was_called = False
-
-    @property
-    def was_called(self) -> bool:
-        """Return whether the exploding failure callback ran."""
-        return self._was_called
-
-    def __call__(self, _: Exception) -> None:
-        """Exit the loop and raise to verify failure callback errors are logged separately."""
         self._was_called = True
         self._loop.quit()
         raise RuntimeError(self._error_message)
@@ -259,6 +242,17 @@ class TestLancetThreadOp:
         assert recorder.success_value is not None
         assert recorder.callback_thread == qapp.thread()
 
+    def test_deletes_operation_after_dispatch(self, executor: concurrent.futures.ThreadPoolExecutor) -> None:
+        """Deferred cleanup destroys the QObject after its completion callback returns."""
+        loop = QEventLoop()
+        recorder = CallbackRecorder(loop, quit_on_callback=False)
+        operation = LancetThreadOp(op=WorkerThreadId(), executor=executor)
+        qconnect(operation.destroyed, loop.quit)
+        operation.success(recorder.on_success).failure(recorder.on_failure).run_in_background()
+        wait_for_qt_event_loop(loop)
+        assert recorder.success_value is not None
+        assert recorder.failure is None
+
     @pytest.mark.parametrize("scenario", MISSING_HANDLER_SCENARIOS.values(), ids=MISSING_HANDLER_SCENARIOS.keys())
     def test_rejects_missing_handler(
         self, scenario: MissingHandlerScenario, executor: concurrent.futures.ThreadPoolExecutor
@@ -289,7 +283,7 @@ class TestLancetThreadOp:
     ) -> None:
         """A success callback bug is logged and does not invoke the worker failure callback."""
         loop = QEventLoop()
-        success = ExplodingSuccess(loop, scenario.error_message)
+        success = ExplodingCallback[int](loop, scenario.error_message)
         recorder = CallbackRecorder(loop)
         with patch("lancet.ocr.thread_op.logger.exception") as log:
             LancetThreadOp(op=WorkerThreadId(), executor=executor).success(success).failure(
@@ -306,7 +300,7 @@ class TestLancetThreadOp:
     ) -> None:
         """A failure callback bug is logged and does not invoke the success callback."""
         loop = QEventLoop()
-        failure = ExplodingFailure(loop, scenario.error_message)
+        failure = ExplodingCallback[Exception](loop, scenario.error_message)
         recorder = CallbackRecorder(loop)
         error = RuntimeError("operation failed")
         with patch("lancet.ocr.thread_op.logger.exception") as log:

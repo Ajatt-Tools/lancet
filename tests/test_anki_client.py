@@ -27,6 +27,7 @@ from lancet.anki.client_types import (
     UpdateNoteFieldsParams,
 )
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
+from lancet.anki.settings import AnkiConnectSettings
 from lancet.config import Config
 from lancet.consts import DEFAULT_ANKICONNECT_URL
 from lancet.exceptions import (
@@ -74,6 +75,25 @@ REQUEST_FAILURE_SCENARIOS: dict[str, RequestFailureScenario] = {
         error_type=requests.Timeout,
         error_message="request timed out",
         expected_error_type=AnkiConnectError,
+    ),
+}
+
+
+class SettingsArgumentsScenario(typing.NamedTuple):
+    """Arguments that must not construct keyword-only Anki operation settings."""
+
+    url: str
+    api_key: str
+    field_name: str
+    field_separator: str
+
+
+SETTINGS_ARGUMENTS_SCENARIOS: dict[str, SettingsArgumentsScenario] = {
+    "all_fields_positional": SettingsArgumentsScenario(
+        url=DEFAULT_ANKICONNECT_URL,
+        api_key="key",
+        field_name=IMAGE_FIELD,
+        field_separator="<br>",
     ),
 }
 
@@ -231,6 +251,15 @@ class AttachmentOperationRecorder:
         self._calls.append(AttachmentOperationCall(name=AttachmentOperation.update_note_field, args=(note_id, value)))
 
 
+def attachment_commit_operations(expected_html: str) -> Sequence[AttachmentOperationCall]:
+    """Return the note field, media storage, and field update operations of one attachment commit."""
+    return (
+        AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID,)),
+        AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
+        AttachmentOperationCall(name=AttachmentOperation.update_note_field, args=(NOTE_ID, expected_html)),
+    )
+
+
 class AttachmentTransactionScenario(typing.NamedTuple):
     """The first attachment transaction's terminal outcome before its lock releases."""
 
@@ -260,8 +289,8 @@ class ConcurrentAttachmentContext:
             image_format=AnkiImageFormat.webp,
             settings=ImageParameters(width=0, height=0, quality=33),
         )
-        self.first_started = threading.Event()
-        self.allow_first = threading.Event()
+        self.first_update_started = threading.Event()
+        self.allow_first_update = threading.Event()
         self._errors: list[Exception] = []
         self.first_error = (
             scenario.update_error_type(scenario.update_error_message) if scenario.update_error_type else None
@@ -271,7 +300,11 @@ class ConcurrentAttachmentContext:
 
     def _install_transaction_mocks(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Install the blocked first transaction and transport-free second-client spies."""
-        monkeypatch.setattr(self.first_client, "browse_note", self._browse_note)
+        monkeypatch.setattr(
+            self.first_client,
+            "browse_note",
+            create_autospec(self.first_client.browse_note),
+        )
         monkeypatch.setattr(
             self.first_client, "note_field", create_autospec(self.first_client.note_field, return_value="")
         )
@@ -283,15 +316,16 @@ class ConcurrentAttachmentContext:
         monkeypatch.setattr(
             self.first_client,
             "update_note_field",
-            create_autospec(self.first_client.update_note_field, side_effect=self.first_error),
+            create_autospec(self.first_client.update_note_field, side_effect=self._update_note_field),
         )
         monkeypatch.setattr(self.second_client, "invoke", self.second_invoke)
 
-    def _browse_note(self, note_id: int) -> None:
-        """Block only the first transaction's flush operation."""
-        if note_id == 0:
-            self.first_started.set()
-            self.allow_first.wait()
+    def _update_note_field(self, note_id: int, value: str) -> None:
+        """Block the first transaction after it completes field lookup and media upload."""
+        self.first_update_started.set()
+        self.allow_first_update.wait()
+        if self.first_error is not None:
+            raise self.first_error
 
     def _attach_first(self) -> None:
         """Run the blocked first attachment and retain unexpected failures."""
@@ -382,6 +416,23 @@ def make_client(cfg: Config) -> AnkiConnectClient:
     return AnkiConnectClientFactory(cfg).create()
 
 
+def make_response(*, payload: object, is_redirect: bool = False) -> Mock:
+    """Create an AnkiConnect HTTP response with a validated redirect flag."""
+    response = create_autospec(requests.Response, instance=True)
+    response.json.return_value = payload
+    response.is_redirect = is_redirect
+    return response
+
+
+def construct_settings_positionally(scenario: SettingsArgumentsScenario) -> AnkiConnectSettings:
+    """Invoke the keyword-only settings constructor through its runtime call boundary."""
+    constructor = typing.cast(
+        typing.Callable[[str, str, str, str], AnkiConnectSettings],
+        AnkiConnectSettings,
+    )
+    return constructor(scenario.url, scenario.api_key, scenario.field_name, scenario.field_separator)
+
+
 def create_attachment_setup(scenario: AttachmentScenario, monkeypatch: pytest.MonkeyPatch) -> AttachmentSetup:
     """Create an attachment client whose collaborators report their ordered operations."""
     client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_field_separator=scenario.separator))
@@ -430,8 +481,7 @@ class TestAnkiConnectInvoke:
     @pytest.mark.parametrize("scenario", REQUEST_SCENARIOS.values(), ids=REQUEST_SCENARIOS.keys())
     def test_request_payload(self, scenario: RequestScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """Transport sends the configured endpoint, version-six payload, and timeout."""
-        response = create_autospec(requests.Response, instance=True)
-        response.json.return_value = {"result": [1], "error": None}
+        response = make_response(payload={"result": [1], "error": None})
         post = Mock(return_value=response)
         monkeypatch.setattr("lancet.anki.client.requests.post", post)
         client = make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL, anki_connect_api_key=scenario.api_key))
@@ -440,6 +490,7 @@ class TestAnkiConnectInvoke:
             DEFAULT_ANKICONNECT_URL,
             json=expected_request(scenario.api_key),
             timeout=ANKI_CONNECT_TIMEOUT_SEC,
+            allow_redirects=False,
         )
         response.raise_for_status.assert_called_once_with()
 
@@ -454,6 +505,36 @@ class TestAnkiConnectInvoke:
         with pytest.raises(scenario.expected_error_type) as exc_info:
             client.invoke("findNotes", {"query": "added:1"})
         assert str(exc_info.value) == f"Could not reach AnkiConnect: {scenario.error_message}"
+        assert exc_info.value.__cause__ is request_error
+
+    def test_http_status_failure_is_wrapped(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """HTTP status failures retain their exact cause in the public transport error."""
+        request_error = requests.HTTPError("server error")
+        response = make_response(payload={"result": None, "error": None})
+        response.raise_for_status.side_effect = request_error
+        monkeypatch.setattr("lancet.anki.client.requests.post", Mock(return_value=response))
+
+        with pytest.raises(AnkiConnectError) as exc_info:
+            make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL)).invoke("findNotes", {"query": "added:1"})
+
+        assert str(exc_info.value) == "Could not reach AnkiConnect: server error"
+        assert exc_info.value.__cause__ is request_error
+
+    def test_redirect_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AnkiConnect requests reject redirects instead of forwarding sensitive payloads."""
+        response = make_response(payload={"result": None, "error": None}, is_redirect=True)
+        monkeypatch.setattr("lancet.anki.client.requests.post", Mock(return_value=response))
+
+        with pytest.raises(AnkiConnectError) as exc_info:
+            make_client(Config(anki_connect_url=DEFAULT_ANKICONNECT_URL)).invoke("findNotes", {"query": "added:1"})
+
+        assert str(exc_info.value) == "AnkiConnect endpoint returned an HTTP redirect"
+
+    @pytest.mark.parametrize("scenario", SETTINGS_ARGUMENTS_SCENARIOS.values(), ids=SETTINGS_ARGUMENTS_SCENARIOS.keys())
+    def test_settings_reject_positional_arguments(self, scenario: SettingsArgumentsScenario) -> None:
+        """Anki operation settings require names so connection fields cannot be swapped."""
+        with pytest.raises(TypeError):
+            construct_settings_positionally(scenario)
 
     def test_factory_client_snapshots_connection_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A client retains endpoint and API key captured before later config changes."""
@@ -461,8 +542,7 @@ class TestAnkiConnectInvoke:
         client = make_client(cfg)
         cfg.anki_connect_url = "http://changed:8765"
         cfg.anki_connect_api_key = "changed-key"
-        response = create_autospec(requests.Response, instance=True)
-        response.json.return_value = {"result": [], "error": None}
+        response = make_response(payload={"result": [], "error": None})
         post = Mock(return_value=response)
         monkeypatch.setattr("lancet.anki.client.requests.post", post)
 
@@ -472,6 +552,7 @@ class TestAnkiConnectInvoke:
             "http://original:8765",
             json=expected_request("original-key"),
             timeout=ANKI_CONNECT_TIMEOUT_SEC,
+            allow_redirects=False,
         )
 
     def test_factory_client_snapshots_attachment_target(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -551,12 +632,7 @@ class TestAnkiNoteOperations:
         setup.filename_factory.assert_called_once_with(NOTE_ID, AnkiImageFormat.webp.value)
         assert setup.operations.calls == (
             AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(0,)),
-            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID,)),
-            AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
-            AttachmentOperationCall(
-                name=AttachmentOperation.update_note_field,
-                args=(NOTE_ID, scenario.expected_html),
-            ),
+            *attachment_commit_operations(scenario.expected_html),
             AttachmentOperationCall(name=AttachmentOperation.browse_note, args=(NOTE_ID,)),
         )
 
@@ -574,13 +650,8 @@ class TestAnkiNoteOperations:
         with patch("lancet.anki.client.logger.warning") as warning:
             assert setup.client.attach_image(NOTE_ID, setup.image) == "lancet_actual.webp"
         assert browse.mock_calls == [call(0), call(NOTE_ID)]
-        assert setup.operations.calls == (
-            AttachmentOperationCall(name=AttachmentOperation.note_field, args=(NOTE_ID,)),
-            AttachmentOperationCall(name=AttachmentOperation.store_media, args=("lancet_actual.webp", IMAGE_DATA)),
-            AttachmentOperationCall(
-                name=AttachmentOperation.update_note_field,
-                args=(NOTE_ID, '<p>existing</p><br><img src="lancet_actual.webp">'),
-            ),
+        assert setup.operations.calls == attachment_commit_operations(
+            '<p>existing</p><br><img src="lancet_actual.webp">'
         )
         warning.assert_called_once_with(f"Anki attachment succeeded but Browser refresh failed: {refresh_error}")
 
@@ -612,14 +683,14 @@ class TestAnkiNoteOperations:
         context = ConcurrentAttachmentContext(scenario, monkeypatch)
         first = context.start()
         try:
-            assert context.first_started.wait(timeout=THREAD_WAIT_TIMEOUT_SEC) is True
+            assert context.first_update_started.wait(timeout=THREAD_WAIT_TIMEOUT_SEC) is True
             assert context.first_client is not context.second_client
             with pytest.raises(AnkiAttachmentInProgressError) as exc_info:
                 context.second_client.attach_image(NOTE_ID, context.image)
             assert str(exc_info.value) == "Another Anki attachment is already in progress"
             context.second_invoke.assert_not_called()
         finally:
-            context.allow_first.set()
+            context.allow_first_update.set()
             first.join(timeout=THREAD_WAIT_TIMEOUT_SEC)
         assert first.is_alive() is False
         assert context.errors == (() if context.first_error is None else (context.first_error,))

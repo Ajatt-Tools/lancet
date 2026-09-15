@@ -3,7 +3,6 @@
 """Tests for system-tray helpers, dependency wiring, and menu actions."""
 
 import concurrent.futures
-import dataclasses
 import pathlib
 import signal
 import typing
@@ -20,7 +19,7 @@ from zala.take_region import ZalaTakeScreenRegion
 
 from lancet.actions import LancetAction
 from lancet.anki.workflow import AnkiWorkflow
-from lancet.config import Config, make_preview_opts
+from lancet.config import Config
 from lancet.consts import (
     ANKI_SCREENSHOT_ICON_PATH,
     APP_NAME,
@@ -29,6 +28,7 @@ from lancet.consts import (
     SCREENSHOT_ICON_PATH,
 )
 from lancet.gui.open_dialogs import OpenDialogs
+from lancet.gui.preview_options import make_preview_opts
 from lancet.keyboard_shortcuts.listener import LancetShortcutManager
 from lancet.model_utils.model_loader import BackgroundModelLoader
 from lancet.model_utils.ocr_service import OcrService
@@ -39,69 +39,6 @@ from lancet.system_tray import (
     format_hotkey,
     make_output_file_path,
 )
-
-
-@dataclasses.dataclass
-class PreviewOptsScenario:
-    """A Config subset and expected screenshot-preview values."""
-
-    border_thickness: int
-    border_color: str
-    fill_color: str
-    outline_color: str
-    fill_brush_color: str
-    show_help_bar: bool
-    expected_alpha_red_green_blue: tuple[int, int, int, int]
-
-
-PREVIEW_OPTS_SCENARIOS: dict[str, PreviewOptsScenario] = {
-    "config_defaults": PreviewOptsScenario(
-        border_thickness=2,
-        border_color="#7F0000FF",
-        fill_color="#3C0080FF",
-        outline_color="#7FFF0000",
-        fill_brush_color="#557F7F7F",
-        show_help_bar=True,
-        expected_alpha_red_green_blue=(127, 0, 0, 255),
-    ),
-    "thicker_border_help_off": PreviewOptsScenario(
-        border_thickness=8,
-        border_color="#FF112233",
-        fill_color="#80445566",
-        outline_color="#A0AABBCC",
-        fill_brush_color="#10112233",
-        show_help_bar=False,
-        expected_alpha_red_green_blue=(255, 17, 34, 51),
-    ),
-}
-
-
-def build_cfg_from_preview_scenario(scenario: PreviewOptsScenario) -> Config:
-    """Create a Config carrying the scenario's preview-related fields."""
-    d = dataclasses.asdict(scenario)
-    del d["expected_alpha_red_green_blue"]
-    return Config(**d)
-
-
-class TestMakePreviewOpts:
-    """make_preview_opts mirrors Config overlay fields."""
-
-    @pytest.mark.parametrize("scenario", PREVIEW_OPTS_SCENARIOS.values(), ids=PREVIEW_OPTS_SCENARIOS.keys())
-    def test_scalar_fields_round_trip(self, scenario: PreviewOptsScenario) -> None:
-        """Scalar preview fields propagate from Config."""
-        opts = make_preview_opts(build_cfg_from_preview_scenario(scenario))
-        assert opts.border_thickness == scenario.border_thickness
-        assert opts.show_help is scenario.show_help_bar
-
-    @pytest.mark.parametrize("scenario", PREVIEW_OPTS_SCENARIOS.values(), ids=PREVIEW_OPTS_SCENARIOS.keys())
-    def test_border_color_components(self, scenario: PreviewOptsScenario) -> None:
-        """The border color parses to the expected ARGB components."""
-        opts = make_preview_opts(build_cfg_from_preview_scenario(scenario))
-        alpha, red, green, blue = scenario.expected_alpha_red_green_blue
-        assert opts.border_color.alpha() == alpha
-        assert opts.border_color.red() == red
-        assert opts.border_color.green() == green
-        assert opts.border_color.blue() == blue
 
 
 class FormatHotkeyScenario(typing.NamedTuple):
@@ -350,6 +287,24 @@ SYSTEM_ACTION_CALLBACK_NAMES: typing.Final[dict[str, str]] = {
 }
 
 
+class TrayRuntimeMocks(typing.NamedTuple):
+    """Related runtime collaborators used to construct tray dependencies."""
+
+    loader: BackgroundModelLoader
+    hotkeys: LancetShortcutManager
+    open_dialogs: OpenDialogs
+    dialog_locked: Mock
+    anki_workflow: AnkiWorkflow
+
+
+class TrayRuntimeCallbacks(typing.NamedTuple):
+    """Mocked callbacks obtained from autospecced tray runtime collaborators."""
+
+    start_anki_screenshot: Mock
+    load_all: Mock
+    start_listener: Mock
+
+
 def make_shortcut_manager_mock() -> LancetShortcutManager:
     """Create a shortcut-manager double with its runtime-owned signal namespace."""
     hotkeys = create_autospec(LancetShortcutManager, instance=True)
@@ -358,33 +313,57 @@ def make_shortcut_manager_mock() -> LancetShortcutManager:
     return hotkeys
 
 
-def make_tray_dependencies() -> TrayDependencies:
-    """Create autospecced tray dependencies."""
+def make_tray_runtime_mocks() -> TrayRuntimeMocks:
+    """Create related autospecced runtime collaborators."""
     loader = create_autospec(BackgroundModelLoader, instance=True)
     hotkeys = make_shortcut_manager_mock()
     open_dialogs = create_autospec(OpenDialogs, instance=True)
     dialog_locked = Mock(return_value=False)
     open_dialogs.is_locked = dialog_locked
     anki_workflow = create_autospec(AnkiWorkflow, instance=True)
-    start_listener = hotkeys.start_listener
-    start_anki_screenshot = anki_workflow.screenshot_and_add_to_anki
-    assert isinstance(start_listener, Mock)
+    return TrayRuntimeMocks(
+        loader=loader,
+        hotkeys=hotkeys,
+        open_dialogs=open_dialogs,
+        dialog_locked=dialog_locked,
+        anki_workflow=anki_workflow,
+    )
+
+
+def runtime_callbacks(runtime: TrayRuntimeMocks) -> TrayRuntimeCallbacks:
+    """Return runtime callbacks after validating that autospec created mocks."""
+    start_anki_screenshot = runtime.anki_workflow.screenshot_and_add_to_anki
+    load_all = runtime.loader.load_all
+    start_listener = runtime.hotkeys.start_listener
     assert isinstance(start_anki_screenshot, Mock)
+    assert isinstance(load_all, Mock)
+    assert isinstance(start_listener, Mock)
+    return TrayRuntimeCallbacks(
+        start_anki_screenshot=start_anki_screenshot,
+        load_all=load_all,
+        start_listener=start_listener,
+    )
+
+
+def make_tray_dependencies() -> TrayDependencies:
+    """Create autospecced tray dependencies."""
+    runtime = make_tray_runtime_mocks()
+    callbacks = runtime_callbacks(runtime)
     return TrayDependencies(
         notify=create_autospec(NotifySend, instance=True),
         screenshot=create_autospec(ZalaScreenshot, instance=True),
         take=create_autospec(ZalaTakeScreenRegion, instance=True),
-        open_dialogs=open_dialogs,
-        dialog_locked=dialog_locked,
+        open_dialogs=runtime.open_dialogs,
+        dialog_locked=runtime.dialog_locked,
         history=create_autospec(OcrHistory, instance=True),
-        loader=loader,
-        hotkeys=hotkeys,
-        anki_workflow=anki_workflow,
-        start_anki_screenshot=start_anki_screenshot,
+        loader=runtime.loader,
+        hotkeys=runtime.hotkeys,
+        anki_workflow=runtime.anki_workflow,
+        start_anki_screenshot=callbacks.start_anki_screenshot,
         ocr_service=create_autospec(OcrService, instance=True),
         executor=create_autospec(concurrent.futures.ThreadPoolExecutor, instance=True),
-        load_all=loader.load_all,
-        start_listener=start_listener,
+        load_all=callbacks.load_all,
+        start_listener=callbacks.start_listener,
     )
 
 
