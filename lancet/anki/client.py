@@ -8,6 +8,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 import requests
+from loguru import logger
 
 from lancet.anki.client_types import (
     AnkiConnectParams,
@@ -157,9 +158,11 @@ class AnkiConnectClient:
         # Anki's Check Media removes true orphans safely.
         self.update_note_field(note_id, new_html)
 
-        # Reselect the target only after the update so the Browser displays the
-        # field contents containing the newly attached image.
-        self.browse_note(note_id)
+        # The attachment is committed even if this cosmetic Browser refresh fails.
+        try:
+            self.browse_note(note_id)
+        except AnkiConnectError as ex:
+            logger.warning(f"Anki attachment succeeded but Browser refresh failed: {ex}")
         return filename
 
 
