@@ -3,11 +3,13 @@
 
 import concurrent.futures
 import datetime
+import functools
 import os
 import pathlib
 import signal
 import sys
 import typing
+from collections.abc import Mapping
 
 from loguru import logger
 from PyQt6.QtGui import QIcon
@@ -18,7 +20,7 @@ from zala.screenshot import ZalaScreenshot
 from zala.take_region import ZalaTakeScreenRegion
 from zala.utils import qconnect
 
-from lancet.actions import LancetAction
+from lancet.actions import LancetAction, LancetActionSpec
 from lancet.anki.workflow import AnkiWorkflow
 from lancet.config import Config, make_preview_opts
 from lancet.consts import (
@@ -135,28 +137,37 @@ class LancetSystemTray(QSystemTrayIcon):
         menu.addSeparator()
         self._add_system_menu_actions(menu)
 
+    def _lancet_action_to_spec(self) -> Mapping[LancetAction, LancetActionSpec]:
+        """Return tray presentation details keyed by dispatch action."""
+        return {
+            LancetAction.screenshot: LancetActionSpec(
+                label=format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
+                icon_path=SCREENSHOT_ICON_PATH,
+            ),
+            LancetAction.screenshot_to_anki: LancetActionSpec(
+                label=format_hotkey("Screenshot to Anki", self._cfg.anki_shortcut),
+                icon_path=ANKI_SCREENSHOT_ICON_PATH,
+            ),
+            LancetAction.ocr: LancetActionSpec(
+                label=format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
+                icon_path=OCR_ICON_PATH,
+            ),
+            LancetAction.detect_and_ocr: LancetActionSpec(
+                label=format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
+                icon_path=DETECT_AND_OCR_ICON_PATH,
+            ),
+        }
+
     def _add_feature_menu_actions(self, menu: QMenu) -> None:
         """Add screenshot and OCR actions to the menu."""
-        menu.addAction(
-            QIcon(str(SCREENSHOT_ICON_PATH)),
-            format_hotkey("Screenshot area", self._cfg.screenshot_shortcut),
-            self.make_screenshot_area,
-        )
-        menu.addAction(
-            QIcon(str(ANKI_SCREENSHOT_ICON_PATH)),
-            format_hotkey("Screenshot to Anki", self._cfg.anki_shortcut),
-            self.make_anki_screenshot,
-        )
-        menu.addAction(
-            QIcon(str(OCR_ICON_PATH)),
-            format_hotkey("OCR screenshot", self._cfg.ocr_shortcut),
-            self.make_ocr_screenshot,
-        )
-        menu.addAction(
-            QIcon(str(DETECT_AND_OCR_ICON_PATH)),
-            format_hotkey("Detect and OCR", self._cfg.ocr_page_shortcut),
-            self.detect_and_make_ocr_screenshot,
-        )
+        for lancet_action, spec in self._lancet_action_to_spec().items():
+            action = menu.addAction(
+                QIcon(str(spec.icon_path)),
+                spec.label,
+                # Can't use lambda in a loop.
+                functools.partial(self.process_received_command, lancet_action),
+            )
+            action.setData(lancet_action)
 
     def _add_system_menu_actions(self, menu: QMenu) -> None:
         """Add the preferences/restart/about/exit actions to the menu."""
