@@ -105,7 +105,7 @@ SYNCHRONIZATION_SCENARIOS: dict[str, SynchronizationScenario] = {
 }
 
 
-def grid_widget(layout: QGridLayout, row: int, column: int) -> QWidget:
+def grid_widget(layout: QGridLayout, *, row: int, column: int) -> QWidget:
     """Return the widget in one grid cell or raise if the tested layout is incomplete."""
     item = layout.itemAtPosition(row, column)
     if item is None or (widget := item.widget()) is None:
@@ -119,11 +119,11 @@ def slider_widgets_for_title(box: ImageSliderBox, title: str) -> RichSliderWidge
     if not isinstance(layout, QGridLayout):
         raise AssertionError("ImageSliderBox must use a QGridLayout")
     for row in range(layout.rowCount()):
-        if isinstance(label := grid_widget(layout, row, 0), QLabel) and label.text() == title:
+        if isinstance(label := grid_widget(layout, row=row, column=0), QLabel) and label.text() == title:
             slider, spinbox, unit_label = (
-                grid_widget(layout, row, 1),
-                grid_widget(layout, row, 2),
-                grid_widget(layout, row, 3),
+                grid_widget(layout, row=row, column=1),
+                grid_widget(layout, row=row, column=2),
+                grid_widget(layout, row=row, column=3),
             )
             if isinstance(slider, QSlider) and isinstance(spinbox, QSpinBox) and isinstance(unit_label, QLabel):
                 return RichSliderWidgets(slider=slider, spinbox=spinbox, unit_label=unit_label)

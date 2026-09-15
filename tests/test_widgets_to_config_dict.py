@@ -24,6 +24,7 @@ from lancet.gui.enum_select_combo import EnumSelectCombo
 from lancet.gui.exceptions import WidgetSetValueError
 from lancet.gui.file_picker import LancetFilePicker
 from lancet.gui.grab_key import ShortCutGrabButton
+from lancet.gui.line_edit import ColorEdit, MonoSpaceLineEdit
 from lancet.gui.utils import DetectorInputSizeSpinBox
 from lancet.gui.widgets_to_config_dict import (
     CfgValueTypes,
@@ -50,6 +51,14 @@ def make_large_spin_box() -> QSpinBox:
 def make_shortcut_button() -> ShortCutGrabButton:
     """Return an unassigned shortcut button."""
     return ShortCutGrabButton(initial_value="")
+
+
+@pytest.mark.parametrize("widget_type", (MonoSpaceLineEdit, ColorEdit))
+def test_custom_line_edit_accepts_keyword_parent(widget_type: type[MonoSpaceLineEdit], qapp: QApplication) -> None:
+    """Custom text controls retain explicit Qt parent ownership."""
+    parent = QWidget()
+    widget = widget_type(parent=parent)
+    assert widget.parentWidget() is parent
 
 
 class WidgetMappingScenario(typing.NamedTuple):

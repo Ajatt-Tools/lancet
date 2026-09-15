@@ -21,7 +21,11 @@ from lancet.anki.client import AnkiConnectClient, AnkiConnectClientFactory
 from lancet.anki.image_types import AnkiImageFormat, EncodedImage, ImageParameters
 from lancet.anki.workflow import AnkiAttachmentJob, AnkiWorkflow, AttachedImage
 from lancet.config import Config, make_preview_opts
-from lancet.exceptions import AnkiConnectUnavailableError, PixmapConversionError
+from lancet.exceptions import (
+    AnkiConnectError,
+    AnkiConnectUnavailableError,
+    PixmapConversionError,
+)
 from lancet.gui.open_dialogs import OpenDialogs
 from lancet.notifications import NotifySend
 from tests.helpers import wait_for_qt_event_loop
@@ -448,6 +452,23 @@ class TestAnkiWorkflow:
                 wait_for_qt_event_loop(loop)
         assert workflow_context.client.attach_image.call_args.args == (NOTE_ID, ATTACHMENT_IMAGE)
         assert notification.messages == [f"Added avif image to Anki note 42: {scenario.filename} (0.00 KiB)"]
+
+    def test_attachment_worker_failure_notifies(self, workflow_context: AnkiWorkflowContext) -> None:
+        """A queued attachment failure reaches the job's configured failure callback."""
+        loop = QEventLoop()
+        notification = NotificationRecorder(loop)
+        error = AnkiConnectError("attachment failed")
+        workflow_context.client.attach_image.side_effect = error
+        workflow_context.notify.notify.side_effect = notification
+        selection = create_autospec(UserSelectionResult, instance=True)
+        with (
+            patch("lancet.anki.workflow.prepare_pillow_image", return_value=Image.new("RGB", (100, 100))),
+            patch("lancet.anki.workflow.encode_image", return_value=ATTACHMENT_IMAGE),
+        ):
+            workflow_context.create_job()._attach_selection(NOTE_ID, selection)
+            wait_for_qt_event_loop(loop)
+
+        assert notification.messages == ["Anki attachment failed: attachment failed"]
 
     @pytest.mark.parametrize("scenario", PREFLIGHT_FAILURE_SCENARIOS.values(), ids=PREFLIGHT_FAILURE_SCENARIOS.keys())
     def test_preflight_failure_notifies_without_selection(

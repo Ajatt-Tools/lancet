@@ -17,8 +17,43 @@ from lancet.consts import (
     ANKI_IMAGE_MAX_DIMENSION,
     ANKI_IMAGE_MAX_QUALITY,
     CONFIG_FILE_MODE,
+    IS_WIN,
 )
 from lancet.exceptions import ConfigReadError
+
+
+class ConfigDumpRecorder:
+    """Observe a temporary configuration file while replacing JSON serialization."""
+
+    def __init__(self) -> None:
+        """Initialize the empty temporary-file observation lists."""
+        self.paths: list[pathlib.Path] = []
+        self.modes: list[int] = []
+
+    def __call__(
+        self,
+        _data: object,
+        output: typing.TextIO,
+        *,
+        ensure_ascii: bool,
+        indent: int,
+    ) -> None:
+        """Record file metadata and write a minimal valid JSON object."""
+        self.paths.append(pathlib.Path(output.name))
+        self.modes.append(stat.S_IMODE(os.fstat(output.fileno()).st_mode))
+        output.write("{}")
+
+
+class ReplaceFailure:
+    """Raise one caller-owned error when atomic config replacement is attempted."""
+
+    def __init__(self, error: OSError) -> None:
+        """Store the exact replacement failure expected by the test."""
+        self._error = error
+
+    def __call__(self, *_paths: pathlib.Path) -> pathlib.Path:
+        """Raise the stored replacement error without altering either path."""
+        raise self._error
 
 
 class ConfigFileScenario(typing.NamedTuple):
@@ -354,6 +389,7 @@ class TestConfigSaveToFile:
         CONFIG_PERMISSION_SCENARIOS.values(),
         ids=CONFIG_PERMISSION_SCENARIOS.keys(),
     )
+    @pytest.mark.skipif(IS_WIN, reason="Windows chmod does not enforce POSIX owner-only permissions")
     def test_restricts_file_permissions(
         self,
         api_key: str,
@@ -367,6 +403,7 @@ class TestConfigSaveToFile:
         Config(anki_connect_api_key=api_key).save_to_file()
         assert stat.S_IMODE(cfg_path.stat().st_mode) == CONFIG_FILE_MODE
 
+    @pytest.mark.skipif(IS_WIN, reason="Windows chmod does not enforce POSIX owner-only permissions")
     def test_new_file_is_restricted_during_write(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -374,30 +411,17 @@ class TestConfigSaveToFile:
     ) -> None:
         """A new config temporary file is owner-only before writing the API key."""
         cfg_path = tmp_path / "lancet.json"
-        observed_paths: list[pathlib.Path] = []
-        observed_modes: list[int] = []
-
-        def record_dump(
-            _data: object,
-            output: typing.TextIO,
-            *,
-            ensure_ascii: bool,
-            indent: int,
-        ) -> None:
-            observed_paths.append(pathlib.Path(output.name))
-            observed_modes.append(stat.S_IMODE(os.fstat(output.fileno()).st_mode))
-            output.write("{}")
-
+        recorder = ConfigDumpRecorder()
         monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
-        monkeypatch.setattr("lancet.config.json.dump", record_dump)
+        monkeypatch.setattr("lancet.config.json.dump", recorder)
         Config(anki_connect_api_key="secret").save_to_file()
 
-        assert len(observed_paths) == 1
-        assert observed_paths[0].parent == cfg_path.parent
-        assert observed_paths[0] != cfg_path
-        assert observed_modes == [CONFIG_FILE_MODE]
+        assert len(recorder.paths) == 1
+        assert recorder.paths[0].parent == cfg_path.parent
+        assert recorder.paths[0] != cfg_path
+        assert recorder.modes == [CONFIG_FILE_MODE]
         assert cfg_path.read_text(encoding="utf-8") == "{}"
-        assert observed_paths[0].exists() is False
+        assert recorder.paths[0].exists() is False
 
     def test_failed_save_does_not_chmod_directory(
         self,
@@ -434,6 +458,46 @@ class TestConfigSaveToFile:
             Config().save_to_file()
 
         assert cfg_path.read_text(encoding="utf-8") == original_content
+
+    def test_failed_replacement_preserves_existing_config(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """A failed atomic replacement preserves the old config and cleans its temporary sibling."""
+        cfg_path = tmp_path / "lancet.json"
+        original_content = '{"old": true}'
+        replace_error = OSError("replace failed")
+        cfg_path.write_text(original_content, encoding="utf-8")
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+        monkeypatch.setattr(pathlib.Path, "replace", ReplaceFailure(replace_error))
+
+        with pytest.raises(OSError) as exc_info:
+            Config().save_to_file()
+
+        assert exc_info.value is replace_error
+        assert cfg_path.read_text(encoding="utf-8") == original_content
+        assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
+        assert list(tmp_path.glob(".lancet.json.*.tmp")) == []
+
+    @pytest.mark.skipif(IS_WIN, reason="Windows symlink behavior differs from POSIX replacement semantics")
+    def test_replaces_config_symlink_without_modifying_target(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """Atomic replacement replaces a config symlink instead of following its target."""
+        cfg_path = tmp_path / "lancet.json"
+        target_path = tmp_path / "target.json"
+        target_content = '{"target": true}'
+        target_path.write_text(target_content, encoding="utf-8")
+        cfg_path.symlink_to(target_path)
+        monkeypatch.setattr("lancet.config.CFG_PATH", cfg_path)
+
+        Config().save_to_file()
+
+        assert cfg_path.is_symlink() is False
+        assert target_path.read_text(encoding="utf-8") == target_content
 
 
 class TestConfigReadInvalidFile:
