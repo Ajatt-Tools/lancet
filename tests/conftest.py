@@ -4,7 +4,18 @@
 import os
 
 import pytest
+from beartype import beartype
 from PyQt6.QtWidgets import QApplication
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """
+    Runtime-check the arguments and return values of collected test functions.
+    https://github.com/beartype/beartype
+    """
+    for item in items:
+        if isinstance(item, pytest.Function):
+            item.obj = beartype(item.obj)
 
 
 @pytest.fixture(scope="session", autouse=True)
