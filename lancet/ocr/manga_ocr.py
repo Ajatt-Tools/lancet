@@ -83,6 +83,13 @@ def load_tokenizer(
     except (ValueError, ImportError) as ex:
         logger.warning(f"{adjust_auto_tokenizer_error_message(ex, pretrained_model_name_or_path)}")
         return load_slow_tokenizer(pretrained_model_name_or_path, local_files_only=local_files_only)
+    except TypeError as ex:
+        if "stat: path should be" not in str(ex) or "not NoneType" not in str(ex):
+            raise
+        raise MangaOCRTokenizerFileNotFoundError(
+            f"Missing tokenizer file for '{pretrained_model_name_or_path}'. "
+            "Check that the model provides all required tokenizer files."
+        ) from ex
 
 
 class MangaOcr(MangaOcrBase):
