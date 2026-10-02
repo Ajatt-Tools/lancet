@@ -6,7 +6,6 @@ import pathlib
 
 from PIL import Image
 
-from lancet.exceptions import LancetException
 from lancet.model_utils.base import LancetModel
 
 EXAMPLE_IMAGE_PATH = pathlib.Path(__file__).parent / "assets/example.jpg"
@@ -34,33 +33,3 @@ class MangaOcrBase(LancetModel):
     def recognize(self, img_or_path: str | pathlib.Path | Image.Image) -> str:
         """Recognize text in the given image or image file path and return it as a string."""
         raise NotImplementedError
-
-
-class MangaOCRException(LancetException):
-    """Base exception for all manga OCR related errors."""
-
-    pass
-
-
-class MangaOCRLoadError(MangaOCRException):
-    """Raised when the OCR model, tokenizer, or processor fails to load."""
-
-    pass
-
-
-class MangaOCRTokenizerLoadError(MangaOCRLoadError):
-    """Raised when the OCR tokenizer cannot be loaded."""
-
-    pass
-
-
-class MangaOCRUnavailableError(MangaOCRException):
-    """Manga OCR model is still loading."""
-
-    pass
-
-
-class MangaOCRFileNotFoundError(MangaOCRException, FileNotFoundError):
-    """Raised when a required file (e.g. example image) is not found."""
-
-    pass

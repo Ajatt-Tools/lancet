@@ -14,7 +14,7 @@ from PyQt6.QtCore import QEventLoop, QThread
 from PyQt6.QtWidgets import QApplication
 from zala.utils import qconnect
 
-from lancet.ocr.manga_ocr_base import MangaOCRException
+from lancet.ocr.exceptions import MangaOCRException
 from lancet.ocr.thread_op import LancetThreadOp
 from tests.helpers import wait_for_qt_event_loop
 

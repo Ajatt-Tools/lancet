@@ -3,7 +3,7 @@
 import pathlib
 
 from lancet.model_utils.common import class_name
-from lancet.ocr.manga_ocr_base import MangaOCRTokenizerLoadError
+from lancet.ocr.exceptions import MangaOCRTokenizerLoadError
 
 BACKEND_TOKENIZER_ERROR: str = "Couldn't instantiate the backend tokenizer"
 

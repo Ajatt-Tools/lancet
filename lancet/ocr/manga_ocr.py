@@ -24,12 +24,15 @@ from lancet.ocr.error_messages import (
     adjust_error_message,
     adjust_slow_tokenizer_error_message,
 )
-from lancet.ocr.manga_ocr_base import (
-    EXAMPLE_IMAGE_PATH,
-    MangaOcrBase,
+from lancet.ocr.exceptions import (
     MangaOCRException,
     MangaOCRFileNotFoundError,
     MangaOCRLoadError,
+    MangaOCRTokenizerFileNotFoundError,
+)
+from lancet.ocr.manga_ocr_base import (
+    EXAMPLE_IMAGE_PATH,
+    MangaOcrBase,
 )
 
 # Verify that VisionEncoderDecoderModel inherits GenerationMixin.

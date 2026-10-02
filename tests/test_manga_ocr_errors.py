@@ -13,14 +13,15 @@ from lancet.ocr.error_messages import (
     adjust_error_message,
     adjust_slow_tokenizer_error_message,
 )
+from lancet.ocr.exceptions import (
+    MangaOCRLoadError,
+    MangaOCRTokenizerFileNotFoundError,
+    MangaOCRTokenizerLoadError,
+)
 from lancet.ocr.manga_ocr import (
     MangaOcr,
     load_tokenizer,
     tokenizer_is_fast_label,
-)
-from lancet.ocr.manga_ocr_base import (
-    MangaOCRLoadError,
-    MangaOCRTokenizerLoadError,
 )
 
 

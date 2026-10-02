@@ -17,10 +17,8 @@ from lancet.model_utils.base import (
     ModelName,
 )
 from lancet.notifications import NotifySend
-from lancet.ocr.manga_ocr_base import (
-    MangaOcrBase,
-    MangaOCRUnavailableError,
-)
+from lancet.ocr.exceptions import MangaOCRUnavailableError
+from lancet.ocr.manga_ocr_base import MangaOcrBase
 from lancet.ocr.thread_op import LancetThreadOp
 from lancet.text_detector_client.text_detector_base import (
     ComicTextDetectorBase,

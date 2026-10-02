@@ -10,7 +10,7 @@ from loguru import logger
 from PyQt6.QtCore import QCoreApplication, QObject, Qt, pyqtSignal, pyqtSlot
 from zala.utils import q_emit
 
-from lancet.ocr.manga_ocr_base import MangaOCRException
+from lancet.ocr.exceptions import MangaOCRException
 
 
 class ThreadOpResult(typing.NamedTuple):
