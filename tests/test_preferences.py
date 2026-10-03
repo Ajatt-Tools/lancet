@@ -270,6 +270,19 @@ class TestWriteSplitterState:
             assert state_file.exists() is False
 
 
+class ApplyScenario(typing.NamedTuple):
+    """A save result and expected Apply outcome."""
+
+    error_message: str | None
+    expected_success: bool
+
+
+APPLY_SCENARIOS: dict[str, ApplyScenario] = {
+    "apply_succeeds": ApplyScenario(None, True),
+    "save_failure_emits_error": ApplyScenario("disk full", False),
+}
+
+
 class TestPreferencesDialogLifecycle:
     """Test Apply, Restore Defaults, and real persistence wiring."""
 
@@ -287,15 +300,10 @@ class TestPreferencesDialogLifecycle:
 
         assert dialog._tabs.widgets.force_cpu.isChecked() is False
 
-    @pytest.mark.parametrize(
-        "save_error,expected_success",
-        [(None, True), (OSError("disk full"), False)],
-        ids=["apply_succeeds", "save_failure_emits_error"],
-    )
+    @pytest.mark.parametrize("scenario", APPLY_SCENARIOS.values(), ids=APPLY_SCENARIOS.keys())
     def test_apply(
         self,
-        save_error: OSError | None,
-        expected_success: bool,
+        scenario: ApplyScenario,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: pathlib.Path,
         qapp: QApplication,
@@ -303,7 +311,7 @@ class TestPreferencesDialogLifecycle:
         """Apply copies values and emits a result according to config persistence."""
         patch_dialog_files(monkeypatch, tmp_path)
         cfg = Config()
-        save = Mock(side_effect=save_error)
+        save = Mock(side_effect=OSError(scenario.error_message) if scenario.error_message is not None else None)
         monkeypatch.setattr(cfg, "save_to_file", save)
         dialog = make_preferences_dialog(cfg)
         results: list[SettingsApplyResult] = []
@@ -313,8 +321,8 @@ class TestPreferencesDialogLifecycle:
         dialog._apply()
 
         assert cfg.force_cpu is True
-        assert results[0].success is expected_success
-        assert (results[0].error is None) is expected_success
+        assert results[0].success is scenario.expected_success
+        assert (results[0].error is None) is scenario.expected_success
 
     def test_save_geometry_persists_splitter(
         self,

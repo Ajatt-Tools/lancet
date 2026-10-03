@@ -5,7 +5,8 @@ import os
 import pathlib
 import sys
 import typing
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from types import MappingProxyType
 
 import pytest
 
@@ -29,38 +30,45 @@ def windows_pathsep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("lancet.find_executable.os.pathsep", ";")
 
 
+class FilterPathsScenario(typing.NamedTuple):
+    """A library path string and the entries expected after filtering."""
+
+    input_path: str
+    expected: Sequence[str]
+
+
+FILTER_PATHS_SCENARIOS: dict[str, FilterPathsScenario] = {
+    # No PyInstaller paths
+    "user_paths": FilterPathsScenario("/usr/lib:/opt/lib", ("/usr/lib", "/opt/lib")),
+    # Only PyInstaller path
+    "only_bundle": FilterPathsScenario("/tmp/_MEIxxxxx", ()),
+    # PyInstaller path at start
+    "bundle_first": FilterPathsScenario("/tmp/_MEIxxxxx:/usr/lib:/opt/lib", ("/usr/lib", "/opt/lib")),
+    # PyInstaller path in middle
+    "bundle_middle": FilterPathsScenario("/usr/lib:/tmp/_MEIxxxxx:/opt/lib", ("/usr/lib", "/opt/lib")),
+    # PyInstaller path at end
+    "bundle_last": FilterPathsScenario("/usr/lib:/opt/lib:/tmp/_MEIxxxxx", ("/usr/lib", "/opt/lib")),
+    # Repeated PyInstaller paths
+    "repeated_bundle": FilterPathsScenario(
+        "/tmp/_MEIxxxxx:/usr/lib:/tmp/_MEIxxxxx/lib:/opt/lib", ("/usr/lib", "/opt/lib")
+    ),
+    # A similarly named user path must be preserved
+    "similar_user_path": FilterPathsScenario("/opt/_MEI-tools/lib:/usr/lib", ("/opt/_MEI-tools/lib", "/usr/lib")),
+    # Empty string
+    "empty": FilterPathsScenario("", ()),
+    # Single path (no colons)
+    "single_user_path": FilterPathsScenario("/usr/lib", ("/usr/lib",)),
+}
+
+
 class TestFilterPyinstallerPaths:
     """Test filtering of PyInstaller paths from LD_LIBRARY_PATH."""
 
-    @pytest.mark.parametrize(
-        "input_path,expected",
-        [
-            # No PyInstaller paths
-            ("/usr/lib:/opt/lib", ["/usr/lib", "/opt/lib"]),
-            # Only PyInstaller path
-            ("/tmp/_MEIxxxxx", []),
-            # PyInstaller path at start
-            ("/tmp/_MEIxxxxx:/usr/lib:/opt/lib", ["/usr/lib", "/opt/lib"]),
-            # PyInstaller path in middle
-            ("/usr/lib:/tmp/_MEIxxxxx:/opt/lib", ["/usr/lib", "/opt/lib"]),
-            # PyInstaller path at end
-            ("/usr/lib:/opt/lib:/tmp/_MEIxxxxx", ["/usr/lib", "/opt/lib"]),
-            # Repeated PyInstaller paths
-            ("/tmp/_MEIxxxxx:/usr/lib:/tmp/_MEIxxxxx/lib:/opt/lib", ["/usr/lib", "/opt/lib"]),
-            # A similarly named user path must be preserved
-            ("/opt/_MEI-tools/lib:/usr/lib", ["/opt/_MEI-tools/lib", "/usr/lib"]),
-            # Empty string
-            ("", []),
-            # Single path (no colons)
-            ("/usr/lib", ["/usr/lib"]),
-        ],
-    )
-    def test_filter_pyinstaller_paths(
-        self, input_path: str, expected: Sequence[str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    @pytest.mark.parametrize("scenario", FILTER_PATHS_SCENARIOS.values(), ids=FILTER_PATHS_SCENARIOS.keys())
+    def test_filter_pyinstaller_paths(self, scenario: FilterPathsScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that PyInstaller paths are correctly filtered out."""
         monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
-        assert filter_pyinstaller_paths(input_path) == list(expected)
+        assert filter_pyinstaller_paths(scenario.input_path) == list(scenario.expected)
 
     def test_filter_windows_paths(
         self,
@@ -75,43 +83,50 @@ class TestFilterPyinstallerPaths:
         ]
 
 
+class CleanLdPathScenario(typing.NamedTuple):
+    """An environment and the expected result of cleaning its library path."""
+
+    input_env: Mapping[str, str]
+    expected_env: Mapping[str, str]
+
+
+CLEAN_LD_PATH_SCENARIOS: dict[str, CleanLdPathScenario] = {
+    # No LD_LIBRARY_PATH
+    "no_library_path": CleanLdPathScenario(
+        MappingProxyType({"PATH": "/usr/bin"}), MappingProxyType({"PATH": "/usr/bin"})
+    ),
+    # LD_LIBRARY_PATH with user paths only
+    "user_paths": CleanLdPathScenario(
+        MappingProxyType({"LD_LIBRARY_PATH": "/usr/lib:/opt/lib", "PATH": "/usr/bin"}),
+        MappingProxyType({"LD_LIBRARY_PATH": "/usr/lib:/opt/lib", "PATH": "/usr/bin"}),
+    ),
+    # LD_LIBRARY_PATH with PyInstaller path at start
+    "bundle_first": CleanLdPathScenario(
+        MappingProxyType({"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/usr/lib", "PATH": "/usr/bin"}),
+        MappingProxyType({"LD_LIBRARY_PATH": "/usr/lib", "PATH": "/usr/bin"}),
+    ),
+    # LD_LIBRARY_PATH with only PyInstaller path (should be removed)
+    "only_bundle": CleanLdPathScenario(
+        MappingProxyType({"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx", "PATH": "/usr/bin"}),
+        MappingProxyType({"PATH": "/usr/bin"}),
+    ),
+    # LD_LIBRARY_PATH with multiple PyInstaller paths
+    "multiple_bundle_paths": CleanLdPathScenario(
+        MappingProxyType({"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/usr/lib:/tmp/_MEIxxxxx/lib", "PATH": "/usr/bin"}),
+        MappingProxyType({"LD_LIBRARY_PATH": "/usr/lib", "PATH": "/usr/bin"}),
+    ),
+}
+
+
 class TestCleanLdLibraryPath:
     """Test cleaning of LD_LIBRARY_PATH in environment dictionary."""
 
-    @pytest.mark.parametrize(
-        "input_env,expected_env",
-        [
-            # No LD_LIBRARY_PATH
-            ({"PATH": "/usr/bin"}, {"PATH": "/usr/bin"}),
-            # LD_LIBRARY_PATH with user paths only
-            (
-                {"LD_LIBRARY_PATH": "/usr/lib:/opt/lib", "PATH": "/usr/bin"},
-                {"LD_LIBRARY_PATH": "/usr/lib:/opt/lib", "PATH": "/usr/bin"},
-            ),
-            # LD_LIBRARY_PATH with PyInstaller path at start
-            (
-                {"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/usr/lib", "PATH": "/usr/bin"},
-                {"LD_LIBRARY_PATH": "/usr/lib", "PATH": "/usr/bin"},
-            ),
-            # LD_LIBRARY_PATH with only PyInstaller path (should be removed)
-            (
-                {"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx", "PATH": "/usr/bin"},
-                {"PATH": "/usr/bin"},
-            ),
-            # LD_LIBRARY_PATH with multiple PyInstaller paths
-            (
-                {"LD_LIBRARY_PATH": "/tmp/_MEIxxxxx:/usr/lib:/tmp/_MEIxxxxx/lib", "PATH": "/usr/bin"},
-                {"LD_LIBRARY_PATH": "/usr/lib", "PATH": "/usr/bin"},
-            ),
-        ],
-    )
-    def test_clean_ld_library_path(
-        self, input_env: dict[str, str], expected_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    @pytest.mark.parametrize("scenario", CLEAN_LD_PATH_SCENARIOS.values(), ids=CLEAN_LD_PATH_SCENARIOS.keys())
+    def test_clean_ld_library_path(self, scenario: CleanLdPathScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that LD_LIBRARY_PATH is correctly cleaned in environment dictionary."""
         monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
-        result = clean_ld_library_path(input_env.copy())
-        assert result == expected_env
+        result = clean_ld_library_path(dict(scenario.input_env))
+        assert result == scenario.expected_env
 
     def test_clean_windows_path_variable(self, windows_pathsep: None, monkeypatch: pytest.MonkeyPatch) -> None:
         """Windows PATH-style separators are preserved when cleaning PATH-like variables."""
@@ -221,43 +236,53 @@ class TestMakeCleanEnv:
                 assert result[key] == expected_value
 
 
+class PathDetectionScenario(typing.NamedTuple):
+    """A candidate path and whether it belongs to the active bundle."""
+
+    path: str
+    expected: bool
+
+
+PYINSTALLER_PATH_SCENARIOS: dict[str, PathDetectionScenario] = {
+    "root": PathDetectionScenario("/tmp/_MEIxxxxx", True),
+    "descendant": PathDetectionScenario("/tmp/_MEIxxxxx/PyQt6/Qt6/plugins", True),
+    "normalized_descendant": PathDetectionScenario("/tmp//_MEIxxxxx/./PyQt6", True),
+    "parent_escape": PathDetectionScenario("/tmp/_MEIxxxxx/../other", False),
+    "similar_prefix": PathDetectionScenario("/tmp/_MEIxxxxx-other", False),
+    "relative": PathDetectionScenario("tmp/_MEIxxxxx", False),
+    "similar_user_path": PathDetectionScenario("/opt/_MEI-tools/lib", False),
+    "user_path": PathDetectionScenario("/usr/lib", False),
+}
+
+WINDOWS_PYINSTALLER_PATH_SCENARIOS: dict[str, PathDetectionScenario] = {
+    "lowercase_root": PathDetectionScenario(r"c:\temp\_meixxxxx", True),
+    "uppercase_descendant": PathDetectionScenario(r"C:\TEMP\_MEIXXXXX\PyQt6", True),
+    "normalized_descendant": PathDetectionScenario(r"C:\Temp\_MEIxxxxx\plugins\..\platforms", True),
+    "similar_prefix": PathDetectionScenario(r"C:\Temp\_MEIxxxxx-other", False),
+    "similar_user_path": PathDetectionScenario(r"C:\Temp\_MEI-tools", False),
+    "different_drive": PathDetectionScenario(r"D:\Temp\_MEIxxxxx", False),
+}
+
+
 class TestIsPyinstallerPath:
     """Test platform-independent PyInstaller extraction path detection."""
 
-    @pytest.mark.parametrize(
-        "path,expected",
-        [
-            ("/tmp/_MEIxxxxx", True),
-            ("/tmp/_MEIxxxxx/PyQt6/Qt6/plugins", True),
-            ("/tmp//_MEIxxxxx/./PyQt6", True),
-            ("/tmp/_MEIxxxxx/../other", False),
-            ("/tmp/_MEIxxxxx-other", False),
-            ("tmp/_MEIxxxxx", False),
-            ("/opt/_MEI-tools/lib", False),
-            ("/usr/lib", False),
-        ],
-    )
-    def test_detect(self, path: str, expected: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("scenario", PYINSTALLER_PATH_SCENARIOS.values(), ids=PYINSTALLER_PATH_SCENARIOS.keys())
+    def test_detect(self, scenario: PathDetectionScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """is_pyinstaller_path recognizes only the active extraction root and descendants."""
         monkeypatch.setattr(sys, "_MEIPASS", "/tmp/_MEIxxxxx", raising=False)
-        assert is_pyinstaller_path(path) is expected
+        assert is_pyinstaller_path(scenario.path) is scenario.expected
 
     @pytest.mark.parametrize(
-        "path,expected",
-        [
-            (r"c:\temp\_meixxxxx", True),
-            (r"C:\TEMP\_MEIXXXXX\PyQt6", True),
-            (r"C:\Temp\_MEIxxxxx\plugins\..\platforms", True),
-            (r"C:\Temp\_MEIxxxxx-other", False),
-            (r"C:\Temp\_MEI-tools", False),
-            (r"D:\Temp\_MEIxxxxx", False),
-        ],
+        "scenario", WINDOWS_PYINSTALLER_PATH_SCENARIOS.values(), ids=WINDOWS_PYINSTALLER_PATH_SCENARIOS.keys()
     )
-    def test_detect_windows_case_insensitive(self, path: str, expected: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_detect_windows_case_insensitive(
+        self, scenario: PathDetectionScenario, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Windows extraction-root matching is case-insensitive."""
         monkeypatch.setattr(sys, "_MEIPASS", r"C:\Temp\_MEIxxxxx", raising=False)
         monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
-        assert is_pyinstaller_path(path) is expected
+        assert is_pyinstaller_path(scenario.path) is scenario.expected
 
     @pytest.mark.parametrize("path", ["/tmp/_MEIxxxxx"])
     def test_without_extraction_dir(self, path: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -266,45 +291,79 @@ class TestIsPyinstallerPath:
         assert is_pyinstaller_path(path) is False
 
 
+class NormalizePathScenario(typing.NamedTuple):
+    """Platform, input path, and expected normalized path."""
+
+    is_windows: bool
+    path: str
+    expected: str
+
+
+NORMALIZE_PATH_SCENARIOS: dict[str, NormalizePathScenario] = {
+    "unix_trailing_separator": NormalizePathScenario(False, "/tmp/example/", "/tmp/example"),
+    "unix_dot_segments": NormalizePathScenario(False, "/tmp/example/./plugins/../lib", "/tmp/example/lib"),
+    "unix_backslash": NormalizePathScenario(False, r"/tmp/example\name/", r"/tmp/example\name"),
+    "windows_trailing_separator": NormalizePathScenario(True, "C:\\Temp\\Example\\", r"c:\temp\example"),
+    "windows_dot_segments": NormalizePathScenario(True, r"C:\Temp\Example\.\plugins\..\lib", r"c:\temp\example\lib"),
+}
+
+
 class TestNormalizeEnvPath:
     """Test platform-specific environment path normalization."""
 
-    @pytest.mark.parametrize(
-        "is_windows,path,expected",
-        [
-            (False, "/tmp/example/", "/tmp/example"),
-            (False, "/tmp/example/./plugins/../lib", "/tmp/example/lib"),
-            (False, r"/tmp/example\name/", r"/tmp/example\name"),
-            (True, "C:\\Temp\\Example\\", r"c:\temp\example"),
-            (True, r"C:\Temp\Example\.\plugins\..\lib", r"c:\temp\example\lib"),
-        ],
-    )
-    def test_normalize(self, is_windows: bool, path: str, expected: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.parametrize("scenario", NORMALIZE_PATH_SCENARIOS.values(), ids=NORMALIZE_PATH_SCENARIOS.keys())
+    def test_normalize(self, scenario: NormalizePathScenario, monkeypatch: pytest.MonkeyPatch) -> None:
         """Separators, trailing slashes, and Windows case are normalized."""
-        monkeypatch.setattr("lancet.find_executable.IS_WIN", is_windows)
-        assert normalize_env_path(path) == expected
+        monkeypatch.setattr("lancet.find_executable.IS_WIN", scenario.is_windows)
+        assert normalize_env_path(scenario.path) == scenario.expected
+
+
+class ExecutableModeScenario(typing.NamedTuple):
+    """A file mode and whether its file is executable."""
+
+    mode: int
+    expected: bool
+
+
+EXECUTABLE_MODE_SCENARIOS: dict[str, ExecutableModeScenario] = {
+    "executable": ExecutableModeScenario(0o755, True),
+    "non_executable": ExecutableModeScenario(0o644, False),
+}
+
+
+class ExecutableSuffixScenario(typing.NamedTuple):
+    """A file extension and whether Windows accepts it as executable."""
+
+    suffix: str
+    expected: bool
+
+
+EXECUTABLE_SUFFIX_SCENARIOS: dict[str, ExecutableSuffixScenario] = {
+    "executable": ExecutableSuffixScenario(".exe", True),
+    "text_file": ExecutableSuffixScenario(".txt", False),
+}
 
 
 class TestIsExecutableFile:
     """Test executable file detection."""
 
-    @pytest.mark.parametrize("mode,expected", [(0o755, True), (0o644, False)])
-    def test_file_mode(self, mode: int, expected: bool, tmp_path: pathlib.Path) -> None:
+    @pytest.mark.parametrize("scenario", EXECUTABLE_MODE_SCENARIOS.values(), ids=EXECUTABLE_MODE_SCENARIOS.keys())
+    def test_file_mode(self, scenario: ExecutableModeScenario, tmp_path: pathlib.Path) -> None:
         """Only executable regular files are accepted."""
         file_path = tmp_path / "probe"
         file_path.write_text("#!/bin/sh\n", encoding="utf-8")
-        file_path.chmod(mode)
-        assert is_executable_file(file_path) is expected
+        file_path.chmod(scenario.mode)
+        assert is_executable_file(file_path) is scenario.expected
 
-    @pytest.mark.parametrize("suffix,expected", [(".exe", True), (".txt", False)])
+    @pytest.mark.parametrize("scenario", EXECUTABLE_SUFFIX_SCENARIOS.values(), ids=EXECUTABLE_SUFFIX_SCENARIOS.keys())
     def test_windows_file_type(
-        self, suffix: str, expected: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+        self, scenario: ExecutableSuffixScenario, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
     ) -> None:
         """Windows executable detection uses the filename suffix instead of POSIX mode bits."""
         monkeypatch.setattr("lancet.find_executable.IS_WIN", True)
-        file_path = tmp_path / f"probe{suffix}"
+        file_path = tmp_path / f"probe{scenario.suffix}"
         file_path.write_text("contents", encoding="utf-8")
-        assert is_executable_file(file_path) is expected
+        assert is_executable_file(file_path) is scenario.expected
 
 
 @pytest.fixture(autouse=True)
@@ -465,14 +524,14 @@ class TestFindExecutable:
         else:
             assert result is None
 
-    @pytest.mark.parametrize("mode,expected_found", [(0o755, True), (0o644, False)])
-    def test_absolute_path(self, mode: int, expected_found: bool, tmp_path: pathlib.Path) -> None:
+    @pytest.mark.parametrize("scenario", EXECUTABLE_MODE_SCENARIOS.values(), ids=EXECUTABLE_MODE_SCENARIOS.keys())
+    def test_absolute_path(self, scenario: ExecutableModeScenario, tmp_path: pathlib.Path) -> None:
         """Absolute paths resolve only when they point to executable files."""
         executable = tmp_path / "custom-app"
         executable.write_text("#!/bin/sh\n", encoding="utf-8")
-        executable.chmod(mode)
+        executable.chmod(scenario.mode)
         result = find_executable(str(executable))
-        if expected_found:
+        if scenario.expected:
             assert result == str(executable.resolve())
         else:
             assert result is None

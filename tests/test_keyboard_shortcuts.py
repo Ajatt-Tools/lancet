@@ -22,42 +22,52 @@ from tests.helpers import (
 )
 
 
+class ShortcutConversionScenario(typing.NamedTuple):
+    """A Qt shortcut string and the expected pynput representation."""
+
+    shortcut: str
+    expected: str
+
+
+SHORTCUT_CONVERSION_SCENARIOS: dict[str, ShortcutConversionScenario] = {
+    # Basic modifier + letter (Qt output style)
+    "ctrl_letter": ShortcutConversionScenario("Ctrl+O", "<ctrl>+o"),
+    "alt_letter": ShortcutConversionScenario("Alt+S", "<alt>+s"),
+    "shift_letter": ShortcutConversionScenario("Shift+A", "<shift>+a"),
+    # Multiple modifiers
+    "alt_shift": ShortcutConversionScenario("Alt+Shift+S", "<alt>+<shift>+s"),
+    "ctrl_shift": ShortcutConversionScenario("Ctrl+Shift+F", "<ctrl>+<shift>+f"),
+    # Qt's "Meta" (Win/Super/Cmd) maps to pynput's "cmd"
+    "meta": ShortcutConversionScenario("Meta+P", "<cmd>+p"),
+    "meta_alt": ShortcutConversionScenario("Meta+Alt+P", "<cmd>+<alt>+p"),
+    # Alternative modifier spellings
+    "super_alias": ShortcutConversionScenario("super+o", "<cmd>+o"),
+    "win_alias": ShortcutConversionScenario("win+l", "<cmd>+l"),
+    "control_alias": ShortcutConversionScenario("control+o", "<ctrl>+o"),
+    "cmd_alias": ShortcutConversionScenario("cmd+o", "<cmd>+o"),
+    # Function keys
+    "function_key": ShortcutConversionScenario("Ctrl+F5", "<ctrl>+<f5>"),
+    "shift_function_key": ShortcutConversionScenario("Ctrl+Shift+F12", "<ctrl>+<shift>+<f12>"),
+    "alt_function_key": ShortcutConversionScenario("Alt+F4", "<alt>+<f4>"),
+    # Named trigger keys
+    "tab": ShortcutConversionScenario("Alt+Tab", "<alt>+<tab>"),
+    "space": ShortcutConversionScenario("Ctrl+Shift+Space", "<ctrl>+<shift>+<space>"),
+    "up": ShortcutConversionScenario("Ctrl+Up", "<ctrl>+<up>"),
+    "home": ShortcutConversionScenario("Ctrl+Home", "<ctrl>+<home>"),
+    "delete": ShortcutConversionScenario("Shift+Delete", "<shift>+<delete>"),
+    # Whitespace around tokens is stripped
+    "trim_ctrl": ShortcutConversionScenario(" Ctrl + O ", "<ctrl>+o"),
+    "trim_meta": ShortcutConversionScenario("  Meta  +  P  ", "<cmd>+p"),
+}
+
+
 class TestToPynputHotkeyValid:
     @pytest.mark.parametrize(
-        "shortcut, expected",
-        [
-            # Basic modifier + letter (Qt output style)
-            ("Ctrl+O", "<ctrl>+o"),
-            ("Alt+S", "<alt>+s"),
-            ("Shift+A", "<shift>+a"),
-            # Multiple modifiers
-            ("Alt+Shift+S", "<alt>+<shift>+s"),
-            ("Ctrl+Shift+F", "<ctrl>+<shift>+f"),
-            # Qt's "Meta" (Win/Super/Cmd) maps to pynput's "cmd"
-            ("Meta+P", "<cmd>+p"),
-            ("Meta+Alt+P", "<cmd>+<alt>+p"),
-            # Alternative modifier spellings
-            ("super+o", "<cmd>+o"),
-            ("win+l", "<cmd>+l"),
-            ("control+o", "<ctrl>+o"),
-            ("cmd+o", "<cmd>+o"),
-            # Function keys
-            ("Ctrl+F5", "<ctrl>+<f5>"),
-            ("Ctrl+Shift+F12", "<ctrl>+<shift>+<f12>"),
-            ("Alt+F4", "<alt>+<f4>"),
-            # Named trigger keys
-            ("Alt+Tab", "<alt>+<tab>"),
-            ("Ctrl+Shift+Space", "<ctrl>+<shift>+<space>"),
-            ("Ctrl+Up", "<ctrl>+<up>"),
-            ("Ctrl+Home", "<ctrl>+<home>"),
-            ("Shift+Delete", "<shift>+<delete>"),
-            # Whitespace around tokens is stripped
-            (" Ctrl + O ", "<ctrl>+o"),
-            ("  Meta  +  P  ", "<cmd>+p"),
-        ],
+        "scenario", SHORTCUT_CONVERSION_SCENARIOS.values(), ids=SHORTCUT_CONVERSION_SCENARIOS.keys()
     )
-    def test_converts_correctly(self, shortcut: str, expected: str) -> None:
-        assert to_pynput_hotkey(QtShortcutStr(shortcut)) == PyShortcutStr(expected)
+    def test_converts_correctly(self, scenario: ShortcutConversionScenario) -> None:
+        """Convert each Qt shortcut to its expected pynput representation."""
+        assert to_pynput_hotkey(QtShortcutStr(scenario.shortcut)) == PyShortcutStr(scenario.expected)
 
 
 # Real Qt modifier+key combinations the grab dialog could produce.
@@ -155,15 +165,10 @@ class TestToPynputHotkeyInvalid:
 class TestInvalidQtShortcutSentinels:
     """Invalid shortcut strings can also be rejected when constructed via QKeySequence."""
 
-    @pytest.mark.parametrize(
-        "modifiers, key",
-        [
-            # Modifier-only QKeySequence: toString() emits e.g. "Ctrl+" which lacks a trigger.
-            (Qt.KeyboardModifier.ControlModifier, Qt.Key.Key_unknown),
-        ],
-    )
-    def test_modifier_only_raises(self, modifiers: Qt.KeyboardModifier, key: Qt.Key) -> None:
-        rendered = QKeySequence(int(modifiers.value) + key).toString()
+    def test_modifier_only_raises(self) -> None:
+        """Reject a modifier-only key sequence without a trigger key."""
+        # Modifier-only QKeySequence: toString() emits e.g. "Ctrl+" which lacks a trigger.
+        rendered = QKeySequence(int(Qt.KeyboardModifier.ControlModifier.value) + Qt.Key.Key_unknown).toString()
         with pytest.raises(KeyboardShortcutParseError):
             to_pynput_hotkey(QtShortcutStr(rendered))
 

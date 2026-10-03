@@ -22,6 +22,19 @@ COLOR_SIGNAL_SCENARIOS: dict[str, ColorSignalScenario] = {
 }
 
 
+class InitialColorScenario(typing.NamedTuple):
+    """An initial color and the normalized picker color."""
+
+    initial: str
+    expected: str
+
+
+INITIAL_COLOR_SCENARIOS: dict[str, InitialColorScenario] = {
+    "valid_color": InitialColorScenario("#FF0000FF", "#FF0000FF"),
+    "empty_falls_back_to_default": InitialColorScenario("", DEFAULT_COLOR),
+}
+
+
 class TestColorEditPickerSignal:
     """Test that ColorEditPicker emits color_changed when the text changes."""
 
@@ -39,15 +52,8 @@ class TestColorEditPickerSignal:
 
         assert received == [scenario.value]
 
-    @pytest.mark.parametrize(
-        "initial,expected",
-        [
-            ("#FF0000FF", "#FF0000FF"),
-            ("", DEFAULT_COLOR),
-        ],
-        ids=["valid_color", "empty_falls_back_to_default"],
-    )
-    def test_initial_color(self, initial: str, expected: str, qapp: QApplication) -> None:
+    @pytest.mark.parametrize("scenario", INITIAL_COLOR_SCENARIOS.values(), ids=INITIAL_COLOR_SCENARIOS.keys())
+    def test_initial_color(self, scenario: InitialColorScenario, qapp: QApplication) -> None:
         """The picker initializes with the provided color or the default."""
-        picker = ColorEditPicker(initial_color=initial)
-        assert picker.color_hex() == expected.upper()
+        picker = ColorEditPicker(initial_color=scenario.initial)
+        assert picker.color_hex() == scenario.expected.upper()

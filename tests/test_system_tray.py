@@ -68,20 +68,26 @@ class TestFormatHotkey:
         assert format_hotkey(scenario.menu_label, scenario.keyboard_shortcut) == scenario.expected
 
 
+class OutputPathScenario(typing.NamedTuple):
+    """A screenshot path attribute and its expected value."""
+
+    attribute: str
+    expected: pathlib.Path | str
+
+
+OUTPUT_PATH_SCENARIOS: dict[str, OutputPathScenario] = {
+    "pictures_directory": OutputPathScenario("parent", pathlib.Path.home() / "Pictures" / "Screenshots"),
+    "png_suffix": OutputPathScenario("suffix", ".png"),
+}
+
+
 class TestMakeOutputFilePath:
     """make_output_file_path creates timestamped screenshot paths."""
 
-    @pytest.mark.parametrize(
-        "attribute,expected",
-        [
-            ("parent", pathlib.Path.home() / "Pictures" / "Screenshots"),
-            ("suffix", ".png"),
-        ],
-        ids=("pictures_directory", "png_suffix"),
-    )
-    def test_path_attribute(self, attribute: str, expected: pathlib.Path | str) -> None:
+    @pytest.mark.parametrize("scenario", OUTPUT_PATH_SCENARIOS.values(), ids=OUTPUT_PATH_SCENARIOS.keys())
+    def test_path_attribute(self, scenario: OutputPathScenario) -> None:
         """Static path attributes match the screenshot storage convention."""
-        assert getattr(make_output_file_path(), attribute) == expected
+        assert getattr(make_output_file_path(), scenario.attribute) == scenario.expected
 
     @pytest.mark.parametrize("prefix", (APP_NAME,))
     def test_path_name_contains_app_name(self, prefix: str) -> None:

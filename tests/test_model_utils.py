@@ -3,6 +3,7 @@
 
 import pathlib
 import typing
+from collections.abc import Sequence
 
 import pytest
 from PIL import Image
@@ -13,38 +14,53 @@ from lancet.model_utils.ocr_service import deduplicate
 from lancet.text_detector_client.text_detector_base import Rect, SpeechBubbleBlock
 
 
+class RoundToStrideScenario(typing.NamedTuple):
+    """A stride-rounding input and expected result."""
+
+    value: int
+    stride: int
+    expected: int
+
+
+ROUND_TO_STRIDE_SCENARIOS: dict[str, RoundToStrideScenario] = {
+    "already_rounded": RoundToStrideScenario(64, 64, 64),
+    "just_above_stride": RoundToStrideScenario(65, 64, 64),
+    "halfway": RoundToStrideScenario(96, 64, 128),
+    "double_stride": RoundToStrideScenario(128, 64, 128),
+    "large_aligned": RoundToStrideScenario(1024, 64, 1024),
+    "large_unaligned": RoundToStrideScenario(1000, 64, 1024),
+    "smaller_stride": RoundToStrideScenario(100, 32, 96),
+    "zero": RoundToStrideScenario(0, 64, 0),
+}
+
+
+class DefaultStrideScenario(typing.NamedTuple):
+    """An input and expected result when using the default stride."""
+
+    value: int
+    expected: int
+
+
+DEFAULT_STRIDE_SCENARIOS: dict[str, DefaultStrideScenario] = {
+    "aligned": DefaultStrideScenario(64, 64),
+    "halfway": DefaultStrideScenario(96, 128),
+    "below_half": DefaultStrideScenario(32, 0),
+    "above_half": DefaultStrideScenario(33, 64),
+}
+
+
 class TestRoundToStride:
     """Test the round_to_stride utility function."""
 
-    @pytest.mark.parametrize(
-        "value,stride,expected",
-        [
-            (64, 64, 64),
-            (65, 64, 64),
-            (96, 64, 128),
-            (128, 64, 128),
-            (1024, 64, 1024),
-            (1000, 64, 1024),
-            (100, 32, 96),
-            (0, 64, 0),
-        ],
-    )
-    def test_round_to_stride(self, value: int, stride: int, expected: int) -> None:
+    @pytest.mark.parametrize("scenario", ROUND_TO_STRIDE_SCENARIOS.values(), ids=ROUND_TO_STRIDE_SCENARIOS.keys())
+    def test_round_to_stride(self, scenario: RoundToStrideScenario) -> None:
         """Test that round_to_stride rounds to the nearest multiple of stride."""
-        assert round_to_stride(value, stride) == expected
+        assert round_to_stride(scenario.value, scenario.stride) == scenario.expected
 
-    @pytest.mark.parametrize(
-        "value,expected",
-        [
-            (64, 64),
-            (96, 128),
-            (32, 0),
-            (33, 64),
-        ],
-    )
-    def test_round_to_stride_default(self, value: int, expected: int) -> None:
+    @pytest.mark.parametrize("scenario", DEFAULT_STRIDE_SCENARIOS.values(), ids=DEFAULT_STRIDE_SCENARIOS.keys())
+    def test_round_to_stride_default(self, scenario: DefaultStrideScenario) -> None:
         """Test that round_to_stride uses default stride of 64."""
-        assert round_to_stride(value) == expected
+        assert round_to_stride(scenario.value) == scenario.expected
 
 
 MANGA_OCR_ERROR = ModelLoadError(name=ModelName.manga_ocr, error=RuntimeError("model broken"))
@@ -93,6 +109,22 @@ STATUS_SCENARIOS: dict[str, StatusScenario] = {
 }
 
 
+class StatusMessageScenario(typing.NamedTuple):
+    """Model counts, optional failure, and expected status text."""
+
+    total_count: int
+    ready_count: int
+    has_error: bool
+    expected_substring: str
+
+
+STATUS_MESSAGE_SCENARIOS: dict[str, StatusMessageScenario] = {
+    "ready": StatusMessageScenario(2, 2, False, "OCR ready."),
+    "loading": StatusMessageScenario(2, 0, False, "Models are loading..."),
+    "failed": StatusMessageScenario(2, 1, True, "manga_ocr"),
+}
+
+
 class TestModelLoaderStatus:
     """Test the ModelLoaderStatus named tuple properties."""
 
@@ -103,20 +135,16 @@ class TestModelLoaderStatus:
         assert scenario.status.any_loading is scenario.any_loading
         assert scenario.status.all_settled is scenario.all_settled
 
-    @pytest.mark.parametrize(
-        "status,expected_substring",
-        [
-            (ModelLoaderStatus(total_count=2, ready_count=2, errors=[]), "OCR ready."),
-            (ModelLoaderStatus(total_count=2, ready_count=0, errors=[]), "Models are loading..."),
-            (
-                ModelLoaderStatus(total_count=2, ready_count=1, errors=[MANGA_OCR_ERROR]),
-                "manga_ocr",
-            ),
-        ],
-    )
-    def test_what(self, status: ModelLoaderStatus, expected_substring: str) -> None:
+    @pytest.mark.parametrize("scenario", STATUS_MESSAGE_SCENARIOS.values(), ids=STATUS_MESSAGE_SCENARIOS.keys())
+    def test_what(self, scenario: StatusMessageScenario) -> None:
         """Test what() returns appropriate status messages."""
-        assert expected_substring in status.what()
+        errors = (
+            (ModelLoadError(name=ModelName.manga_ocr, error=RuntimeError("model broken")),)
+            if scenario.has_error
+            else ()
+        )
+        status = ModelLoaderStatus(scenario.total_count, scenario.ready_count, errors)
+        assert scenario.expected_substring in status.what()
 
 
 class ClassNameSubject:
@@ -233,22 +261,29 @@ class TestSaveBubbleImages:
         assert nested.is_dir()
 
 
+class DeduplicateScenario(typing.NamedTuple):
+    """Input values and their expected consecutive-deduplicated output."""
+
+    items: Sequence[str | int]
+    expected: Sequence[str | int]
+
+
+DEDUPLICATE_SCENARIOS: dict[str, DeduplicateScenario] = {
+    "empty": DeduplicateScenario((), ()),
+    "single": DeduplicateScenario(("A",), ("A",)),
+    "repeated": DeduplicateScenario(("A", "A", "A"), ("A",)),
+    "nonconsecutive_repeat": DeduplicateScenario(("A", "A", "B", "A"), ("A", "B", "A")),
+    "distinct": DeduplicateScenario(("A", "B", "C"), ("A", "B", "C")),
+    "empty_string": DeduplicateScenario(("", "", "A"), ("", "A")),
+    "middle_empty_string": DeduplicateScenario(("A", "", "", "B"), ("A", "", "B")),
+    "numbers": DeduplicateScenario((1, 1, 2, 2, 1), (1, 2, 1)),
+}
+
+
 class TestDeduplicate:
     """deduplicate drops consecutive duplicates while preserving order."""
 
-    @pytest.mark.parametrize(
-        "items,expected",
-        [
-            ([], []),
-            (["A"], ["A"]),
-            (["A", "A", "A"], ["A"]),
-            (["A", "A", "B", "A"], ["A", "B", "A"]),
-            (["A", "B", "C"], ["A", "B", "C"]),
-            (["", "", "A"], ["", "A"]),
-            (["A", "", "", "B"], ["A", "", "B"]),
-            ([1, 1, 2, 2, 1], [1, 2, 1]),
-        ],
-    )
-    def test_deduplicate(self, items: list[typing.Any], expected: list[typing.Any]) -> None:
+    @pytest.mark.parametrize("scenario", DEDUPLICATE_SCENARIOS.values(), ids=DEDUPLICATE_SCENARIOS.keys())
+    def test_deduplicate(self, scenario: DeduplicateScenario) -> None:
         """Consecutive duplicate values collapse without changing later repetitions."""
-        assert list(deduplicate(items)) == expected
+        assert list(deduplicate(scenario.items)) == list(scenario.expected)

@@ -111,33 +111,42 @@ def install_cache_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -
     return tmp_path / MODEL_FILE_NAME
 
 
+class CheckpointValidationScenario(typing.NamedTuple):
+    """A checkpoint file state and its expected validity."""
+
+    content_kind: str
+    write_file: bool
+    expected: bool
+
+
+CHECKPOINT_VALIDATION_SCENARIOS: dict[str, CheckpointValidationScenario] = {
+    "valid_zip": CheckpointValidationScenario("valid_zip", True, True),
+    "exact_size_non_zip": CheckpointValidationScenario("exact_size_non_zip", True, False),
+    "wrong_size": CheckpointValidationScenario("wrong_size", True, False),
+    "empty_file": CheckpointValidationScenario("empty_file", True, False),
+    "missing_file": CheckpointValidationScenario("missing_file", False, False),
+}
+
+
 class TestIsValidCheckpoint:
     """Test is_valid_checkpoint with various file states."""
 
     @pytest.mark.parametrize(
-        "content_kind,write_file,expected",
-        [
-            ("valid_zip", True, True),
-            ("exact_size_non_zip", True, False),
-            ("wrong_size", True, False),
-            ("empty_file", True, False),
-            ("missing_file", False, False),
-        ],
-        ids=["valid_zip", "exact_size_non_zip", "wrong_size", "empty_file", "missing_file"],
+        "scenario", CHECKPOINT_VALIDATION_SCENARIOS.values(), ids=CHECKPOINT_VALIDATION_SCENARIOS.keys()
     )
-    def test_validate(self, content_kind: str, write_file: bool, expected: bool, tmp_path: pathlib.Path) -> None:
+    def test_validate(self, scenario: CheckpointValidationScenario, tmp_path: pathlib.Path) -> None:
         """A file is valid only if it is a regular ZIP file with the pinned checkpoint size."""
         file_path = tmp_path / "checkpoint.pt"
-        if write_file:
+        if scenario.write_file:
             checkpoint = make_checkpoint_bytes()
             content = {
                 "valid_zip": checkpoint,
                 "exact_size_non_zip": b"x" * len(checkpoint),
                 "wrong_size": b"not a zip at all",
                 "empty_file": b"",
-            }[content_kind]
+            }[scenario.content_kind]
             file_path.write_bytes(content)
-        assert is_valid_checkpoint(file_path) == expected
+        assert is_valid_checkpoint(file_path) == scenario.expected
 
 
 class CacheStateScenario(typing.NamedTuple):
@@ -293,20 +302,26 @@ class TestDownloadFailures:
         assert not model_path.with_suffix(".pt.part").exists()
 
 
+class RequestFailureScenario(typing.NamedTuple):
+    """A transport exception type and message for a failed checkpoint download."""
+
+    error_type: type[requests.RequestException]
+    message: str
+
+
+REQUEST_FAILURE_SCENARIOS: dict[str, RequestFailureScenario] = {
+    "connection_error": RequestFailureScenario(requests.exceptions.ConnectionError, "connection refused"),
+    "timeout": RequestFailureScenario(requests.exceptions.Timeout, "request timed out"),
+}
+
+
 class TestRequestFailures:
     """Test request-level failures before a response stream exists."""
 
-    @pytest.mark.parametrize(
-        "request_error",
-        [
-            requests.exceptions.ConnectionError("connection refused"),
-            requests.exceptions.Timeout("request timed out"),
-        ],
-        ids=["connection_error", "timeout"],
-    )
+    @pytest.mark.parametrize("scenario", REQUEST_FAILURE_SCENARIOS.values(), ids=REQUEST_FAILURE_SCENARIOS.keys())
     def test_wraps_request_error(
         self,
-        request_error: requests.RequestException,
+        scenario: RequestFailureScenario,
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: pathlib.Path,
     ) -> None:
@@ -314,7 +329,7 @@ class TestRequestFailures:
         model_path = install_cache_dir(monkeypatch, tmp_path)
         monkeypatch.setattr(
             "lancet.text_detector_client.model_cache.requests.get",
-            Mock(side_effect=request_error),
+            Mock(side_effect=scenario.error_type(scenario.message)),
         )
 
         with pytest.raises(LancetHTTPError, match=FAILED_DOWNLOAD_RE):

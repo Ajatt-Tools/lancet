@@ -1,13 +1,16 @@
 # Copyright: Ajatt-Tools and contributors; https://github.com/Ajatt-Tools
 # License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import json
+import pathlib
 import typing
 from collections.abc import Sequence
-from unittest.mock import create_autospec, patch
+from unittest.mock import call, create_autospec, patch
 
 import pytest
 from transformers import PreTrainedTokenizerBase
 
+from lancet.model_utils.device import TorchDevice
 from lancet.ocr.error_messages import (
     adjust_auto_tokenizer_error_message,
     adjust_error_message,
@@ -150,28 +153,78 @@ class TestTryLoadModelWithWebDownload:
         if scenario.preserve_identity:
             assert excinfo.value is error
 
+    def test_missing_tokenizer_file_after_retry_preserves_domain_error(self) -> None:
+        """A still-incomplete model reports the tokenizer-specific error after retrying."""
+        mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
+        error = MangaOCRTokenizerFileNotFoundError("Missing tokenizer file for 'model/name'")
+        mocr._load_from_pretrained.side_effect = error
+
+        with pytest.raises(MangaOCRTokenizerFileNotFoundError) as excinfo:
+            MangaOcr._try_load_model_with_web_download_enabled(mocr, "model/name")
+
+        assert excinfo.value is error
+        mocr._load_from_pretrained.assert_called_once_with("model/name", local_files_only=False)
+
+
+class LoadModelRetryScenario(typing.NamedTuple):
+    """A local cache failure that should trigger a download-enabled retry."""
+
+    error_type: type[OSError]
+    error_message: str
+    model_name: str
+
+
+LOAD_MODEL_RETRY_SCENARIOS: dict[str, LoadModelRetryScenario] = {
+    "cache_miss": LoadModelRetryScenario(OSError, "cache miss", "model/name"),
+    "offline_cache": LoadModelRetryScenario(OSError, "offline cache", "alternate/model"),
+    "missing_tokenizer_file": LoadModelRetryScenario(
+        MangaOCRTokenizerFileNotFoundError, "missing tokenizer file", "model/name"
+    ),
+}
+
 
 class TestLoadModelRetry:
     """_load_model warns on a local cache miss and then retries with downloads enabled."""
 
-    @pytest.mark.parametrize(
-        "error_message,model_name",
-        [("cache miss", "model/name"), ("offline cache", "alternate/model")],
-        ids=["cache_miss", "offline_cache"],
-    )
-    def test_local_cache_failure_warns_then_retries_with_downloads(self, error_message: str, model_name: str) -> None:
+    @pytest.mark.parametrize("scenario", LOAD_MODEL_RETRY_SCENARIOS.values(), ids=LOAD_MODEL_RETRY_SCENARIOS.keys())
+    def test_local_cache_failure_warns_then_retries_with_downloads(self, scenario: LoadModelRetryScenario) -> None:
         """A local cache miss logs a warning before the download-enabled retry."""
         mocr = create_autospec(MangaOcr, instance=True, spec_set=True)
         with (patch("lancet.ocr.manga_ocr.logger.warning") as mock_warning,):
-            mocr._load_from_pretrained.side_effect = OSError(error_message)
-            MangaOcr._load_model(mocr, model_name)
+            mocr._load_from_pretrained.side_effect = scenario.error_type(scenario.error_message)
+            MangaOcr._load_model(mocr, scenario.model_name)
 
             assert mocr._load_from_pretrained.call_count == 1
-            mocr._try_load_model_with_web_download_enabled.assert_called_once_with(model_name)
+            mocr._try_load_model_with_web_download_enabled.assert_called_once_with(scenario.model_name)
             assert mock_warning.call_args.args == (
-                f"Failed to load OCR model from local cache: OSError: {error_message}. "
+                f"Failed to load OCR model from local cache: {scenario.error_type.__name__}: {scenario.error_message}. "
                 "Retrying with downloads enabled.",
             )
+
+    def test_missing_cached_tokenizer_retries_complete_load(self) -> None:
+        """Retry the complete OCR loading path with downloads enabled after a missing cached file."""
+        model_name = "tatsumoto/manga-ocr-base"
+        missing_file = TypeError("stat: path should be string, bytes, os.PathLike or integer, not NoneType")
+        tokenizer = FakeTokenizer()
+        with (
+            patch("lancet.ocr.manga_ocr.ViTImageProcessor.from_pretrained") as processor_load,
+            patch("lancet.ocr.manga_ocr.AutoTokenizer.from_pretrained", side_effect=[missing_file, tokenizer]) as load,
+            patch("lancet.ocr.manga_ocr.VisionEncoderDecoderModel.from_pretrained") as model_load,
+            patch("lancet.ocr.manga_ocr.move_model_to_device", return_value=TorchDevice.cpu),
+            patch.object(MangaOcr, "recognize", return_value="ready"),
+        ):
+            ocr = MangaOcr(pretrained_model_name_or_path=model_name)
+
+        assert ocr.tokenizer is tokenizer
+        assert processor_load.call_args_list == [
+            call(model_name, local_files_only=True),
+            call(model_name, local_files_only=False),
+        ]
+        assert load.call_args_list == [
+            call(model_name, local_files_only=True),
+            call(model_name, local_files_only=False),
+        ]
+        model_load.assert_called_once_with(model_name, local_files_only=False)
 
 
 class AutoTokenizerErrorScenario(typing.NamedTuple):
@@ -238,18 +291,26 @@ class TestAdjustSlowTokenizerErrorMessage:
         assert all(substring in str(result) for substring in scenario.expected_substrings)
 
 
+class TokenizerLabelScenario(typing.NamedTuple):
+    """A tokenizer class and its expected fast-status label."""
+
+    tokenizer_type: type[PreTrainedTokenizerBase]
+    expected: str
+
+
+TOKENIZER_LABEL_SCENARIOS: dict[str, TokenizerLabelScenario] = {
+    "slow": TokenizerLabelScenario(FakeTokenizer, "False"),
+    "unknown": TokenizerLabelScenario(TokenizerWithoutIsFast, "unknown"),
+}
+
+
 class TestTokenizerIsFastLabel:
     """tokenizer_is_fast_label is safe for logging regardless of tokenizer attributes."""
 
-    @pytest.mark.parametrize(
-        "tokenizer,expected",
-        [
-            (FakeTokenizer(), "False"),
-            (TokenizerWithoutIsFast(), "unknown"),
-        ],
-    )
-    def test_label(self, tokenizer: object, expected: str) -> None:
-        assert tokenizer_is_fast_label(tokenizer) == expected
+    @pytest.mark.parametrize("scenario", TOKENIZER_LABEL_SCENARIOS.values(), ids=TOKENIZER_LABEL_SCENARIOS.keys())
+    def test_label(self, scenario: TokenizerLabelScenario) -> None:
+        """Report a tokenizer's fast status, or unknown when the attribute is absent."""
+        assert tokenizer_is_fast_label(scenario.tokenizer_type()) == scenario.expected
 
 
 class TokenizerFallbackScenario(typing.NamedTuple):
@@ -326,6 +387,50 @@ class TestLoadTokenizerFallback:
             )
 
 
+class TestMissingTokenizerFile:
+    """Normalize the missing-file error emitted by Transformers 5.18 without hiding other type errors."""
+
+    def test_missing_vocab_in_local_model(self, tmp_path: pathlib.Path) -> None:
+        """Recognize Transformers' real missing-vocabulary error without accessing the Hub."""
+        (tmp_path / "tokenizer_config.json").write_text(
+            json.dumps({"tokenizer_class": "BertJapaneseTokenizer"}), encoding="utf-8"
+        )
+        (tmp_path / "config.json").write_text(json.dumps({"model_type": "bert"}), encoding="utf-8")
+
+        with pytest.raises(MangaOCRTokenizerFileNotFoundError) as excinfo:
+            load_tokenizer(tmp_path, local_files_only=True)
+
+        assert isinstance(excinfo.value.__cause__, TypeError)
+
+    @pytest.mark.parametrize("local_files_only", [True, False])
+    def test_missing_file_raises_domain_error(self, local_files_only: bool) -> None:
+        """Normalize the known missing-file TypeError in either loading mode."""
+        original = TypeError("stat: path should be string, bytes, os.PathLike or integer, not NoneType")
+        with (
+            patch("lancet.ocr.manga_ocr.AutoTokenizer.from_pretrained", side_effect=original) as mock_auto,
+            patch("lancet.ocr.manga_ocr.BertJapaneseTokenizer.from_pretrained") as mock_slow,
+        ):
+            with pytest.raises(MangaOCRTokenizerFileNotFoundError) as excinfo:
+                load_tokenizer("model/name", local_files_only=local_files_only)
+
+        assert str(excinfo.value) == (
+            "Missing tokenizer file for 'model/name'. Check that the model provides all required tokenizer files."
+        )
+        assert excinfo.value.__cause__ is original
+        mock_auto.assert_called_once_with("model/name", local_files_only=local_files_only)
+        mock_slow.assert_not_called()
+
+    @pytest.mark.parametrize("message", ["unexpected type error", "stat: path should be a string, not int"])
+    def test_other_type_errors_pass_through(self, message: str) -> None:
+        """Preserve unrelated TypeErrors without triggering the tokenizer-file retry."""
+        original = TypeError(message)
+        with patch("lancet.ocr.manga_ocr.AutoTokenizer.from_pretrained", side_effect=original):
+            with pytest.raises(TypeError) as excinfo:
+                load_tokenizer("model/name", local_files_only=True)
+
+        assert excinfo.value is original
+
+
 class MangaOcrInitErrorScenario(typing.NamedTuple):
     """A model-load failure and the public exception MangaOcr should raise."""
 
@@ -337,6 +442,13 @@ class MangaOcrInitErrorScenario(typing.NamedTuple):
 
 
 MANGA_OCR_INIT_ERROR_SCENARIOS: dict[str, MangaOcrInitErrorScenario] = {
+    "missing_tokenizer_file_preserved": MangaOcrInitErrorScenario(
+        MangaOCRTokenizerFileNotFoundError,
+        "Missing tokenizer file",
+        MangaOCRTokenizerFileNotFoundError,
+        "Missing tokenizer file",
+        True,
+    ),
     "specific_error_preserved": MangaOcrInitErrorScenario(
         MangaOCRTokenizerLoadError,
         "clean message",
