@@ -8,7 +8,7 @@ ROOT=$(git rev-parse --show-toplevel)
 readonly ROOT
 cd -- "$ROOT" || exit 1
 
-readarray -t FILES <<<"$(find "$ROOT/tests" "$ROOT/lancet" -type f -iname '*.py')"
+mapfile -d '' -t FILES < <(find "$ROOT/tests" "$ROOT/lancet" -type f -iname '*.py' -print0)
 readonly -a FILES
 
 is_installed() {
@@ -22,6 +22,7 @@ for prog in pyupgrade isort black; do
 	fi
 done
 
-pyupgrade --py313-plus "${FILES[@]}"
+# Successful rewrites must not stop fix mode before isort and Black run.
+pyupgrade --exit-zero-even-if-changed --py313-plus "${FILES[@]}"
 isort "${FILES[@]}"
 black "${FILES[@]}"
