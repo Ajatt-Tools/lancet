@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from unittest.mock import call, create_autospec, patch
 
 import pytest
-from transformers import PreTrainedTokenizerBase
+from transformers import BertJapaneseTokenizer, PreTrainedTokenizerBase
 
 from lancet.model_utils.device import TorchDevice
 from lancet.ocr.error_messages import (
@@ -429,6 +429,34 @@ class TestMissingTokenizerFile:
                 load_tokenizer("model/name", local_files_only=True)
 
         assert excinfo.value is original
+
+
+class TestLocalJapaneseTokenizer:
+    """Exercise real Japanese tokenization through automatic loading and the slow fallback offline."""
+
+    @pytest.mark.parametrize("tokenizer_class", ["BertJapaneseTokenizer", "UnavailableTokenizer"])
+    def test_loads_and_decodes_japanese(self, tmp_path: pathlib.Path, tokenizer_class: str) -> None:
+        """Keep vocabulary-only models usable even when AutoTokenizer cannot resolve their declared class."""
+        # An unavailable class makes AutoTokenizer fail without mocking the slow tokenizer or its dependencies.
+        # https://huggingface.co/docs/transformers/v5.23.0/en/model_doc/bert-japanese
+        (tmp_path / "tokenizer_config.json").write_text(
+            json.dumps(
+                {
+                    "tokenizer_class": tokenizer_class,
+                    "word_tokenizer_type": "mecab",
+                    "mecab_kwargs": {"mecab_dic": "unidic_lite"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        (tmp_path / "config.json").write_text(json.dumps({"model_type": "bert"}), encoding="utf-8")
+        (tmp_path / "vocab.txt").write_text("[PAD]\n[UNK]\n[CLS]\n[SEP]\n[MASK]\n私\nは\n学生\n。\n", encoding="utf-8")
+
+        tokenizer = load_tokenizer(tmp_path, local_files_only=True)
+
+        assert isinstance(tokenizer, BertJapaneseTokenizer)
+        assert tokenizer.encode("私は学生。") == [2, 5, 6, 7, 8, 3]
+        assert tokenizer.decode([2, 5, 6, 7, 8, 3], skip_special_tokens=True) == "私 は 学生 。"
 
 
 class MangaOcrInitErrorScenario(typing.NamedTuple):
